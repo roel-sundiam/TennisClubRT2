@@ -305,48 +305,54 @@ export class SeedingService {
   static async getTournamentStats(): Promise<{
     totalMatches: number;
     matchesByTier: Record<string, number>;
-    totalPointsAwarded: number;
-    activeRankedPlayers: number;
+    totalEvents: number;
+    activeMembers: number;
   }> {
     try {
-      const [matchStats, userStats] = await Promise.all([
-        Reservation.aggregate([
-          { $match: { status: 'completed', pointsProcessed: true } },
+      // Count polls/open play events instead of matches
+      const Poll = require('../models/Poll');
+      const [eventStats, userStats] = await Promise.all([
+        Poll.aggregate([
+          { $match: { status: { $in: ['active', 'completed'] } } },
           {
             $group: {
-              _id: '$tournamentTier',
-              count: { $sum: 1 },
-              matchCount: { $sum: { $size: { $ifNull: ['$matchResults', []] } } }
+              _id: '$tier',
+              count: { $sum: 1 }
             }
           }
         ]),
         User.aggregate([
-          { $match: { isActive: true, isApproved: true, matchesPlayed: { $gt: 0 } } },
+          { $match: { isActive: true, isApproved: true } },
           {
             $group: {
               _id: null,
-              activeRankedPlayers: { $sum: 1 },
-              totalPointsAwarded: { $sum: '$seedPoints' }
+              activeMembers: { $sum: 1 }
             }
           }
         ])
       ]);
 
-      const matchesByTier: Record<string, number> = {};
-      let totalMatches = 0;
+      const matchesByTier: Record<string, number> = {
+        '100': 0,
+        '250': 0,
+        '500': 0
+      };
+      let totalEvents = 0;
 
-      matchStats.forEach(stat => {
-        matchesByTier[stat._id] = stat.matchCount;
-        totalMatches += stat.matchCount;
+      eventStats.forEach((stat: any) => {
+        if (stat._id) {
+          matchesByTier[stat._id] = stat.count;
+          totalEvents += stat.count;
+        }
       });
 
-      const stats = userStats[0] || { activeRankedPlayers: 0, totalPointsAwarded: 0 };
+      const stats = userStats[0] || { activeMembers: 0 };
 
       return {
-        totalMatches,
+        totalMatches: 0, // No longer tracking matches
         matchesByTier,
-        totalPointsAwarded: stats.totalPointsAwarded,
-        activeRankedPlayers: stats.activeRankedPlayers
+        totalEvents,
+        activeMembers: stats.activeMembers
       };
     } catch (error) {
       console.error('Error getting tournament stats:', error);

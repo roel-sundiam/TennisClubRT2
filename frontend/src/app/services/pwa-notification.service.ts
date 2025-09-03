@@ -1,18 +1,25 @@
 import { Injectable } from '@angular/core';
 import { SwPush, SwUpdate } from '@angular/service-worker';
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subject } from 'rxjs';
+import { MatDialog } from '@angular/material/dialog';
+import { OpenPlayNotificationModalComponent } from '../components/open-play-notification-modal/open-play-notification-modal.component';
 
 @Injectable({
   providedIn: 'root'
 })
 export class PWANotificationService {
   private VAPID_PUBLIC_KEY = ''; // Will be fetched from backend
+  private openPlayClickSubject = new Subject<any>();
+  
+  // Observable for other services to subscribe to notification clicks
+  public openPlayNotificationClicked$ = this.openPlayClickSubject.asObservable();
   
   constructor(
     private swPush: SwPush,
     private swUpdate: SwUpdate,
-    private http: HttpClient
+    private http: HttpClient,
+    private dialog: MatDialog
   ) {
     this.fetchVapidKey();
   }
@@ -145,7 +152,7 @@ export class PWANotificationService {
 
     // Check if app is in focus (don't show notification if user is actively using app)
     if (document.visibilityState === 'visible') {
-      console.log('App is in focus, skipping notification');
+      console.log('App is in focus, WebSocket will handle this');
       return;
     }
 
@@ -161,7 +168,22 @@ export class PWANotificationService {
       });
 
       notification.onclick = () => {
+        console.log('🎾 PWA notification clicked, focusing window and preparing modal');
         window.focus();
+        
+        // Store notification data for showing modal when app becomes visible
+        if (data) {
+          localStorage.setItem('pendingOpenPlayNotification', JSON.stringify({
+            ...data,
+            notificationTitle: title,
+            notificationBody: body,
+            timestamp: new Date().toISOString()
+          }));
+        }
+        
+        // Emit event for subscribers
+        this.openPlayClickSubject.next(data);
+        
         if (data?.url) {
           window.location.href = data.url;
         } else {
@@ -170,10 +192,10 @@ export class PWANotificationService {
         notification.close();
       };
 
-      // Auto close after 10 seconds
+      // Auto close after 15 seconds (longer for open play events)
       setTimeout(() => {
         notification.close();
-      }, 10000);
+      }, 15000);
 
     } catch (error) {
       console.error('Error showing notification:', error);
@@ -287,5 +309,63 @@ export class PWANotificationService {
       startTime,
       endTime
     });
+  }
+
+  /**
+   * Check for pending open play notifications and show modal
+   */
+  checkAndShowPendingNotification(): void {
+    const pendingData = localStorage.getItem('pendingOpenPlayNotification');
+    if (pendingData) {
+      try {
+        const notificationData = JSON.parse(pendingData);
+        console.log('🎾 Found pending open play notification:', notificationData);
+        
+        // Clear the pending notification
+        localStorage.removeItem('pendingOpenPlayNotification');
+        
+        // Create modal notification format
+        const modalNotification = {
+          id: 'pwa-' + Date.now(),
+          type: 'open_play_new' as const,
+          title: 'New Open Play Event!',
+          message: notificationData.notificationBody || 'Vote to join the Open Play event!',
+          eventDate: new Date(notificationData.eventDate),
+          startTime: notificationData.startTime || 0,
+          endTime: notificationData.endTime || 0,
+          confirmedPlayers: 0,
+          maxPlayers: 12,
+          pollId: notificationData.pollId || '',
+          hasVoted: false
+        };
+
+        // Show modal with small delay to ensure app is fully loaded
+        setTimeout(() => {
+          const dialogRef = this.dialog.open(OpenPlayNotificationModalComponent, {
+            width: '90vw',
+            maxWidth: '500px',
+            height: 'auto',
+            maxHeight: '80vh',
+            data: {
+              notifications: [modalNotification]
+            },
+            disableClose: false,
+            hasBackdrop: true,
+            panelClass: ['open-play-modal', 'pwa-triggered']
+          });
+
+          dialogRef.afterClosed().subscribe(result => {
+            console.log('🎾 PWA-triggered modal closed with result:', result);
+            if (result === 'navigate-polls') {
+              window.location.href = '/polls';
+            }
+          });
+        }, 500);
+
+      } catch (error) {
+        console.error('Error parsing pending notification data:', error);
+        localStorage.removeItem('pendingOpenPlayNotification');
+      }
+    }
   }
 }

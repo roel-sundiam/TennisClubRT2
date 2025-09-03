@@ -19,18 +19,14 @@ interface PlayerRanking {
   _id: string;
   username: string;
   fullName: string;
-  seedPoints: number;
-  matchesWon: number;
-  matchesPlayed: number;
-  winRate: number;
   rank: number;
 }
 
 interface TournamentStats {
   totalMatches: number;
   matchesByTier: Record<string, number>;
-  totalPointsAwarded: number;
-  activeRankedPlayers: number;
+  totalEvents: number;
+  activeMembers: number;
 }
 
 @Component({
@@ -91,8 +87,8 @@ interface TournamentStats {
                   <mat-icon>people</mat-icon>
                 </div>
                 <div class="stat-info">
-                  <div class="stat-number">{{ tournamentStats.activeRankedPlayers }}</div>
-                  <div class="stat-label">Ranked Players</div>
+                  <div class="stat-number">{{ tournamentStats.activeMembers }}</div>
+                  <div class="stat-label">Active Members</div>
                 </div>
               </div>
             </div>
@@ -100,23 +96,11 @@ interface TournamentStats {
             <div class="stat-card matches-card">
               <div class="stat-content">
                 <div class="stat-icon">
-                  <mat-icon>sports_tennis</mat-icon>
+                  <mat-icon>event</mat-icon>
                 </div>
                 <div class="stat-info">
-                  <div class="stat-number">{{ tournamentStats.totalMatches }}</div>
-                  <div class="stat-label">Total Matches</div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="stat-card points-card">
-              <div class="stat-content">
-                <div class="stat-icon">
-                  <mat-icon>star</mat-icon>
-                </div>
-                <div class="stat-info">
-                  <div class="stat-number">{{ tournamentStats.totalPointsAwarded }}</div>
-                  <div class="stat-label">Points Awarded</div>
+                  <div class="stat-number">{{ tournamentStats.totalEvents }}</div>
+                  <div class="stat-label">Open Play Events</div>
                 </div>
               </div>
             </div>
@@ -181,7 +165,7 @@ interface TournamentStats {
               <div class="header-content">
                 <div class="header-info">
                   <h2 class="card-title">Current Rankings</h2>
-                  <p class="card-subtitle">Tournament series: Winners get higher points, participants get base points</p>
+                  <p class="card-subtitle">Member rankings based on participation in Open Play events</p>
                 </div>
                 <div class="header-chips">
                   <div class="legend-chip tier-100">100</div>
@@ -196,9 +180,6 @@ interface TournamentStats {
             <div class="table-header">
               <div class="rank-col">Rank</div>
               <div class="player-col">Player</div>
-              <div class="points-col">Points</div>
-              <div class="matches-col">Record</div>
-              <div class="winrate-col">Win Rate</div>
             </div>
 
             <div 
@@ -220,47 +201,9 @@ interface TournamentStats {
                 <div class="player-info">
                   <div class="player-name">{{ player.fullName }}</div>
                   <div class="player-username">@{{ player.username }}</div>
-                  <div class="mobile-stats" [class.no-matches]="player.matchesPlayed === 0" (click)="showPlayerStats(player)">
-                    <span class="mobile-points">{{ player.seedPoints }}pts</span>
-                    <span class="mobile-record clickable-stat" *ngIf="player.matchesPlayed > 0" title="Tap for details">
-                      {{ player.matchesWon }}-{{ player.matchesPlayed - player.matchesWon }}
-                    </span>
-                    <span class="mobile-record" *ngIf="player.matchesPlayed === 0">
-                      No matches
-                    </span>
-                    <span class="mobile-winrate clickable-stat" *ngIf="player.matchesPlayed > 0" title="Tap for details">
-                      {{ (player.winRate * 100).toFixed(0) }}%
-                    </span>
-                  </div>
                 </div>
               </div>
 
-              <div class="points-col desktop-only">
-                <div class="points-display">
-                  <span class="points-value">{{ player.seedPoints }}</span>
-                  <span class="points-suffix">pts</span>
-                </div>
-              </div>
-
-              <div class="matches-col desktop-only">
-                <div class="matches-display clickable-stat" (click)="showPlayerStats(player)" title="Click to view detailed match history">
-                  <span class="matches-summary">{{ player.matchesWon }}-{{ player.matchesPlayed - player.matchesWon }}</span>
-                  <span class="matches-total">({{ player.matchesPlayed }} played)</span>
-                  <mat-icon class="click-indicator">info</mat-icon>
-                </div>
-              </div>
-
-              <div class="winrate-col desktop-only">
-                <div class="winrate-display clickable-stat" (click)="showPlayerStats(player)" title="Click to view detailed performance stats">
-                  <span class="winrate-value">{{ (player.winRate * 100).toFixed(0) }}%</span>
-                  <mat-progress-bar 
-                    mode="determinate" 
-                    [value]="player.winRate * 100"
-                    class="winrate-bar">
-                  </mat-progress-bar>
-                  <mat-icon class="click-indicator">info</mat-icon>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -295,47 +238,13 @@ interface TournamentStats {
               <div class="my-stat-value">{{ currentUserStats.rank || 'Unranked' }}</div>
               <div class="my-stat-label">Rank</div>
             </div>
-            <div class="my-stat">
-              <mat-icon class="stat-icon">star</mat-icon>
-              <div class="my-stat-value">{{ currentUserStats.user.seedPoints }}</div>
-              <div class="my-stat-label">Points</div>
-            </div>
-            <div class="my-stat">
-              <mat-icon class="stat-icon">check_circle</mat-icon>
-              <div class="my-stat-value">{{ currentUserStats.user.matchesWon }}</div>
-              <div class="my-stat-label">Wins</div>
-            </div>
-            <div class="my-stat">
-              <mat-icon class="stat-icon">sports_tennis</mat-icon>
-              <div class="my-stat-value">{{ currentUserStats.user.matchesPlayed }}</div>
-              <div class="my-stat-label">Played</div>
-            </div>
           </div>
           
           <mat-divider></mat-divider>
           
-          <div class="recent-matches-section">
-            <h4>
-              <mat-icon>history</mat-icon>
-              Recent Matches
-            </h4>
-            <div *ngIf="currentUserStats.recentMatches.length > 0" class="recent-matches">
-              <div class="recent-match" *ngFor="let match of currentUserStats.recentMatches.slice(0, 5)">
-                <div class="match-result" [class.win]="match.result === 'won'">
-                  <mat-icon>{{ match.result === 'won' ? 'emoji_events' : 'sports_tennis' }}</mat-icon>
-                  <span>{{ match.result === 'won' ? 'Win' : 'Played' }}</span>
-                </div>
-                <mat-chip class="match-tier" [class]="'tier-' + match.tournamentTier">
-                  {{ match.tournamentTier }}
-                </mat-chip>
-                <div class="match-points">+{{ match.points }} pts</div>
-                <div class="match-date">{{ match.date | date:'short' }}</div>
-              </div>
-            </div>
-            <div *ngIf="currentUserStats.recentMatches.length === 0" class="no-matches">
-              <mat-icon>sports_tennis</mat-icon>
-              <p>No matches played yet. Join an Open Play event to start earning seeding points!</p>
-            </div>
+          <div class="no-stats-message">
+            <mat-icon>sports_tennis</mat-icon>
+            <p>Rankings are based on participation in Open Play events. Join an event to see your ranking!</p>
           </div>
             </div>
           </div>
@@ -421,14 +330,10 @@ export class RankingsComponent implements OnInit {
         if (this.authService.currentUser) {
           this.currentUserStats = {
             user: {
-              ...this.authService.currentUser,
-              seedPoints: 0,
-              matchesWon: 0,
-              matchesPlayed: 0
+              ...this.authService.currentUser
             },
             rank: null,
-            totalPlayers: this.rankings.length,
-            recentMatches: []
+            totalPlayers: this.rankings.length
           };
         }
       }
@@ -467,72 +372,4 @@ export class RankingsComponent implements OnInit {
     this.router.navigate(['/dashboard']);
   }
 
-  showPlayerStats(player: PlayerRanking): void {
-    // For now, let's show detailed stats in a snackbar
-    // Later we can create a proper dialog component
-    const message = this.getPlayerStatsMessage(player);
-    
-    this.snackBar.open(message, 'Close', {
-      duration: 8000,
-      horizontalPosition: 'center',
-      verticalPosition: 'top',
-      panelClass: ['player-stats-snackbar']
-    });
-    
-    // Optional: Load detailed match history from API
-    this.loadDetailedPlayerStats(player);
-  }
-
-  private getPlayerStatsMessage(player: PlayerRanking): string {
-    const losses = player.matchesPlayed - player.matchesWon;
-    const winPercentage = player.matchesPlayed > 0 ? (player.winRate * 100).toFixed(1) : '0';
-    
-    if (player.matchesPlayed === 0) {
-      return `${player.fullName} hasn't played any matches yet. Encourage them to join an Open Play event!`;
-    }
-    
-    return `${player.fullName} Stats: ${player.matchesWon} wins, ${losses} losses (${winPercentage}% win rate) • ${player.seedPoints} points earned from ${player.matchesPlayed} matches played`;
-  }
-
-  private loadDetailedPlayerStats(player: PlayerRanking): void {
-    // Load detailed match history for this player
-    this.http.get<any>(`${this.apiUrl}/seeding/player-stats/${player._id}`).subscribe({
-      next: (response) => {
-        if (response.success) {
-          console.log('Detailed player stats:', response.data);
-          // Here we could open a detailed dialog with match history
-          this.openPlayerStatsDialog(player, response.data);
-        }
-      },
-      error: (error) => {
-        console.log('Could not load detailed stats for player:', error);
-      }
-    });
-  }
-
-  private openPlayerStatsDialog(player: PlayerRanking, detailedStats: any): void {
-    // For now, let's create a simple alert with more details
-    // Later we can create a proper dialog component
-    const matchHistory = detailedStats.recentMatches || [];
-    const historyText = matchHistory.length > 0 
-      ? matchHistory.map((match: any) => 
-          `• ${match.result === 'won' ? 'Won' : 'Played'} ${match.tournamentTier} Open Play (+${match.points} pts)`
-        ).join('\n')
-      : 'No recent matches found';
-    
-    const dialogMessage = `
-${player.fullName} - Detailed Stats
-
-📊 Performance:
-• Rank: #${player.rank}
-• Points: ${player.seedPoints}
-• Win Rate: ${(player.winRate * 100).toFixed(1)}%
-• Record: ${player.matchesWon}-${player.matchesPlayed - player.matchesWon}
-
-🏆 Recent Matches:
-${historyText}
-    `;
-    
-    alert(dialogMessage.trim());
-  }
 }

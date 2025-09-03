@@ -15,6 +15,27 @@ export interface CourtUsageUpdateEvent {
   message: string;
 }
 
+export interface OpenPlayNotificationEvent {
+  type: 'open_play_created' | 'open_play_updated' | 'open_play_closed';
+  data: {
+    pollId: string;
+    title: string;
+    description: string;
+    eventDate: string;
+    startTime: number;
+    endTime: number;
+    maxPlayers: number;
+    confirmedPlayers: number;
+    createdBy: {
+      _id: string;
+      username: string;
+      fullName: string;
+    };
+  };
+  timestamp: string;
+  message: string;
+}
+
 export class WebSocketService {
   private io: SocketIOServer | null = null;
   private connectedClients: Set<Socket> = new Set();
@@ -64,6 +85,19 @@ export class WebSocketService {
       socket.on('unsubscribe_court_usage_updates', () => {
         console.log('🏸 Client unsubscribed from court usage updates:', socket.id);
         socket.leave('court_usage_updates');
+      });
+
+      // Handle client subscription to open play notifications
+      socket.on('subscribe_open_play_notifications', () => {
+        console.log('🎾 Client subscribed to open play notifications:', socket.id);
+        socket.join('open_play_notifications');
+        socket.emit('subscription_confirmed', { type: 'open_play_notifications' });
+      });
+
+      // Handle client unsubscription from open play notifications
+      socket.on('unsubscribe_open_play_notifications', () => {
+        console.log('🎾 Client unsubscribed from open play notifications:', socket.id);
+        socket.leave('open_play_notifications');
       });
 
       // Handle disconnect
@@ -153,6 +187,35 @@ export class WebSocketService {
     this.io.emit('court_usage_data_changed', {
       message: updateData.message,
       timestamp: updateData.timestamp
+    });
+  }
+
+  /**
+   * Emit open play notification to all subscribed clients
+   */
+  emitOpenPlayNotification(notificationData: OpenPlayNotificationEvent): void {
+    if (!this.io) {
+      console.warn('⚠️  WebSocket not initialized - cannot emit open play notification');
+      return;
+    }
+
+    console.log('📡 Broadcasting open play notification to subscribed clients');
+    console.log(`🎾 Open Play Event: ${notificationData.data.title} on ${new Date(notificationData.data.eventDate).toLocaleDateString()}`);
+    console.log(`🎾 Event times: ${notificationData.data.startTime}:00 - ${notificationData.data.endTime}:00`);
+    console.log('🎾 Full notification data:', JSON.stringify(notificationData, null, 2));
+    
+    // Emit to all clients subscribed to open play notifications
+    this.io.to('open_play_notifications').emit('open_play_notification', notificationData);
+
+    // Also emit to all connected clients as a general notification
+    this.io.emit('open_play_event', {
+      message: notificationData.message,
+      timestamp: notificationData.timestamp,
+      pollId: notificationData.data.pollId,
+      eventDate: notificationData.data.eventDate,
+      title: notificationData.data.title,
+      startTime: notificationData.data.startTime,
+      endTime: notificationData.data.endTime
     });
   }
 

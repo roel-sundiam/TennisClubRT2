@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import { PageVisitTrackerService } from './services/page-visit-tracker.service';
 import { AnalyticsService } from './services/analytics.service';
 import { PWANotificationService } from './services/pwa-notification.service';
+import { WebSocketService } from './services/websocket.service';
 import { LayoutComponent } from './shared/layout/layout.component';
 
 @Component({
@@ -17,7 +18,8 @@ export class App implements OnInit {
   constructor(
     private pageVisitTracker: PageVisitTrackerService,
     private analyticsService: AnalyticsService,
-    private pwaNotificationService: PWANotificationService
+    private pwaNotificationService: PWANotificationService,
+    private webSocketService: WebSocketService
   ) {
     console.log('🚀 App component constructor called');
     // Services will be initialized automatically
@@ -26,6 +28,8 @@ export class App implements OnInit {
     // Initialize PWA notification service
     this.pwaNotificationService.init();
     console.log('📱 PWA notification service initialized');
+    // WebSocket service will auto-initialize when user is authenticated
+    console.log('🔌 WebSocket service initialized');
   }
 
   ngOnInit() {

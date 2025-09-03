@@ -6,6 +6,8 @@ import User from '../models/User';
 import Payment from '../models/Payment';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
+import { webSocketService } from '../services/websocketService';
+import { NotificationService } from '../services/notificationService';
 
 // Get all polls with filtering and pagination
 export const getPolls = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -710,6 +712,52 @@ export const createOpenPlay = asyncHandler(async (req: AuthenticatedRequest, res
 
   await openPlayPoll.save();
   await openPlayPoll.populate('createdBy', 'username fullName');
+
+  // Send real-time WebSocket notification
+  console.log('🎾 Poll Controller: Creating WebSocket notification data...');
+  console.log('🎾 Poll Controller: openPlayEvent startTime:', openPlayPoll.openPlayEvent!.startTime);
+  console.log('🎾 Poll Controller: openPlayEvent endTime:', openPlayPoll.openPlayEvent!.endTime);
+  
+  const webSocketNotification = {
+    type: 'open_play_created' as const,
+    data: {
+      pollId: (openPlayPoll._id as any).toString(),
+      title: openPlayPoll.title,
+      description: openPlayPoll.description,
+      eventDate: openPlayPoll.openPlayEvent!.eventDate.toISOString(),
+      startTime: openPlayPoll.openPlayEvent!.startTime,
+      endTime: openPlayPoll.openPlayEvent!.endTime,
+      maxPlayers: openPlayPoll.openPlayEvent!.maxPlayers,
+      confirmedPlayers: openPlayPoll.openPlayEvent!.confirmedPlayers.length,
+      createdBy: {
+        _id: req.user._id.toString(),
+        username: req.user.username,
+        fullName: req.user.fullName || req.user.username
+      }
+    },
+    timestamp: new Date().toISOString(),
+    message: `New Open Play event: ${openPlayPoll.title}`
+  };
+
+  console.log('🎾 Poll Controller: Final WebSocket notification data:', JSON.stringify(webSocketNotification, null, 2));
+
+  // Emit WebSocket notification for real-time updates
+  webSocketService.emitOpenPlayNotification(webSocketNotification);
+
+  // Send PWA push notifications to all members
+  try {
+    await NotificationService.sendOpenPlayNotification({
+      title: openPlayPoll.title,
+      description: openPlayPoll.description,
+      date: openPlayPoll.openPlayEvent!.eventDate,
+      startTime: openPlayPoll.openPlayEvent!.startTime,
+      endTime: openPlayPoll.openPlayEvent!.endTime
+    });
+    console.log('✅ PWA notifications sent for Open Play event');
+  } catch (error) {
+    console.error('❌ Failed to send PWA notifications:', error);
+    // Don't fail the request if notifications fail
+  }
 
   return res.status(201).json({
     success: true,
