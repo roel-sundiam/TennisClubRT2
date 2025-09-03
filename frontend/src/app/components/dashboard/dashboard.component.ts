@@ -8,6 +8,10 @@ import { MatGridListModule } from '@angular/material/grid-list';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { AuthService, User } from '../../services/auth.service';
+import { WebSocketService, OpenPlayNotificationEvent } from '../../services/websocket.service';
+import { NotificationService } from '../../services/notification.service';
+import { PWANotificationService } from '../../services/pwa-notification.service';
+import { OpenPlayNotificationModalComponent } from '../open-play-notification-modal/open-play-notification-modal.component';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -495,6 +499,47 @@ import { Subscription } from 'rxjs';
             </mat-card>
           </div>
         </div>
+
+        <!-- Sponsor Section -->
+        <div class="sponsor-section">
+          <h2 class="section-title sponsor-title">
+            <mat-icon>restaurant</mat-icon>
+            Our Club Partner
+          </h2>
+          
+          <mat-card class="sponsor-card" (click)="openHelensKitchen()">
+            <mat-card-header>
+              <img src="helens-kitchen-logo.jpg" alt="Helen's Kitchen Logo" mat-card-avatar class="sponsor-logo-header">
+              <mat-card-title>Helen's Kitchen</mat-card-title>
+              <mat-card-subtitle>Delicious Meals & Tennis Club Catering</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="sponsor-content">
+                <p>Looking for great food after your tennis match? Check out Helen's Kitchen for authentic, delicious meals!</p>
+                <div class="sponsor-features">
+                  <div class="feature-item">
+                    <mat-icon>local_dining</mat-icon>
+                    <span>Fresh Daily Menu</span>
+                  </div>
+                  <div class="feature-item">
+                    <mat-icon>delivery_dining</mat-icon>
+                    <span>Court-side Delivery</span>
+                  </div>
+                  <div class="feature-item">
+                    <mat-icon>group</mat-icon>
+                    <span>Group Catering</span>
+                  </div>
+                </div>
+              </div>
+            </mat-card-content>
+            <mat-card-actions>
+              <button mat-raised-button class="sponsor-btn" (click)="openHelensKitchen()">
+                <mat-icon>open_in_new</mat-icon>
+                View Menu
+              </button>
+            </mat-card-actions>
+          </mat-card>
+        </div>
       </div>
     </div>
   `,
@@ -504,12 +549,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
   currentUser: User | null = null;
   isAdmin = false;
   private apiUrl = 'http://localhost:3000/api';
+  private subscriptions: Subscription[] = [];
 
   constructor(
     private authService: AuthService,
     private router: Router,
     private dialog: MatDialog,
-    private http: HttpClient
+    private http: HttpClient,
+    private webSocketService: WebSocketService,
+    private notificationService: NotificationService,
+    private pwaNotificationService: PWANotificationService
   ) {}
 
   ngOnInit(): void {
@@ -517,10 +566,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.isAdmin = this.authService.isAdmin();
     
     // Subscribe to user changes
-    this.authService.currentUser$.subscribe((user: any) => {
+    const userSub = this.authService.currentUser$.subscribe((user: any) => {
       this.currentUser = user;
       this.isAdmin = this.authService.isAdmin();
     });
+    this.subscriptions.push(userSub);
+
+    // Set up WebSocket listeners for real-time open play notifications
+    this.setupWebSocketListeners();
+
+    // Check for any pending PWA notifications that were clicked while app was closed
+    this.pwaNotificationService.checkAndShowPendingNotification();
   }
 
   testNavigation(): void {
@@ -531,7 +587,92 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.router.navigate([route]);
   }
 
+  openHelensKitchen(): void {
+    window.open('https://helens-kitchen.netlify.app/', '_blank');
+  }
+
+  /**
+   * Set up WebSocket listeners for real-time notifications
+   */
+  private setupWebSocketListeners(): void {
+    console.log('🎾 Dashboard: Setting up WebSocket listeners');
+
+    // Listen for open play notifications
+    const openPlaySub = this.webSocketService.openPlayNotifications$.subscribe(
+      (notification: OpenPlayNotificationEvent) => {
+        console.log('🎾 Dashboard: Received open play notification:', notification);
+        this.handleOpenPlayNotification(notification);
+      }
+    );
+    this.subscriptions.push(openPlaySub);
+
+    // Listen for WebSocket connection status
+    const connectionSub = this.webSocketService.isConnected$.subscribe(
+      (connected: boolean) => {
+        console.log('🔌 Dashboard: WebSocket connection status:', connected ? 'Connected' : 'Disconnected');
+      }
+    );
+    this.subscriptions.push(connectionSub);
+  }
+
+  /**
+   * Handle incoming open play notifications and show auto-modal
+   */
+  private handleOpenPlayNotification(notification: OpenPlayNotificationEvent): void {
+    console.log('🎾 Dashboard: Handling open play notification');
+    console.log('🎾 Dashboard: Notification data:', notification);
+    console.log('🎾 Dashboard: startTime:', notification.data.startTime, 'endTime:', notification.data.endTime);
+    
+    // Only show modal for new open play events
+    if (notification.type === 'open_play_created') {
+      console.log('🎾 Dashboard: Showing auto-modal for new open play event');
+      
+      // Convert WebSocket notification to the format expected by the modal
+      const modalNotification = {
+        id: notification.data.pollId,
+        type: 'open_play_new' as const,
+        title: 'New Open Play Event!',
+        message: `${notification.data.title} - Vote to join!`,
+        eventDate: new Date(notification.data.eventDate),
+        startTime: notification.data.startTime,
+        endTime: notification.data.endTime,
+        confirmedPlayers: notification.data.confirmedPlayers,
+        maxPlayers: notification.data.maxPlayers,
+        pollId: notification.data.pollId,
+        hasVoted: false
+      };
+
+      // Show the modal automatically
+      const dialogRef = this.dialog.open(OpenPlayNotificationModalComponent, {
+        width: '90vw',
+        maxWidth: '500px',
+        height: 'auto',
+        maxHeight: '80vh',
+        data: {
+          notifications: [modalNotification]
+        },
+        disableClose: false,
+        hasBackdrop: true,
+        panelClass: ['open-play-modal', 'auto-triggered']
+      });
+
+      // Handle modal result
+      dialogRef.afterClosed().subscribe(result => {
+        console.log('🎾 Dashboard: Auto-modal closed with result:', result);
+        if (result === 'navigate-polls') {
+          console.log('🎾 Dashboard: Navigating to polls page');
+          this.navigateTo('/polls');
+        }
+      });
+
+      // Refresh notifications to keep them in sync
+      this.notificationService.refreshNotifications();
+    }
+  }
+
   ngOnDestroy(): void {
-    // Clean up subscriptions if needed
+    // Clean up all subscriptions
+    this.subscriptions.forEach(sub => sub.unsubscribe());
+    this.subscriptions = [];
   }
 }
