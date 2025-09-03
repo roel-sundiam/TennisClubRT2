@@ -1,13 +1,13 @@
 Rich Town 2 Tennis Court Schedule Project Plan for Club Members
 
-This app is for Club members who want to reserve a court schedule. Let's use Angular for frontend, express.js for backend and mongodb for database ("mongodb+srv://admin:Helenbot04117777!1@mydb.zxr9i5k.mongodb.net/TennisClubRT2@?retryWrites=true&w=majority&appName=MyDB";) The application will be used through mobiles/devices, please make it mobile friendly (PWA is needed. CSS design must me modern and professional.
+This app is for Club members who want to reserve a court schedule. Let's use Angular for frontend, express.js for backend and mongodb for database. The application will be used through mobiles/devices, please make it mobile friendly (PWA is needed). CSS design must be modern and professional.
 
 Registration
 
 1.  Interested Club Member need to register to the application (Full Name, username, gender etc). In the registration page, we need to include some rules like a membership fee is need to be paid before it will be approved. Also, it will be a coin based system that need make payment for them to use the app. But they will get free coins.
 2.  Approvement of registered Member will be approved by supseruser admin (create me a superadmin account, username superadmin, password admin123).
 3.  Approved users will have access to the tool by logging in and they will have admin to change password and view their profile info.
-4.  There are already registered Club members, can we copy the data from the Members table of: mongodb+srv://adminHelenbot04117777!1@mydb.zxr9i5k.mongodb.net/AppDB?retryWrites=true&w=majority&appName=MyDB. The format of the username is FirstnameLastName, example if the name is Roel Sundiam, username is RoelSundiam and let's put a default password of RT2Tennis
+4.  There are already registered Club members that can be imported from the legacy database. The format of the username is FirstnameLastName, example if the name is Roel Sundiam, username is RoelSundiam and let's put a default password of RT2Tennis
 
 Court Reservation
 

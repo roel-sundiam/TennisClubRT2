@@ -4,7 +4,7 @@ const User = require('./dist/models/User.js').default;
 
 async function checkPayments() {
   try {
-    await mongoose.connect('mongodb+srv://admin:Helenbot04117777!1@mydb.zxr9i5k.mongodb.net/TennisClubRT2?retryWrites=true&w=majority&appName=MyDB');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/TennisClubRT2');
     console.log('✅ Connected to MongoDB');
     
     // Find RoelSundiam user
