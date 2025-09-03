@@ -212,6 +212,9 @@ requireAdmin  // Role-based access control
 
 ### Common Development Workflows
 
+#### Git Workflow
+**IMPORTANT**: Claude will handle `git add` and `git commit` operations. The user will handle `git push` operations.
+
 #### Adding New Features
 1. Define TypeScript interfaces in `/backend/src/types/`
 2. Create Mongoose model with validation
