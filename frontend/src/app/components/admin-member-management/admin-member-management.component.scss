@@ -1,0 +1,399 @@
+// Modern Page Container following design system
+.page-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e0 100%);
+}
+
+// Modern Header
+.page-header {
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #2563eb 100%);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.2);
+  color: white;
+  padding: 1rem 0;
+  margin-bottom: 2rem;
+  
+  .header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    
+    @media (max-width: 768px) {
+      padding: 0 1rem;
+    }
+  }
+  
+  .back-button {
+    color: white;
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+  }
+  
+  .title-section {
+    .page-title {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin: 0;
+      
+      mat-icon {
+        font-size: 2rem;
+        width: 2rem;
+        height: 2rem;
+      }
+      
+      @media (max-width: 768px) {
+        font-size: 1.5rem;
+        
+        mat-icon {
+          font-size: 1.75rem;
+          width: 1.75rem;
+          height: 1.75rem;
+        }
+      }
+    }
+    
+    .page-subtitle {
+      font-size: 0.875rem;
+      margin: 0.25rem 0 0 0;
+      opacity: 0.9;
+      font-weight: 300;
+    }
+  }
+}
+
+// Page Content
+.page-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  
+  @media (max-width: 768px) {
+    padding: 0 1rem;
+  }
+}
+
+// Management Tabs
+.management-tabs {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  
+  ::ng-deep .mat-mdc-tab-header {
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  }
+  
+  ::ng-deep .mat-mdc-tab-label {
+    min-width: 160px;
+    
+    .count-chip {
+      margin-left: 0.5rem;
+      background: #ef4444;
+      color: white;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 12px;
+    }
+  }
+}
+
+.tab-content {
+  padding: 2rem;
+  min-height: 400px;
+  
+  @media (max-width: 768px) {
+    padding: 1rem;
+  }
+}
+
+// Loading State
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  gap: 1rem;
+  
+  p {
+    color: #6b7280;
+    font-size: 1rem;
+  }
+}
+
+// Empty State
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: #6b7280;
+  
+  .empty-icon {
+    font-size: 4rem;
+    width: 4rem;
+    height: 4rem;
+    color: #10b981;
+    margin-bottom: 1rem;
+  }
+  
+  h3 {
+    font-size: 1.5rem;
+    margin: 0 0 0.5rem 0;
+    color: #374151;
+  }
+  
+  p {
+    font-size: 1rem;
+    margin: 0;
+  }
+}
+
+// Members Grid for Pending Approvals
+.members-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 1.5rem;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+.member-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  }
+  
+  &.pending-card {
+    border-left: 4px solid #f59e0b;
+  }
+  
+  .member-avatar {
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    color: white;
+    
+    mat-icon {
+      font-size: 1.5rem;
+      width: 1.5rem;
+      height: 1.5rem;
+    }
+  }
+}
+
+.member-details {
+  margin: 1rem 0;
+  
+  .detail-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    
+    mat-icon {
+      font-size: 1.125rem;
+      width: 1.125rem;
+      height: 1.125rem;
+      color: #6b7280;
+    }
+    
+    span {
+      font-size: 0.875rem;
+      color: #374151;
+    }
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
+.status-chips {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.status-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  
+  mat-icon {
+    font-size: 0.875rem;
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+  
+  &.pending {
+    background: rgba(245, 158, 11, 0.1);
+    color: #d97706;
+  }
+  
+  &.approved {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+  }
+  
+  &.paid {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+  }
+  
+  &.unpaid {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+  }
+}
+
+.member-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 1rem;
+  
+  button {
+    flex: 1;
+    min-width: 80px;
+    
+    &:disabled {
+      opacity: 0.6;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
+}
+
+// Members Table
+.members-table {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.members-data-table {
+  width: 100%;
+  
+  .member-info {
+    display: flex;
+    flex-direction: column;
+    
+    strong {
+      font-weight: 600;
+      color: #374151;
+    }
+    
+    .username {
+      font-size: 0.875rem;
+      color: #6b7280;
+      margin-top: 0.25rem;
+    }
+  }
+  
+  .contact-info {
+    display: flex;
+    flex-direction: column;
+    
+    .phone {
+      font-size: 0.875rem;
+      color: #6b7280;
+      margin-top: 0.25rem;
+    }
+  }
+  
+  .status-badges {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .coin-balance {
+    font-weight: 600;
+    color: #f59e0b;
+    
+    &::after {
+      content: ' 🪙';
+    }
+  }
+  
+  .table-actions {
+    display: flex;
+    gap: 0.25rem;
+    
+    button {
+      min-width: 40px;
+    }
+  }
+}
+
+// Responsive Design
+@media (max-width: 768px) {
+  .members-data-table {
+    font-size: 0.875rem;
+    
+    .mat-column-contact,
+    .mat-column-coins {
+      display: none;
+    }
+  }
+  
+  .member-actions {
+    button {
+      font-size: 0.875rem;
+      padding: 0.5rem 0.75rem;
+    }
+  }
+}
+
+// Animations
+.member-card {
+  animation: slideIn 0.4s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Snackbar styles
+::ng-deep .success-snackbar {
+  background-color: #10b981 !important;
+  color: white !important;
+}
+
+::ng-deep .warning-snackbar {
+  background-color: #f59e0b !important;
+  color: white !important;
+}

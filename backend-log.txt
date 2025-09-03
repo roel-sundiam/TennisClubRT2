@@ -1,0 +1,43 @@
+
+> tennis-club-backend@1.0.0 dev
+> nodemon src/server.ts
+
+[33m[nodemon] 3.1.10[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: ts,json[39m
+[32m[nodemon] starting `ts-node src/server.ts`[39m
+🌤️  Weather service initialized for coordinates: 15.087, 120.6285
+(node:38307) [MONGOOSE] Warning: Duplicate schema index on {"date":1,"timeSlot":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✅ Connected to MongoDB successfully
+🚀 Tennis Club RT2 Backend running on port 3000
+📱 Environment: development
+🔗 Health check: http://localhost:3000/health
+📥 GET /api/health - ::1 - 2025-08-23T08:30:48.483Z
+📤 GET /api/health - 200 - 173ms - 115 bytes
+📥 GET /api/reservations/my-upcoming - ::1 - 2025-08-23T08:30:48.706Z
+📤 GET /api/reservations/my-upcoming - 304 - 576ms - 0 bytes
+📥 GET /api/reservations?showAll=true&_t=1755937856948 - ::1 - 2025-08-23T08:30:57.000Z
+🔍 Reservation Filter Debug:
+- User role: member
+- showAll query: true
+- Final filter: {}
+- Will show all users? true
+📤 GET /api/reservations?showAll=true&_t=1755937856948 - 200 - 326ms - 6289 bytes
+📥 GET /api/payments/my - ::1 - 2025-08-23T08:30:59.046Z
+📥 GET /api/coins/balance - ::1 - 2025-08-23T08:30:59.192Z
+📤 GET /api/payments/my - 304 - 354ms - 0 bytes
+📤 GET /api/coins/balance - 304 - 233ms - 0 bytes
+📥 GET /api/payments/my - ::1 - 2025-08-23T08:30:59.443Z
+📤 GET /api/payments/my - 304 - 196ms - 0 bytes
+📥 GET /api/health - ::1 - 2025-08-23T08:32:01.277Z
+📤 GET /api/health - 200 - 2ms - 116 bytes
+📥 GET /favicon.ico - ::1 - 2025-08-23T08:32:01.309Z
+📤 GET /favicon.ico - 404 - 3ms - 63 bytes
+📥 GET /api/coins/balance - ::1 - 2025-08-23T08:32:33.965Z
+📤 GET /api/coins/balance - 304 - 179ms - 0 bytes
+📥 GET /api/coins/balance - ::1 - 2025-08-23T08:32:34.159Z
+📤 GET /api/coins/balance - 304 - 161ms - 0 bytes
+📥 GET /api/coins/balance - ::1 - 2025-08-23T08:32:47.004Z
+📤 GET /api/coins/balance - 304 - 182ms - 0 bytes

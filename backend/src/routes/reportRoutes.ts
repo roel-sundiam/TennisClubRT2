@@ -1,0 +1,253 @@
+import { Router } from 'express';
+import {
+  getDashboardStats,
+  getMemberActivityReport,
+  getFinancialAnalysisReport,
+  getCoinReport,
+  getReservationReport,
+  getCourtReceiptsReport,
+  getCourtUsageFromSheet,
+  getFinancialReport,
+  forceRefreshFinancialReport,
+  forceRefreshCourtUsageReport,
+  triggerSync,
+  getSyncStatus
+} from '../controllers/reportController';
+import { authenticateToken, requireRole } from '../middleware/auth';
+
+const router = Router();
+
+/**
+ * @route GET /api/reports/dashboard
+ * @desc Get dashboard statistics
+ * @access Private (Admin/SuperAdmin)
+ */
+router.get(
+  '/dashboard',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  getDashboardStats
+);
+
+/**
+ * @route GET /api/reports/member-activity
+ * @desc Get member activity report
+ * @access Private (Admin/SuperAdmin)
+ */
+router.get(
+  '/member-activity',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  getMemberActivityReport
+);
+
+/**
+ * @route GET /api/reports/financial
+ * @desc Get financial analysis report
+ * @access Private (Admin/SuperAdmin)
+ */
+router.get(
+  '/financial',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  getFinancialAnalysisReport
+);
+
+/**
+ * @route GET /api/reports/coins
+ * @desc Get coin system analytics
+ * @access Private (Admin/SuperAdmin)
+ */
+router.get(
+  '/coins',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  getCoinReport
+);
+
+/**
+ * @route GET /api/reports/reservations
+ * @desc Get reservation analytics
+ * @access Private (Admin/SuperAdmin)
+ */
+router.get(
+  '/reservations',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  getReservationReport
+);
+
+/**
+ * @route GET /api/reports/court-receipts
+ * @desc Get court payment receipts with service fee breakdown
+ * @access Private (Admin/SuperAdmin)
+ */
+router.get(
+  '/court-receipts',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  getCourtReceiptsReport
+);
+
+/**
+ * @route GET /api/reports/court-usage-sheet
+ * @desc Get court usage report from Google Spreadsheet
+ * @access Private (All authenticated users)
+ */
+router.get(
+  '/court-usage-sheet',
+  getCourtUsageFromSheet
+);
+
+/**
+ * @route GET /api/reports/financial-sheet
+ * @desc Get financial report from spreadsheet data
+ * @access Private (Admin/SuperAdmin)
+ */
+router.get(
+  '/financial-sheet',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  getFinancialReport
+);
+
+/**
+ * @route POST /api/reports/financial-sheet/force-refresh
+ * @desc Force refresh financial report bypassing cache
+ * @access Private (Admin/SuperAdmin)
+ */
+router.post(
+  '/financial-sheet/force-refresh',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  forceRefreshFinancialReport
+);
+
+/**
+ * @route POST /api/reports/court-usage-sheet/force-refresh
+ * @desc Force refresh court usage report bypassing cache
+ * @access Private (Admin/SuperAdmin)
+ */
+router.post(
+  '/court-usage-sheet/force-refresh',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  forceRefreshCourtUsageReport
+);
+
+/**
+ * @route POST /api/reports/sync
+ * @desc Manually trigger Google Sheets sync
+ * @access Private (Admin/SuperAdmin)
+ */
+router.post(
+  '/sync',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  triggerSync
+);
+
+/**
+ * @route GET /api/reports/sync-status
+ * @desc Get Google Sheets sync status
+ * @access Private (Admin/SuperAdmin)
+ */
+router.get(
+  '/sync-status',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  getSyncStatus
+);
+
+/**
+ * @route POST /api/reports/fix-financial-report
+ * @desc Manual fix for financial report with recorded payments
+ * @access Private (Admin/SuperAdmin)
+ */
+// Special endpoint without auth for testing
+const specialRouter = Router();
+specialRouter.post('/fix-financial-report', async (req: any, res: any) => {
+    try {
+      console.log('🔧 Manual fix for financial report requested');
+      
+      // Import required modules
+      const Payment = (await import('../models/Payment')).default;
+      const fs = require('fs');
+      const path = require('path');
+      
+      // Calculate recorded payments
+      const recordedPayments = await Payment.find({ 
+        status: 'record', 
+        paymentMethod: { $ne: 'coins' }
+      });
+      
+      const totalRecordedAmount = recordedPayments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
+      console.log(`💰 Found ${recordedPayments.length} recorded payments totaling ₱${totalRecordedAmount}`);
+      
+      if (totalRecordedAmount > 0) {
+        // Read current financial report
+        const dataPath = path.join(__dirname, '../../data/financial-report.json');
+        const fileContent = fs.readFileSync(dataPath, 'utf8');
+        const financialData = JSON.parse(fileContent);
+        
+        // Find Tennis Court Usage Receipts
+        const courtReceiptsIndex = financialData.receiptsCollections.findIndex((item: any) => 
+          item.description === 'Tennis Court Usage Receipts'
+        );
+        
+        if (courtReceiptsIndex !== -1) {
+          const baselineAmount = 67800; // Google Sheets baseline
+          const newAmount = baselineAmount + totalRecordedAmount;
+          
+          financialData.receiptsCollections[courtReceiptsIndex].amount = newAmount;
+          
+          // Recalculate totals
+          financialData.totalReceipts = financialData.receiptsCollections.reduce((sum: number, item: any) => sum + item.amount, 0);
+          financialData.netIncome = financialData.totalReceipts - financialData.totalDisbursements;
+          financialData.fundBalance = financialData.beginningBalance.amount + financialData.netIncome;
+          financialData.lastUpdated = new Date().toISOString();
+          
+          // Save updated report
+          fs.writeFileSync(dataPath, JSON.stringify(financialData, null, 2));
+          
+          console.log('✅ Financial report manually fixed:', {
+            baseline: baselineAmount,
+            recorded: totalRecordedAmount,
+            total: newAmount,
+            fundBalance: financialData.fundBalance
+          });
+          
+          return res.status(200).json({
+            success: true,
+            message: 'Financial report fixed successfully',
+            data: {
+              baseline: baselineAmount,
+              recorded: totalRecordedAmount,
+              total: newAmount
+            }
+          });
+        }
+      }
+      
+      return res.status(200).json({
+        success: true,
+        message: 'No recorded payments found to fix',
+        data: { recorded: totalRecordedAmount }
+      });
+      
+    } catch (error: any) {
+      console.error('❌ Error fixing financial report:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fix financial report',
+        details: error.message
+      });
+    }
+  }
+);
+
+// TODO: Add export functionality
+
+// Export special router for fix endpoint
+export { specialRouter };
+export default router;

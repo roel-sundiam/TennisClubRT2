@@ -1,0 +1,79 @@
+{
+  "clubName": "RICH TOWN 2 TENNIS CLUB",
+  "location": "Rich Town 2 Subdivision, City of San Fernando, Pampanga",
+  "statementTitle": "Statement of Accounts and Disbursements",
+  "period": "COVERING January 1, 2025 - September 3, 2025",
+  "beginningBalance": {
+    "date": "JANUARY 1, 2025",
+    "amount": 2162.85
+  },
+  "receiptsCollections": [
+    {
+      "description": "Annual Membership Fees",
+      "amount": 40000
+    },
+    {
+      "description": "Advances",
+      "amount": 200
+    },
+    {
+      "description": "Tennis Court Usage Receipts",
+      "amount": 67800
+    },
+    {
+      "description": "Men's Tournament Entries",
+      "amount": 0
+    }
+  ],
+  "totalReceipts": 108000,
+  "disbursementsExpenses": [
+    {
+      "description": "Purchase - Miscellaneous",
+      "amount": 8080
+    },
+    {
+      "description": "Delivery Fee",
+      "amount": 480
+    },
+    {
+      "description": "Mineral Water",
+      "amount": 520
+    },
+    {
+      "description": "Court Service",
+      "amount": 1800
+    },
+    {
+      "description": "Court Maintenance",
+      "amount": 8575
+    },
+    {
+      "description": "Purchase - Tennis Net",
+      "amount": 6000
+    },
+    {
+      "description": "Tournament Expense",
+      "amount": 820
+    },
+    {
+      "description": "Tennis Score Board",
+      "amount": 1500
+    },
+    {
+      "description": "Purchase - Lights",
+      "amount": 5400
+    },
+    {
+      "description": "Water System Project Expense",
+      "amount": 20504
+    },
+    {
+      "description": "Financial Donation",
+      "amount": 5000
+    }
+  ],
+  "totalDisbursements": 49321,
+  "netIncome": 58679,
+  "fundBalance": 51483.85,
+  "lastUpdated": "2025-09-03T05:18:59.360Z"
+}

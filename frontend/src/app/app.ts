@@ -1,0 +1,36 @@
+import { Component, signal, OnInit } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+import { PageVisitTrackerService } from './services/page-visit-tracker.service';
+import { AnalyticsService } from './services/analytics.service';
+import { PWANotificationService } from './services/pwa-notification.service';
+import { LayoutComponent } from './shared/layout/layout.component';
+
+@Component({
+  selector: 'app-root',
+  imports: [LayoutComponent],
+  templateUrl: './app.html',
+  styleUrl: './app.scss'
+})
+export class App implements OnInit {
+  protected readonly title = signal('Rich Town 2 Tennis Club');
+
+  constructor(
+    private pageVisitTracker: PageVisitTrackerService,
+    private analyticsService: AnalyticsService,
+    private pwaNotificationService: PWANotificationService
+  ) {
+    console.log('🚀 App component constructor called');
+    // Services will be initialized automatically
+    // AnalyticsService handles page view tracking and session management
+    console.log('📊 Analytics service initialized');
+    // Initialize PWA notification service
+    this.pwaNotificationService.init();
+    console.log('📱 PWA notification service initialized');
+  }
+
+  ngOnInit() {
+    console.log('🚀 App component ngOnInit called');
+    console.log('🚀 Current URL:', window.location.href);
+    console.log('📊 Analytics session ID:', this.analyticsService.getCurrentSession());
+  }
+}

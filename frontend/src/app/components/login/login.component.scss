@@ -1,0 +1,852 @@
+/* Modern Split-Screen Login Design */
+.login-container {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Left Panel - How It Works */
+.info-panel {
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #2563eb 100%);
+  color: white;
+  padding: 3rem;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-y: auto;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+      radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3), transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.1), transparent 50%);
+    pointer-events: none;
+  }
+  
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+.info-header {
+  margin-bottom: 3rem;
+  
+  .logo-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    
+    .logo-icon {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 1rem;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      
+      i {
+        font-size: 2rem;
+        color: white;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+      }
+    }
+    
+    .app-title {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.025em;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .app-tagline {
+      font-size: 0.9rem;
+      margin: 0.25rem 0 0 0;
+      opacity: 0.9;
+      font-weight: 400;
+    }
+  }
+}
+
+.features-section {
+  flex: 1;
+  
+  .features-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0 0 1rem 0;
+    color: rgba(255, 255, 255, 0.95);
+    text-align: center;
+    position: relative;
+    
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -0.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.6);
+      border-radius: 1px;
+    }
+  }
+  
+  .features-subtitle {
+    text-align: center;
+    margin-bottom: 2rem;
+    
+    p {
+      font-size: 0.9rem;
+      line-height: 1.4;
+      color: rgba(255, 255, 255, 0.8);
+      margin: 0;
+      font-weight: 400;
+    }
+  }
+}
+
+.feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateX(4px);
+  }
+  
+  .feature-icon {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    padding: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    
+    i {
+      font-size: 1.25rem;
+      color: white;
+    }
+  }
+  
+  .feature-content {
+    flex: 1;
+    
+    h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0 0 0.5rem 0;
+      color: white;
+    }
+    
+    p {
+      font-size: 0.85rem;
+      margin: 0;
+      line-height: 1.5;
+      color: rgba(255, 255, 255, 0.9);
+    }
+  }
+}
+
+/* Right Panel - Login Form */
+.login-panel {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e0 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+      radial-gradient(circle at 70% 30%, rgba(99, 102, 241, 0.1), transparent 50%),
+      radial-gradient(circle at 30% 70%, rgba(16, 185, 129, 0.05), transparent 50%);
+    pointer-events: none;
+  }
+}
+
+// PrimeNG Card Styling
+.login-card {
+  max-width: 450px;
+  width: 100%;
+  border-radius: 24px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(20px);
+  position: relative;
+  z-index: 1;
+  
+  ::ng-deep {
+    .p-card-body {
+      padding: 0;
+    }
+    
+    .p-card-header {
+      padding: 0;
+      border: none;
+    }
+    
+    .p-card-content {
+      padding: 0;
+    }
+    
+    .p-card-footer {
+      padding: 0;
+      border: none;
+    }
+  }
+}
+
+// Card Header Styling
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 2.5rem 2.5rem 1.5rem 2.5rem;
+  
+  .header-icon {
+    background: linear-gradient(135deg, #3b82f6, #1e40af);
+    border-radius: 16px;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+    
+    i {
+      font-size: 1.5rem;
+      color: white;
+    }
+  }
+  
+  .header-text {
+    .login-title {
+      margin: 0;
+      font-size: 1.625rem;
+      font-weight: 700;
+      color: #1f2937;
+      line-height: 1.2;
+      letter-spacing: -0.025em;
+    }
+    
+    .login-subtitle {
+      margin: 0.5rem 0 0 0;
+      color: #6b7280;
+      font-size: 0.9rem;
+      font-weight: 400;
+      line-height: 1.4;
+    }
+  }
+}
+
+// Card Content
+.card-content {
+  padding: 1.5rem 2.5rem 2.5rem 2.5rem;
+}
+
+// Form Styling
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    
+    .field-label {
+      font-weight: 500;
+      color: #374151;
+      font-size: 0.9rem;
+    }
+    
+    // PrimeNG Input Overrides
+    ::ng-deep {
+      .p-inputtext,
+      .p-password-input {
+        width: 100%;
+        padding: 0.8rem 1rem;
+        font-size: 0.9rem !important;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #f9fafb;
+        
+        &:focus {
+          border-color: #667eea;
+          box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+          background: white;
+        }
+        
+        &.p-invalid {
+          border-color: #ef4444;
+          background: #fef2f2;
+        }
+      }
+      
+      .p-input-icon-right {
+        .pi {
+          color: #9ca3af;
+          font-size: 1rem;
+        }
+      }
+      
+      .p-password {
+        width: 100%;
+        
+        .p-password-input {
+          width: 100%;
+        }
+      }
+    }
+    
+    .p-error {
+      font-size: 0.8rem;
+      color: #ef4444;
+      margin-top: 0.25rem;
+    }
+  }
+}
+
+// Login Actions
+.login-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+  
+  ::ng-deep {
+    .p-button {
+      padding: 0.8rem 1.5rem;
+      font-size: 0.95rem;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+      
+      &.p-button-raised {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border: none;
+        color: white !important;
+        
+        &:hover {
+          background: linear-gradient(135deg, #5a6fd8, #6a4190);
+          transform: translateY(-1px);
+          color: white !important;
+        }
+      }
+      
+      &.p-component:disabled {
+        opacity: 0.6;
+      }
+    }
+    
+    .w-full {
+      width: 100%;
+    }
+    
+    .mt-2 {
+      margin-top: 0.5rem;
+    }
+  }
+}
+
+// Login Help Footer
+.login-help {
+  padding: 2rem 2.5rem;
+  border-top: 1px solid #e5e7eb;
+  background: rgba(248, 250, 252, 0.8);
+  border-radius: 0 0 24px 24px;
+  
+  .help-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #6b7280;
+    flex-wrap: wrap;
+    text-align: center;
+    
+    i {
+      color: #3b82f6;
+      font-size: 1rem;
+    }
+    
+    ::ng-deep {
+      .p-button.p-button-link {
+        color: #3b82f6;
+        font-weight: 500;
+        text-decoration: none;
+        padding: 0.25rem 0.5rem;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        
+        &:hover {
+          color: #1e40af;
+          background: rgba(59, 130, 246, 0.1);
+          text-decoration: none;
+        }
+      }
+    }
+  }
+}
+
+// Responsive Design
+@media (max-width: 1024px) {
+  .login-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+  }
+  
+  .info-panel {
+    padding: 2rem;
+    order: 1; // Content first on mobile/tablet
+  }
+  
+  .login-panel {
+    order: 2; // Login form second on mobile/tablet
+    padding: 2rem 1rem;
+  }
+  
+  .features-section {
+    .feature-item {
+      margin-bottom: 1.5rem;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .login-container {
+    grid-template-rows: auto auto;
+  }
+  
+  .info-panel {
+    padding: 1.5rem;
+    min-height: auto;
+    
+    // Add a subtle bottom border to separate from login
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    }
+    
+    .info-header {
+      margin-bottom: 1.5rem;
+      text-align: center;
+      
+      .logo-section {
+        flex-direction: column;
+        gap: 0.75rem;
+        
+        .logo-icon {
+          align-self: center;
+        }
+        
+        .app-title {
+          font-size: 1.375rem;
+        }
+        
+        .app-tagline {
+          font-size: 0.85rem;
+        }
+      }
+    }
+    
+    .features-section {
+      .features-title {
+        font-size: 1.125rem;
+        margin-bottom: 0.75rem;
+      }
+      
+      .features-subtitle {
+        margin-bottom: 1.25rem;
+        
+        p {
+          font-size: 0.8rem;
+          line-height: 1.3;
+        }
+      }
+      
+      .feature-item {
+        padding: 0.625rem;
+        margin-bottom: 0.75rem;
+        
+        .feature-icon {
+          padding: 0.625rem;
+          
+          i {
+            font-size: 1rem;
+          }
+        }
+        
+        .feature-content {
+          h3 {
+            font-size: 0.875rem;
+            margin-bottom: 0.375rem;
+          }
+          
+          p {
+            font-size: 0.75rem;
+            line-height: 1.4;
+          }
+        }
+      }
+    }
+  }
+  
+  .login-panel {
+    padding: 1.5rem 1rem;
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 50%, #cbd5e0 100%);
+  }
+  
+  .login-card {
+    max-width: 100%;
+    border-radius: 20px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
+  }
+  
+  .card-header {
+    padding: 1.75rem 1.75rem 1rem 1.75rem;
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+    
+    .header-icon {
+      align-self: center;
+    }
+    
+    .header-text {
+      .login-title {
+        font-size: 1.25rem;
+      }
+      
+      .login-subtitle {
+        font-size: 0.85rem;
+      }
+    }
+  }
+  
+  .card-content {
+    padding: 1rem 1.75rem 1.75rem 1.75rem;
+  }
+  
+  .login-help {
+    padding: 1.25rem 1.75rem;
+    
+    .help-text {
+      font-size: 0.8rem;
+      flex-direction: column;
+      gap: 0.75rem;
+      
+      span {
+        order: 1;
+      }
+      
+      i {
+        order: 0;
+        font-size: 1.25rem;
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .info-panel {
+    padding: 1rem;
+    
+    .info-header {
+      margin-bottom: 1rem;
+      
+      .logo-section {
+        gap: 0.5rem;
+        
+        .app-title {
+          font-size: 1.25rem;
+        }
+        
+        .app-tagline {
+          font-size: 0.8rem;
+        }
+      }
+    }
+    
+    .features-section {
+      .features-title {
+        font-size: 1rem;
+      }
+      
+      .features-subtitle {
+        margin-bottom: 1rem;
+        
+        p {
+          font-size: 0.75rem;
+        }
+      }
+      
+      .feature-item {
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+        
+        .feature-content {
+          h3 {
+            font-size: 0.8rem;
+          }
+          
+          p {
+            font-size: 0.7rem;
+          }
+        }
+      }
+    }
+  }
+  
+  .login-panel {
+    padding: 1rem 0.75rem;
+  }
+  
+  .card-header {
+    padding: 1.5rem 1.5rem 0.75rem 1.5rem;
+    
+    .header-text {
+      .login-title {
+        font-size: 1.125rem;
+      }
+      
+      .login-subtitle {
+        font-size: 0.8rem;
+      }
+    }
+  }
+  
+  .card-content {
+    padding: 0.75rem 1.5rem 1.5rem 1.5rem;
+  }
+  
+  .login-help {
+    padding: 1rem 1.5rem;
+    
+    .help-text {
+      font-size: 0.75rem;
+    }
+  }
+}
+
+// Modern Error Message
+.error-container {
+  margin: 1rem 0;
+  width: 100%;
+}
+
+.modern-error-alert {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border: 1px solid rgba(220, 38, 38, 0.5);
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.25);
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  
+  // Subtle animated gradient background
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%);
+    pointer-events: none;
+  }
+  
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+  
+  .error-icon {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    
+    i {
+      font-size: 1.125rem;
+      color: white;
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+    }
+  }
+  
+  .error-content {
+    flex: 1;
+    min-width: 0; // Prevent content overflow
+    
+    .error-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: white;
+      margin: 0 0 0.25rem 0;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+    
+    .error-message {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.95);
+      margin: 0;
+      line-height: 1.4;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+  }
+  
+  .error-close {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    min-width: 24px;
+    min-height: 24px;
+    
+    i {
+      font-size: 0.9rem;
+    }
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      transform: scale(1.1);
+    }
+    
+    &:focus {
+      outline: 2px solid rgba(255, 255, 255, 0.5);
+      outline-offset: 2px;
+    }
+  }
+}
+
+// High contrast mode support
+@media (prefers-contrast: high) {
+  .modern-error-alert {
+    background: #dc2626;
+    border: 2px solid #7f1d1d;
+    
+    .error-title,
+    .error-message {
+      color: white;
+      text-shadow: none;
+    }
+    
+    .error-icon {
+      background: rgba(255, 255, 255, 0.3);
+    }
+    
+    .error-close {
+      border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+  }
+}
+
+// Reduced motion support
+@media (prefers-reduced-motion: reduce) {
+  .modern-error-alert {
+    &::before {
+      animation: none;
+    }
+    
+    .error-close {
+      transition: none;
+      
+      &:hover {
+        transform: none;
+      }
+    }
+  }
+}
+
+// Mobile adjustments
+@media (max-width: 768px) {
+  .modern-error-alert {
+    padding: 0.875rem;
+    gap: 0.625rem;
+    
+    .error-icon {
+      padding: 0.375rem;
+      
+      i {
+        font-size: 1rem;
+      }
+    }
+    
+    .error-content {
+      .error-title {
+        font-size: 0.85rem;
+      }
+      
+      .error-message {
+        font-size: 0.75rem;
+        line-height: 1.3;
+      }
+    }
+    
+    .error-close {
+      min-width: 20px;
+      min-height: 20px;
+      
+      i {
+        font-size: 0.8rem;
+      }
+    }
+  }
+}
+
+// PrimeNG Toast Overrides
+::ng-deep {
+  .p-toast {
+    z-index: 9999;
+  }
+  
+  .p-toast-message {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+}
