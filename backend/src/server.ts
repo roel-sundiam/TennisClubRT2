@@ -44,11 +44,11 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 
-// Rate limiting (disabled in development)
-if (process.env.NODE_ENV === 'production') {
+// Rate limiting (temporarily disabled for CORS debugging)
+if (false && process.env.NODE_ENV === 'production') {
   const limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '500'),
     message: 'Too many requests from this IP, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
@@ -56,7 +56,7 @@ if (process.env.NODE_ENV === 'production') {
   app.use(limiter);
   console.log('📊 Rate limiting enabled for production');
 } else {
-  console.log('📊 Rate limiting disabled for development');
+  console.log('📊 Rate limiting disabled');
 }
 
 // CORS configuration
