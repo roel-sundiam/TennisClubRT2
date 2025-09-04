@@ -164,6 +164,10 @@ OFF_PEAK_FEE_PER_MEMBER=20
 # Coin system
 INITIAL_COIN_BALANCE=100
 COIN_RATE_PER_PAGE=1
+
+# Rate limiting (production only)
+RATE_LIMIT_WINDOW_MS=900000    # 15 minutes
+RATE_LIMIT_MAX_REQUESTS=500    # Max requests per window
 ```
 
 #### Weather Integration
@@ -210,10 +214,16 @@ requireMembershipFees  // Validates membership payment
 requireAdmin  // Role-based access control
 ```
 
+#### Rate Limiting
+- **Development**: Rate limiting disabled for local development
+- **Production**: 500 requests per 15-minute window per IP
+- **Health Endpoints**: `/health` and `/api/health` are included in rate limiting
+- **Error Message**: "Too many requests from this IP, please try again later."
+
 ### Common Development Workflows
 
 #### Git Workflow
-**IMPORTANT**: Claude will handle `git add` and `git commit` operations. The user will handle `git push` operations.
+**IMPORTANT**: Claude can handle `git add`, `git commit`, and `git push` operations when requested by the user.
 
 #### Adding New Features
 1. Define TypeScript interfaces in `/backend/src/types/`
