@@ -63,7 +63,8 @@ if (process.env.NODE_ENV === 'production') {
 const allowedOrigins = [
   'http://localhost:4200',
   'http://localhost:4201', 
-  'http://localhost:3000'
+  'http://localhost:3000',
+  'https://tennisclubrt2.netlify.app'
 ];
 
 // Add production frontend URL if available
@@ -71,15 +72,35 @@ if (process.env.FRONTEND_URL) {
   allowedOrigins.push(process.env.FRONTEND_URL);
 }
 
-// Add common Netlify patterns
-allowedOrigins.push(/.*\.netlify\.app$/);
-allowedOrigins.push(/.*--.*\.netlify\.app$/);
+// Add common Netlify patterns for preview deployments
+allowedOrigins.push(/https:\/\/.*--tennisclubrt2\.netlify\.app$/);
+allowedOrigins.push(/https:\/\/.*\.netlify\.app$/);
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: function(origin, callback) {
+    // Allow requests with no origin (mobile apps, postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Check regex patterns for Netlify
+    for (const pattern of allowedOrigins) {
+      if (pattern instanceof RegExp && pattern.test(origin)) {
+        return callback(null, true);
+      }
+    }
+    
+    console.log('❌ CORS blocked origin:', origin);
+    return callback(new Error('Not allowed by CORS'), false);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
+  optionsSuccessStatus: 200
 }));
 
 // Body parsing middleware
