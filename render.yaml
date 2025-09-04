@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: tennis-club-rt2-backend
+    runtime: node
+    env: node
+    plan: starter
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        fromDatabase:
+          name: tennis-club-rt2-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: WEATHER_API_KEY
+        sync: false
+      - key: PEAK_HOURS
+        value: "5,18,19,21"
+      - key: PEAK_HOUR_FEE
+        value: "100"
+      - key: OFF_PEAK_FEE_PER_MEMBER
+        value: "20"
+      - key: INITIAL_COIN_BALANCE
+        value: "100"
+      - key: COIN_RATE_PER_PAGE
+        value: "1"
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "900000"
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: "100"
+    healthCheckPath: /health
+    autoDeploy: true
+
+databases:
+  - name: tennis-club-rt2-db
+    databaseName: tennis-club-rt2
+    user: tennis-club-rt2-user
+    plan: starter

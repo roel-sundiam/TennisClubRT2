@@ -1,0 +1,45 @@
+# Development files
+.env.local
+.env.development
+.env.test
+
+# Node modules (will be installed during build)
+node_modules/
+
+# Build artifacts that will be regenerated
+backend/dist/
+
+# Development tools
+backend/src/
+backend/tsconfig.json
+backend/.eslintrc.js
+
+# Frontend (not needed for backend deployment)
+frontend/
+
+# Git and IDE files
+.git/
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test files
+backend/test/
+*.test.ts
+*.test.js
+
+# Temporary files
+*.tmp
+*.temp
+
+# Scripts not needed in production
+backend/src/scripts/
+
+# Documentation
+*.md
+docs/
