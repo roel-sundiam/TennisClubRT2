@@ -43,7 +43,7 @@
     {
       "name": "auth-api",
       "urls": [
-        "http://localhost:3000/api/auth/**"
+        "https://tennis-club-rt2-backend.onrender.com/api/auth/**"
       ],
       "cacheConfig": {
         "strategy": "freshness",
@@ -55,7 +55,7 @@
     {
       "name": "api-cache",
       "urls": [
-        "http://localhost:3000/api/**"
+        "https://tennis-club-rt2-backend.onrender.com/api/**"
       ],
       "cacheConfig": {
         "strategy": "performance",

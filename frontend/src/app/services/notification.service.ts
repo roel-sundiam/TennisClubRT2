@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, map, catchError, of, forkJoin } from 'rxjs';
 import { AuthService } from './auth.service';
+import { environment } from '../../environments/environment';
 
 export interface PaymentNotification {
   id: string;
@@ -45,7 +46,7 @@ export interface NotificationSummary {
   providedIn: 'root'
 })
 export class NotificationService {
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
   private notificationSubject = new BehaviorSubject<NotificationSummary>({
     overdueCount: 0,
     dueSoonCount: 0,

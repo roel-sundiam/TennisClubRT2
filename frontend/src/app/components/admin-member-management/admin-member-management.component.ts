@@ -16,6 +16,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
+import { environment } from '../../../environments/environment';
 
 interface Member {
   _id: string;
@@ -304,7 +305,7 @@ export class AdminMemberManagementComponent implements OnInit {
 
   displayedColumns: string[] = ['name', 'contact', 'status', 'registered', 'coins', 'actions'];
 
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
 
   constructor(
     private http: HttpClient,

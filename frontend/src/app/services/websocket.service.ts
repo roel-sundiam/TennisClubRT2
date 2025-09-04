@@ -2,6 +2,7 @@ import { Injectable, OnDestroy } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
 import { AuthService } from './auth.service';
+import { environment } from '../../environments/environment';
 
 export interface OpenPlayNotificationEvent {
   type: 'open_play_created' | 'open_play_updated' | 'open_play_closed';
@@ -29,7 +30,7 @@ export interface OpenPlayNotificationEvent {
 })
 export class WebSocketService implements OnDestroy {
   private socket: Socket | null = null;
-  private serverUrl = 'http://localhost:3000';
+  private serverUrl = environment.socketUrl;
   private connectionSubject = new BehaviorSubject<boolean>(false);
   private openPlayNotificationSubject = new Subject<OpenPlayNotificationEvent>();
 

@@ -4,12 +4,13 @@ import { Router, NavigationEnd, ActivatedRoute } from '@angular/router';
 import { BehaviorSubject, Observable, filter, map, debounceTime, takeUntil } from 'rxjs';
 import { AuthService } from './auth.service';
 import { AnalyticsPageView, AnalyticsUserActivity, AnalyticsStats } from '../../../../shared/types';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AnalyticsService {
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
   private sessionId: string;
   private pageStartTime: number = 0;
   private currentPage: string = '';

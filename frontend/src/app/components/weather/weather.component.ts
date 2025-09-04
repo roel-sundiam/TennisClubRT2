@@ -10,6 +10,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatChipsModule } from '@angular/material/chips';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 interface WeatherData {
   temperature: number;
@@ -363,7 +364,7 @@ export class WeatherComponent implements OnInit, OnDestroy {
   location = 'San Fernando, Pampanga';
   selectedView: 'hourly' | 'daily' = 'hourly';
   
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
 
   constructor(
     private http: HttpClient,

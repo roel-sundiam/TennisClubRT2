@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface CoinTransaction {
   _id: string;
@@ -62,7 +63,7 @@ export interface AdminCoinAction {
   providedIn: 'root'
 })
 export class CoinService {
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
   private coinBalanceSubject = new BehaviorSubject<number>(0);
   
   public coinBalance$ = this.coinBalanceSubject.asObservable();

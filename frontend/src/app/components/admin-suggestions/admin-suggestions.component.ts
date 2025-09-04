@@ -26,6 +26,7 @@ import { Subscription } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { AdminResponseDialogComponent } from '../admin-response-dialog/admin-response-dialog.component';
 import { ConfirmationDialogComponent, ConfirmationDialogData } from '../confirmation-dialog/confirmation-dialog.component';
+import { environment } from '../../../environments/environment';
 
 interface Suggestion {
   _id: string;
@@ -414,7 +415,7 @@ interface SuggestionStats {
   styleUrl: './admin-suggestions.component.scss'
 })
 export class AdminSuggestionsComponent implements OnInit, OnDestroy {
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
   private subscription = new Subscription();
 
   selectedTab = 0;

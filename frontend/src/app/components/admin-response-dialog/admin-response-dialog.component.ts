@@ -11,6 +11,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Subscription } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 interface Suggestion {
   _id: string;
@@ -211,7 +212,7 @@ interface DialogData {
   styleUrl: './admin-response-dialog.component.scss'
 })
 export class AdminResponseDialogComponent implements OnDestroy {
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
   private subscription = new Subscription();
 
   responseForm: FormGroup;

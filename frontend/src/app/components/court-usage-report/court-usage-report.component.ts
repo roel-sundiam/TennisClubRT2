@@ -11,6 +11,7 @@ import { interval, Subscription } from 'rxjs';
 import { switchMap, filter, tap } from 'rxjs/operators';
 import { io, Socket } from 'socket.io-client';
 import { AuthService } from '../../services/auth.service';
+import { environment } from '../../../environments/environment';
 
 interface CourtUsageAPIResponse {
   success: boolean;
@@ -168,7 +169,7 @@ export class CourtUsageReportComponent implements OnInit, OnDestroy {
   autoRefreshEnabled = true;
   nextUpdateCountdown = 30;
   
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
   private autoRefreshSubscription?: Subscription;
   private countdownSubscription?: Subscription;
   private readonly REFRESH_INTERVAL = 30000; // 30 seconds
@@ -345,7 +346,7 @@ export class CourtUsageReportComponent implements OnInit, OnDestroy {
    */
   private initializeWebSocket(): void {
     try {
-      this.socket = io('http://localhost:3000', {
+      this.socket = io(environment.socketUrl, {
         transports: ['websocket', 'polling'],
         auth: {
           token: this.authService.token

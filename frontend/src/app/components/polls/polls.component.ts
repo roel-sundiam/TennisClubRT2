@@ -10,6 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthService } from '../../services/auth.service';
 import { Subscription } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 interface Poll {
   _id: string;
@@ -561,7 +562,7 @@ export class PollsComponent implements OnInit, OnDestroy {
   members: any[] = [];
   isAdmin = false;
   private subscription = new Subscription();
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
 
   constructor(
     private http: HttpClient,

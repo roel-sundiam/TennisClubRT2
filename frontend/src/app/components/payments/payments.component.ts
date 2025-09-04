@@ -8,6 +8,7 @@ import { trigger, transition, style, animate } from '@angular/animations';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { CancellationDialogComponent, CancellationDialogData } from '../cancellation-dialog/cancellation-dialog.component';
+import { environment } from '../../../environments/environment';
 
 // Interfaces
 interface Payment {
@@ -700,7 +701,7 @@ export class PaymentsComponent implements OnInit {
   manualPaymentForm: FormGroup;
   loadingManualPayment = false;
 
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
 
   constructor(
     private fb: FormBuilder,

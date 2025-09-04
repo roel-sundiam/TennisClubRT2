@@ -21,6 +21,7 @@ import { AuthService } from '../../services/auth.service';
 import { CreditService, CreditTransaction } from '../../services/credit.service';
 import { PaymentConfirmationDialogComponent, PaymentConfirmationData } from '../payment-confirmation-dialog/payment-confirmation-dialog.component';
 import { UnrecordConfirmationDialogComponent, UnrecordDialogData } from '../unrecord-confirmation-dialog/unrecord-confirmation-dialog.component';
+import { environment } from '../../../environments/environment';
 
 interface PaymentRecord {
   _id: string;
@@ -1313,7 +1314,7 @@ export class CourtReceiptsReportComponent implements OnInit {
     'actions'
   ];
 
-  private baseUrl = 'http://localhost:3000/api';
+  private baseUrl = environment.apiUrl;
 
   constructor(
     private http: HttpClient,

@@ -71,6 +71,10 @@ if (process.env.FRONTEND_URL) {
   allowedOrigins.push(process.env.FRONTEND_URL);
 }
 
+// Add common Netlify patterns
+allowedOrigins.push(/.*\.netlify\.app$/);
+allowedOrigins.push(/.*--.*\.netlify\.app$/);
+
 app.use(cors({
   origin: allowedOrigins,
   credentials: true,

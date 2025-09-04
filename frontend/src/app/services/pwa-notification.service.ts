@@ -4,6 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom, Subject } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { OpenPlayNotificationModalComponent } from '../components/open-play-notification-modal/open-play-notification-modal.component';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
@@ -30,7 +31,7 @@ export class PWANotificationService {
   private async fetchVapidKey(): Promise<void> {
     try {
       const response = await firstValueFrom(
-        this.http.get<{success: boolean, data: {publicKey: string}}>('http://localhost:3000/api/notifications/vapid-key')
+        this.http.get<{success: boolean, data: {publicKey: string}}>(`${environment.apiUrl}/notifications/vapid-key`)
       );
       
       if (response.success) {
@@ -132,7 +133,7 @@ export class PWANotificationService {
       };
 
       const response = await firstValueFrom(
-        this.http.post('http://localhost:3000/api/notifications/subscribe', subscriptionData)
+        this.http.post(`${environment.apiUrl}/notifications/subscribe`, subscriptionData)
       );
 
       console.log('✅ Subscription sent to backend successfully');

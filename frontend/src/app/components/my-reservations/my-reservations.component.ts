@@ -16,6 +16,7 @@ import { HttpClient } from '@angular/common/http';
 import { timeout, catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
+import { environment } from '../../../environments/environment';
 
 interface Reservation {
   _id: string;
@@ -302,7 +303,7 @@ export class MyReservationsComponent implements OnInit {
   showCancelModal = false;
   reservationToCancel: Reservation | null = null;
   
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
 
   constructor(
     private http: HttpClient,
@@ -325,7 +326,7 @@ export class MyReservationsComponent implements OnInit {
     console.log('🔌 Testing backend connectivity...');
     
     // Try /health endpoint first (without /api prefix)
-    this.http.get<any>('http://localhost:3000/health')
+    this.http.get<any>('${environment.apiBaseUrl}/health')
       .pipe(
         timeout(5000),
         catchError(error => {

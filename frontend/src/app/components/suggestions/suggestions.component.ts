@@ -17,6 +17,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
+import { environment } from '../../../environments/environment';
 
 interface Suggestion {
   _id: string;
@@ -353,7 +354,7 @@ interface Suggestion {
   styleUrl: './suggestions.component.scss'
 })
 export class SuggestionsComponent implements OnInit, OnDestroy {
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
   private subscription = new Subscription();
 
   suggestionForm: FormGroup;

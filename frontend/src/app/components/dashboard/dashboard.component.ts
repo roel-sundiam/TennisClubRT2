@@ -13,6 +13,7 @@ import { NotificationService } from '../../services/notification.service';
 import { PWANotificationService } from '../../services/pwa-notification.service';
 import { OpenPlayNotificationModalComponent } from '../open-play-notification-modal/open-play-notification-modal.component';
 import { Subscription } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-dashboard',
@@ -548,7 +549,7 @@ import { Subscription } from 'rxjs';
 export class DashboardComponent implements OnInit, OnDestroy {
   currentUser: User | null = null;
   isAdmin = false;
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
   private subscriptions: Subscription[] = [];
 
   constructor(

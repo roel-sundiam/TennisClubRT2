@@ -6,6 +6,7 @@ import { BehaviorSubject, Observable, filter, debounceTime, distinctUntilChanged
 import { AuthService } from './auth.service';
 import { CoinService } from './coin.service';
 import { InsufficientCoinsModalComponent, InsufficientCoinsData } from '../components/insufficient-coins-modal/insufficient-coins-modal.component';
+import { environment } from '../../environments/environment';
 
 export interface PageVisitConfig {
   route: string;
@@ -29,7 +30,7 @@ export interface PageVisitResponse {
   providedIn: 'root'
 })
 export class PageVisitTrackerService {
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
   private currentRoute = '';
   private lastVisitTime = 0;
   private visitDebounceTime = 3000; // 3 seconds debounce to avoid duplicate charges

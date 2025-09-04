@@ -6,6 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
 import { CreditService } from '../../services/credit.service';
 import { trigger, transition, style, animate } from '@angular/animations';
+import { environment } from '../../../environments/environment';
 
 // Custom notification interface
 interface Notification {
@@ -523,7 +524,7 @@ export class ReservationsComponent implements OnInit, OnDestroy {
   // Debounce timer for fee calculation
   private feeCalculationTimer: any;
   
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
   private peakHours = [5, 18, 19, 20, 21]; // 5AM, 6PM, 7PM, 8PM, 9PM
 
   constructor(

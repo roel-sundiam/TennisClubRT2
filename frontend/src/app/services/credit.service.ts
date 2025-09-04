@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, tap, map } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface CreditTransaction {
   _id: string;
@@ -64,7 +65,7 @@ export interface AdminCreditAction {
   providedIn: 'root'
 })
 export class CreditService {
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
   private creditBalanceSubject = new BehaviorSubject<number>(0);
   
   public creditBalance$ = this.creditBalanceSubject.asObservable();

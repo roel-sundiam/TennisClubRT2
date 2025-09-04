@@ -22,6 +22,7 @@ import { Subscription } from 'rxjs';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { AuthService } from '../../services/auth.service';
 import { NotificationService } from '../../services/notification.service';
+import { environment } from '../../../environments/environment';
 
 interface OpenPlayEvent {
   _id: string;
@@ -2920,7 +2921,7 @@ interface OpenPlayEvent {
   `]
 })
 export class AdminPollManagementComponent implements OnInit, OnDestroy {
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
   private subscriptions = new Subscription();
 
   selectedTab = 0;
