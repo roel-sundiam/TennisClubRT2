@@ -44,7 +44,7 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
         <div class="info-header">
           <div class="logo-section">
             <div class="logo-icon">
-              <i class="pi pi-bolt"></i>
+              <img src="/rich-town-2-tennis-logo.png" alt="Rich Town 2 Tennis Club Logo" class="logo-image">
             </div>
             <div>
               <h1 class="app-title">Rich Town 2 Tennis Club</h1>
