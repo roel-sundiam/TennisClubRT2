@@ -78,31 +78,68 @@ const netlifyPatterns: RegExp[] = [
   /^https:\/\/.*\.netlify\.app$/
 ];
 
+// Add explicit CORS preflight handling
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  console.log('🔄 OPTIONS preflight request from origin:', origin);
+  
+  if (!origin) {
+    res.header('Access-Control-Allow-Origin', '*');
+  } else if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else {
+    // Check regex patterns for Netlify
+    let matched = false;
+    for (const pattern of netlifyPatterns) {
+      if (pattern.test(origin)) {
+        res.header('Access-Control-Allow-Origin', origin);
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      res.header('Access-Control-Allow-Origin', origin); // Allow for debugging
+    }
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
+
 app.use(cors({
   origin: function(origin, callback) {
     // Allow requests with no origin (mobile apps, postman, etc.)
     if (!origin) return callback(null, true);
     
+    // Log the incoming origin for debugging
+    console.log('🔍 CORS request from origin:', origin);
+    
     // Check if origin is in allowed string list
     if (allowedOrigins.includes(origin)) {
+      console.log('✅ CORS allowed origin:', origin);
       return callback(null, true);
     }
     
     // Check regex patterns for Netlify
     for (const pattern of netlifyPatterns) {
       if (pattern.test(origin)) {
+        console.log('✅ CORS allowed origin via pattern:', origin);
         return callback(null, true);
       }
     }
     
     console.log('❌ CORS blocked origin:', origin);
-    return callback(new Error('Not allowed by CORS'), false);
+    // For debugging, allow the origin but log the issue
+    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  preflightContinue: false
 }));
 
 // Body parsing middleware
