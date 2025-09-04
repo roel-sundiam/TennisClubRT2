@@ -60,7 +60,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // CORS configuration
-const allowedOrigins = [
+const allowedOrigins: string[] = [
   'http://localhost:4200',
   'http://localhost:4201', 
   'http://localhost:3000',
@@ -72,23 +72,25 @@ if (process.env.FRONTEND_URL) {
   allowedOrigins.push(process.env.FRONTEND_URL);
 }
 
-// Add common Netlify patterns for preview deployments
-allowedOrigins.push(/https:\/\/.*--tennisclubrt2\.netlify\.app$/);
-allowedOrigins.push(/https:\/\/.*\.netlify\.app$/);
+// Netlify pattern regex for preview deployments
+const netlifyPatterns: RegExp[] = [
+  /^https:\/\/.*--tennisclubrt2\.netlify\.app$/,
+  /^https:\/\/.*\.netlify\.app$/
+];
 
 app.use(cors({
   origin: function(origin, callback) {
     // Allow requests with no origin (mobile apps, postman, etc.)
     if (!origin) return callback(null, true);
     
-    // Check if origin is in allowed list
+    // Check if origin is in allowed string list
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     
     // Check regex patterns for Netlify
-    for (const pattern of allowedOrigins) {
-      if (pattern instanceof RegExp && pattern.test(origin)) {
+    for (const pattern of netlifyPatterns) {
+      if (pattern.test(origin)) {
         return callback(null, true);
       }
     }
