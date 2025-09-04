@@ -33,6 +33,12 @@ services:
         value: "900000"
       - key: RATE_LIMIT_MAX_REQUESTS
         value: "100"
+      - key: VAPID_PUBLIC_KEY
+        value: "BJbkAXA92DdoDfGnxAt8ExE5rGeQpeIvd1bzGoGjSv0_j3KUkrxkAfufqr1SXnUHfzbuUSgUDKz8DBT2tU_nLuY"
+      - key: VAPID_PRIVATE_KEY
+        value: "ea2VB_4DdetNSNUZsQUjrZZ1OkmxNJCWyTTCgQcroUM"
+      - key: VAPID_EMAIL
+        value: "mailto:admin@tennisclubrt2.com"
     healthCheckPath: /health
     autoDeploy: true
 

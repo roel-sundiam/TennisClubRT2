@@ -40,7 +40,7 @@ export class PWANotificationService {
     } catch (error) {
       console.error('❌ Failed to fetch VAPID key:', error);
       // Fallback to hardcoded key for development
-      this.VAPID_PUBLIC_KEY = 'BLTY75PqZY6dcJ8qgX5wL1VeD_mIw2Ze_867cgmxCBp1g0qIsb7Nr5n6knFmJJWfibb0xSGh1yrRcQ2FX_JfC64';
+      this.VAPID_PUBLIC_KEY = 'BJbkAXA92DdoDfGnxAt8ExE5rGeQpeIvd1bzGoGjSv0_j3KUkrxkAfufqr1SXnUHfzbuUSgUDKz8DBT2tU_nLuY';
     }
   }
 
