@@ -159,7 +159,14 @@ export const recordMatchResult = asyncHandler(async (req: AuthenticatedRequest, 
   console.log(`🔍 DEBUGGING: Awarding winner points...`);
   for (const winnerId of winningPlayers) {
     if (winnerId && typeof winnerId === 'string') {
-      await SeedingService.awardPoints(winnerId, tierPoints.winner, `Won ${tournamentTier} Series match`);
+      await SeedingService.awardPoints(
+        winnerId, 
+        tierPoints.winner, 
+        `Won ${tournamentTier} Series match`,
+        tournamentTier,
+        pollId,
+        `${pollId}_match_${matchNumber}`
+      );
     } else {
       console.warn(`❌ DEBUGGING: Invalid winner ID:`, winnerId);
     }
@@ -169,7 +176,14 @@ export const recordMatchResult = asyncHandler(async (req: AuthenticatedRequest, 
   console.log(`🔍 DEBUGGING: Awarding participation points...`);
   for (const loserId of losingPlayers) {
     if (loserId && typeof loserId === 'string') {
-      await SeedingService.awardPoints(loserId, tierPoints.participant, `Participated in ${tournamentTier} Series match`);
+      await SeedingService.awardPoints(
+        loserId, 
+        tierPoints.participant, 
+        `Participated in ${tournamentTier} Series match`,
+        tournamentTier,
+        pollId,
+        `${pollId}_match_${matchNumber}`
+      );
     } else {
       console.warn(`❌ DEBUGGING: Invalid loser ID:`, loserId);
     }

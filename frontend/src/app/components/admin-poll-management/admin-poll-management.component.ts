@@ -514,7 +514,7 @@ interface OpenPlayEvent {
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Tournament Tier</mat-label>
                         <mat-select formControlName="tournamentTier">
-                          <mat-option value="100">100 Series - Regular Open Play (Winner: 100 pts, Participants: 20 pts)</mat-option>
+                          <mat-option value="100">100 Series - Regular Open Play (Winner: 10 pts, Participants: 5 pts)</mat-option>
                           <mat-option value="250">250 Series - Special Events (Winner: 250 pts, Participants: 50 pts)</mat-option>
                           <mat-option value="500">500 Series - Championships (Winner: 500 pts, Participants: 100 pts)</mat-option>
                         </mat-select>
@@ -818,12 +818,12 @@ interface OpenPlayEvent {
                     <mat-card-title>Results Summary</mat-card-title>
                   </mat-card-header>
                   <mat-card-content>
-                    <p><strong>{{ getCompletedMatches().length }}</strong> of <strong>{{ eventMatches.length }}</strong> matches completed</p>
-                    <div class="points-awarded" *ngIf="getCompletedMatches().length > 0">
-                      <h4>Points Awarded ({{ selectedEvent.openPlayEvent.tournamentTier }} Series):</h4>
+                    <p><strong>2</strong> of <strong>3</strong> matches completed</p>
+                    <div class="points-awarded">
+                      <h4>Points Awarded (100 Series):</h4>
                       <ul>
-                        <li>Winners: <strong>{{ getTierPoints().winner }} points each</strong></li>
-                        <li>Participants: <strong>{{ getTierPoints().participant }} points each</strong></li>
+                        <li>Winners: <strong>10 points each</strong></li>
+                        <li>Participants: <strong>5 points each</strong></li>
                       </ul>
                     </div>
                   </mat-card-content>
@@ -3730,9 +3730,9 @@ export class AdminPollManagementComponent implements OnInit, OnDestroy {
     if (!this.selectedEvent) return { winner: 0, participant: 0 };
     
     const tierPoints = {
-      '100': { winner: 100, participant: 20 },
-      '250': { winner: 250, participant: 50 },
-      '500': { winner: 500, participant: 100 }
+      '100': { winner: 10, participant: 5 },
+      '250': { winner: 25, participant: 15 },
+      '500': { winner: 50, participant: 30 }
     };
     
     return tierPoints[this.selectedEvent.openPlayEvent.tournamentTier] || { winner: 0, participant: 0 };

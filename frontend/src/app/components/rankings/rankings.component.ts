@@ -19,6 +19,10 @@ interface PlayerRanking {
   _id: string;
   username: string;
   fullName: string;
+  seedPoints: number;
+  matchesWon: number;
+  matchesPlayed: number;
+  winRate: number;
   rank: number;
 }
 
@@ -180,6 +184,8 @@ interface TournamentStats {
             <div class="table-header">
               <div class="rank-col">Rank</div>
               <div class="player-col">Player</div>
+              <div class="points-col">Points</div>
+              <div class="stats-col">Record</div>
             </div>
 
             <div 
@@ -201,6 +207,22 @@ interface TournamentStats {
                 <div class="player-info">
                   <div class="player-name">{{ player.fullName }}</div>
                   <div class="player-username">@{{ player.username }}</div>
+                </div>
+              </div>
+
+              <div class="points-col">
+                <div class="points-display">
+                  <span class="points-value">{{ player.seedPoints }}</span>
+                  <span class="points-label">pts</span>
+                </div>
+              </div>
+
+              <div class="stats-col">
+                <div class="stats-display">
+                  <span class="wins">{{ player.matchesWon }}W</span>
+                  <span class="separator">-</span>
+                  <span class="total">{{ player.matchesPlayed }}P</span>
+                  <span class="win-rate" *ngIf="player.winRate > 0">({{ (player.winRate * 100).toFixed(0) }}%)</span>
                 </div>
               </div>
 

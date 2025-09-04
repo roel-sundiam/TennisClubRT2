@@ -17,7 +17,8 @@ import {
   voteValidation,
   createOpenPlayValidation,
   addAdminVote,
-  removeAdminVote
+  removeAdminVote,
+  removePlayerFromFutureMatches
 } from '../controllers/pollController';
 import { authenticateToken, requireRole } from '../middleware/auth';
 import { validationResult } from 'express-validator';
@@ -229,6 +230,18 @@ router.delete(
   authenticateToken,
   requireRole(['admin', 'superadmin']),
   removeAdminVote
+);
+
+/**
+ * @route POST /api/polls/:id/remove-player
+ * @desc Remove player from future matches and regenerate incomplete matches (superadmin only)
+ * @access Private (SuperAdmin)
+ */
+router.post(
+  '/:id/remove-player',
+  authenticateToken,
+  requireRole(['superadmin']),
+  removePlayerFromFutureMatches
 );
 
 export default router;

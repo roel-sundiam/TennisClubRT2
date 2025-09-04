@@ -269,6 +269,265 @@ export class DoublesSchedulerService {
   }
 
   /**
+   * Generate matches starting from a specific match number
+   * Useful for regenerating incomplete matches while preserving completed ones
+   */
+  static generateMatchesFromNumber(confirmedPlayers: string[], startingMatchNumber: number = 1): MatchResult[] {
+    const baseMatches = this.generateMatches(confirmedPlayers);
+    
+    // Adjust match numbers to start from the specified number
+    return baseMatches.map((match, index) => ({
+      ...match,
+      matchNumber: startingMatchNumber + index
+    }));
+  }
+
+  /**
+   * Generate remaining matches while avoiding players from completed matches
+   * This prevents player conflicts when regenerating incomplete matches
+   */
+  static generateRemainingMatches(
+    allPlayers: string[], 
+    completedMatches: MatchResult[],
+    startingMatchNumber: number = 1
+  ): MatchResult[] {
+    if (allPlayers.length < 4) {
+      throw new Error('Need at least 4 players to generate matches');
+    }
+    
+    if (allPlayers.length > 12) {
+      throw new Error('Maximum 12 players allowed for Open Play');
+    }
+
+    const playerCount = allPlayers.length;
+    const maxMatches = this.calculateMaxMatches(playerCount);
+    
+    // Track how many matches each player has played in completed matches
+    const playerMatchCount = new Map<string, number>();
+    const playerUsedInMatches = new Map<string, number[]>();
+    
+    // Initialize all players
+    allPlayers.forEach(player => {
+      playerMatchCount.set(player, 0);
+      playerUsedInMatches.set(player, []);
+    });
+    
+    // Count completed matches for each player
+    completedMatches.forEach(match => {
+      if (match.players && Array.isArray(match.players)) {
+        match.players.forEach((player: any) => {
+          // Handle both string IDs and populated objects
+          const playerId = typeof player === 'string' ? player : 
+                          (player && player._id ? player._id : String(player));
+          
+          // Only process valid player IDs
+          if (playerId && typeof playerId === 'string' && playerId !== '[object Object]' && playerId !== 'undefined') {
+            const currentCount = playerMatchCount.get(playerId) || 0;
+            playerMatchCount.set(playerId, currentCount + 1);
+            
+            const usedInMatches = playerUsedInMatches.get(playerId) || [];
+            usedInMatches.push(match.matchNumber);
+            playerUsedInMatches.set(playerId, usedInMatches);
+          }
+        });
+      } else {
+        console.warn(`⚠️  Skipping match ${match.matchNumber} - players array is missing or invalid`);
+      }
+    });
+
+    console.log(`🎯 Player status before regeneration:`);
+    playerMatchCount.forEach((count, playerId) => {
+      const matches = playerUsedInMatches.get(playerId) || [];
+      console.log(`  ${playerId}: ${count} matches played (matches: ${matches.join(', ') || 'none'})`);
+    });
+    
+    // Generate alternative remaining matches that avoid completed match patterns
+    const remainingSchedule: string[][] = [];
+    
+    // Strategy: Instead of using the original optimal pattern, generate matches that maximize
+    // variety by ensuring players from completed matches play with NEW partners when possible
+    
+    const playerMatchNeeds = new Map<string, number>();
+    allPlayers.forEach(player => {
+      const currentCount = playerMatchCount.get(player) || 0;
+      const needed = Math.max(0, 2 - currentCount);
+      playerMatchNeeds.set(player, needed);
+    });
+    
+    // Get players who have played together in completed matches
+    const completedPairings = new Set<string>();
+    completedMatches.forEach(match => {
+      const players = match.players || [];
+      if (Array.isArray(players) && players.length >= 2) {
+        // Convert players to string IDs first
+        const playerIds = players
+          .map((player: any) => typeof player === 'string' ? player : 
+                        (player && player._id ? player._id : String(player)))
+          .filter(id => id && typeof id === 'string' && id !== '[object Object]' && id !== 'undefined');
+        
+        for (let i = 0; i < playerIds.length; i++) {
+          for (let j = i + 1; j < playerIds.length; j++) {
+            const pair = [playerIds[i], playerIds[j]].sort().join('|');
+            completedPairings.add(pair);
+          }
+        }
+      }
+    });
+    
+    console.log(`🚫 Completed pairings to avoid: ${Array.from(completedPairings).join(', ')}`);
+    
+    // Generate matches trying to create new pairings
+    const shuffledPlayers = this.shuffleArray([...allPlayers]);
+    
+    // For 6 players, we know we need exactly the right number of remaining matches
+    const expectedRemainingMatches = maxMatches - completedMatches.length;
+    
+    // Create remaining matches by trying different combinations
+    if (playerCount === 6 && completedMatches.length === 1) {
+      // Special handling for 6 players with 1 completed match
+      // We need 2 more matches, and each remaining player needs specific number of matches
+      
+      // Find players who need 1 more match vs 2 more matches
+      const needOne: string[] = [];
+      const needTwo: string[] = [];
+      
+      playerMatchNeeds.forEach((needed, player) => {
+        if (needed === 1) needOne.push(player);
+        if (needed === 2) needTwo.push(player);
+      });
+      
+      console.log(`📊 Match needs: ${needOne.length} players need 1 more, ${needTwo.length} players need 2 more`);
+      
+      if (needOne.length === 4 && needTwo.length === 2) {
+        // Perfect case: 4 players need 1 match, 2 players need 2 matches
+        // Match A: 2 players who need 1 + 2 players who need 2 = all get 1 match
+        // Match B: 2 players who need 1 + 2 players who need 2 = needTwo players get their 2nd match
+        
+        const shuffledNeedOne = this.shuffleArray(needOne);
+        const shuffledNeedTwo = this.shuffleArray(needTwo);
+        
+        // Match A: First 2 from needOne + both from needTwo
+        const matchA = [shuffledNeedOne[0]!, shuffledNeedOne[1]!, shuffledNeedTwo[0]!, shuffledNeedTwo[1]!];
+        
+        // Match B: Last 2 from needOne + both from needTwo (needTwo players get 2nd match)
+        const matchB = [shuffledNeedOne[2]!, shuffledNeedOne[3]!, shuffledNeedTwo[0]!, shuffledNeedTwo[1]!];
+        
+        remainingSchedule.push(matchA, matchB);
+        console.log(`✨ Generated alternative 6-player matches avoiding previous pairings`);
+      } else {
+        // Fallback to original approach
+        const completeSchedule = this.createRotationSchedule(allPlayers, maxMatches);
+        const completedMatchNumbers = new Set(completedMatches.map(m => m.matchNumber));
+        
+        for (let i = 0; i < completeSchedule.length; i++) {
+          const matchNumber = i + 1;
+          if (!completedMatchNumbers.has(matchNumber)) {
+            const match = completeSchedule[i];
+            if (match) {
+              remainingSchedule.push(match);
+            }
+          }
+        }
+        console.log(`⚠️  Using original pattern as fallback for 6 players`);
+      }
+    } else {
+      // For non-6-player cases or different completion states, use original approach
+      const completeSchedule = this.createRotationSchedule(allPlayers, maxMatches);
+      const completedMatchNumbers = new Set(completedMatches.map(m => m.matchNumber));
+      
+      for (let i = 0; i < completeSchedule.length; i++) {
+        const matchNumber = i + 1;
+        if (!completedMatchNumbers.has(matchNumber)) {
+          const match = completeSchedule[i];
+          if (match) {
+            remainingSchedule.push(match);
+          }
+        }
+      }
+      console.log(`🔄 Using original complete schedule for ${playerCount} players`);
+    }
+    
+    console.log(`✅ Generated ${remainingSchedule.length} remaining matches`);
+    
+    // Convert remaining schedule to match format with proper numbering
+    const remainingMatches: MatchResult[] = [];
+    let currentMatchNumber = startingMatchNumber;
+    
+    remainingSchedule.forEach(matchPlayers => {
+      const shuffledPlayers = this.shuffleArray([...matchPlayers]);
+      
+      if (shuffledPlayers.length !== 4) {
+        throw new Error(`Match ${currentMatchNumber} does not have exactly 4 players`);
+      }
+      
+      remainingMatches.push({
+        court: 1,
+        matchNumber: currentMatchNumber,
+        players: shuffledPlayers,
+        team1: [shuffledPlayers[0]!, shuffledPlayers[1]!],
+        team2: [shuffledPlayers[2]!, shuffledPlayers[3]!],
+        status: 'scheduled' as const
+      });
+      
+      currentMatchNumber++;
+    });
+
+    // Validate that we're not exceeding the 2-match limit
+    const finalPlayerCount = new Map<string, number>();
+    allPlayers.forEach(player => {
+      finalPlayerCount.set(player, playerMatchCount.get(player) || 0);
+    });
+    
+    remainingMatches.forEach(match => {
+      if (match.players && Array.isArray(match.players)) {
+        match.players.forEach(playerId => {
+          const currentCount = finalPlayerCount.get(playerId) || 0;
+          finalPlayerCount.set(playerId, currentCount + 1);
+        });
+      }
+    });
+    
+    // Check for violations
+    let hasViolations = false;
+    const violations: string[] = [];
+    console.log(`🔍 Final player match distribution check:`);
+    finalPlayerCount.forEach((count, playerId) => {
+      const completedCount = playerMatchCount.get(playerId) || 0;
+      const newCount = count - completedCount;
+      console.log(`  ${playerId}: ${count} total matches (${completedCount} completed + ${newCount} new)`);
+      if (count > 2) {
+        const violation = `${playerId} would have ${count} matches (limit: 2)`;
+        console.error(`❌ VIOLATION: ${violation}`);
+        violations.push(violation);
+        hasViolations = true;
+      }
+    });
+    
+    if (hasViolations) {
+      throw new Error(`Generated matches would violate the 2-match-per-player limit: ${violations.join(', ')}`);
+    }
+
+    // Additional validation: Ensure all players are accounted for
+    const expectedPlayerCount = allPlayers.length;
+    const actualPlayerCount = finalPlayerCount.size;
+    if (actualPlayerCount !== expectedPlayerCount) {
+      throw new Error(`Player count mismatch: expected ${expectedPlayerCount}, got ${actualPlayerCount}`);
+    }
+
+    // Additional validation: Check match numbering is sequential
+    const matchNumbers = remainingMatches.map(m => m.matchNumber).sort((a, b) => a - b);
+    for (let i = 0; i < matchNumbers.length; i++) {
+      const expectedNumber = startingMatchNumber + i;
+      if (matchNumbers[i] !== expectedNumber) {
+        throw new Error(`Match numbering error: expected match ${expectedNumber}, got ${matchNumbers[i]}`);
+      }
+    }
+    
+    console.log(`🎾 Generated ${remainingMatches.length} remaining matches for ${playerCount} players`);
+    return remainingMatches;
+  }
+
+  /**
    * Get detailed rotation analysis for debugging
    */
   static analyzeRotation(confirmedPlayers: string[]): RotationResult {
@@ -282,12 +541,14 @@ export class DoublesSchedulerService {
     });
     
     matches.forEach(match => {
-      match.players.forEach(playerId => {
-        if (playerStats[playerId]) {
-          playerStats[playerId].matchCount++;
-          playerStats[playerId].matchNumbers.push(match.matchNumber);
-        }
-      });
+      if (match.players && Array.isArray(match.players)) {
+        match.players.forEach(playerId => {
+          if (playerStats[playerId]) {
+            playerStats[playerId].matchCount++;
+            playerStats[playerId].matchNumbers.push(match.matchNumber);
+          }
+        });
+      }
     });
     
     return {

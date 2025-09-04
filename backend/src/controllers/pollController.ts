@@ -8,6 +8,7 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { webSocketService } from '../services/websocketService';
 import { NotificationService } from '../services/notificationService';
+import DoublesSchedulerService from '../services/DoublesSchedulerService';
 
 // Get all polls with filtering and pagination
 export const getPolls = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -796,22 +797,173 @@ export const generateMatches = asyncHandler(async (req: AuthenticatedRequest, re
   try {
     const wasGenerated = poll.openPlayEvent.matchesGenerated;
     console.log(`🎾 Generating matches for poll ${id} with ${poll.openPlayEvent.confirmedPlayers.length} players:`, poll.openPlayEvent.confirmedPlayers);
-    const matches = (Poll as any).generateMatches(poll.openPlayEvent.confirmedPlayers);
-    console.log(`✅ Generated ${matches.length} matches:`, matches.map((m: any) => ({ 
-      match: m.matchNumber, 
-      team1: m.team1, 
-      team2: m.team2 
-    })));
-    // Ensure clean array assignment to avoid Mongoose validation issues
-    poll.openPlayEvent.matches = matches.map((match: any) => ({
-      court: match.court,
-      matchNumber: match.matchNumber,
-      players: [...match.players],
-      team1: [...match.team1],
-      team2: [...match.team2],
-      status: match.status
-    }));
+    
+    // **SMART REGENERATION**: Preserve completed matches
+    const existingMatches = poll.openPlayEvent.matches || [];
+    // Ensure all existing matches have court as number (fix any legacy string values)
+    const completedMatches = existingMatches
+      .filter(match => match.status === 'completed')
+      .map((match, index) => ({
+        ...match,
+        court: typeof match.court === 'string' ? 1 : match.court, // Convert any string court values to number
+        matchNumber: typeof match.matchNumber === 'number' && !isNaN(match.matchNumber) ? match.matchNumber : index + 1 // Fix invalid matchNumbers
+      }));
+    const incompleteMatches = existingMatches.filter(match => match.status !== 'completed');
+    
+    console.log(`📊 Found ${completedMatches.length} completed matches, ${incompleteMatches.length} incomplete matches`);
+    
+    if (completedMatches.length > 0) {
+      console.log(`🔒 Preserving ${completedMatches.length} completed matches`);
+      console.log(`📋 Completed matches:`, completedMatches.map(m => `Match ${m.matchNumber} (${m.status})`));
+    }
+    
+    // Get total matches expected from DoublesSchedulerService distribution table
+    const totalPlayers = poll.openPlayEvent.confirmedPlayers.length;
+    
+    // Use DoublesSchedulerService to get the correct total match count
+    const allMatches = DoublesSchedulerService.generateMatches(poll.openPlayEvent.confirmedPlayers);
+    const targetTotalMatches = allMatches.length;
+    
+    // Calculate how many NEW matches we need (subtract completed matches)
+    const currentCompletedMatches = completedMatches.length;
+    const newMatchesNeeded = Math.max(0, targetTotalMatches - currentCompletedMatches);
+    
+    console.log(`🎯 Target: ${targetTotalMatches} total matches (from DoublesSchedulerService)`);
+    console.log(`✅ Already completed: ${currentCompletedMatches} matches`);  
+    console.log(`🆕 New matches needed: ${newMatchesNeeded} matches`);
+    
+    let newMatches: any[] = [];
+    
+    if (newMatchesNeeded === 0) {
+      console.log(`🏁 No new matches needed - target already reached`);
+      // Keep existing matches as-is
+      poll.openPlayEvent.matches = completedMatches;
+    } else {
+      // Use enhanced regeneration to generate remaining matches while avoiding conflicts
+      console.log(`🔄 Using enhanced regeneration for ${completedMatches.length} completed matches`);
+      
+      // Calculate the starting match number based on completed matches
+      const validMatchNumbers = completedMatches.map(m => typeof m.matchNumber === 'number' ? m.matchNumber : 0).filter(n => !isNaN(n) && n > 0);
+      const lastCompletedMatchNumber = validMatchNumbers.length > 0 
+        ? Math.max(...validMatchNumbers)
+        : 0;
+      
+      // Generate remaining matches using the enhanced method
+      let remainingMatches;
+      try {
+        // Validate completed matches data structure
+        const validatedCompletedMatches = completedMatches.map(match => ({
+          ...match,
+          players: Array.isArray(match.players) ? match.players : [],
+          matchNumber: typeof match.matchNumber === 'number' ? match.matchNumber : 0
+        }));
+        
+        console.log(`🔍 Validated completed matches:`, validatedCompletedMatches.map(m => 
+          `Match ${m.matchNumber}: ${m.players?.length || 0} players`
+        ));
+        
+        remainingMatches = DoublesSchedulerService.generateRemainingMatches(
+          Array.from(poll.openPlayEvent.confirmedPlayers), // All original players
+          validatedCompletedMatches, // Validated completed matches
+          lastCompletedMatchNumber + 1
+        );
+      } catch (regenerationError: any) {
+        console.error('❌ Enhanced regeneration failed:', regenerationError.message);
+        console.error('❌ Error stack:', regenerationError.stack);
+        return res.status(400).json({
+          success: false,
+          error: `Failed to regenerate matches: ${regenerationError.message}`
+        });
+      }
+      
+      // Convert to the format expected by the rest of the function
+      newMatches = remainingMatches.map((match: any) => ({
+        court: match.court,
+        matchNumber: match.matchNumber, // CRITICAL: Include matchNumber from enhanced regeneration
+        players: match.players,
+        team1: match.team1,
+        team2: match.team2,
+        status: match.status
+      }));
+      
+      console.log(`✅ Generated exactly ${newMatches.length} remaining matches using enhanced regeneration`);
+    }
+    
+    // Handle final match assignment
+    if (newMatchesNeeded > 0) {
+      // The new enhanced regeneration method already handles proper match numbering
+      console.log(`🔢 Using matches with pre-assigned numbering from enhanced regeneration`);
+      
+      // Ensure all matches have proper format and numbering
+      const renumberedMatches = newMatches.map((match: any) => {
+        // Validate that match number is already set correctly by enhanced regeneration
+        if (!match.matchNumber || isNaN(match.matchNumber) || match.matchNumber < 1) {
+          throw new Error(`Invalid matchNumber from enhanced regeneration: ${match.matchNumber}`);
+        }
+        return {
+          court: typeof match.court === 'string' ? 1 : match.court, // Ensure court is always a number
+          matchNumber: match.matchNumber, // Already set by enhanced regeneration
+          players: [...match.players],
+          team1: [...match.team1],
+          team2: [...match.team2],
+          status: match.status
+        };
+      });
+      
+      // Combine completed matches with new matches
+      poll.openPlayEvent.matches = [
+        ...completedMatches, // Keep completed matches as-is
+        ...renumberedMatches // Add new matches with proper numbering
+      ];
+      
+      console.log(`🎯 Final result: ${completedMatches.length} preserved + ${renumberedMatches.length} new = ${poll.openPlayEvent.matches?.length || 0} total matches`);
+    }
+    
+    // Validate final result matches the DoublesSchedulerService distribution
+    const finalMatchCount = poll.openPlayEvent.matches?.length || 0;
+    if (finalMatchCount === targetTotalMatches) {
+      console.log(`✅ SUCCESS: Generated exactly ${finalMatchCount} matches as per DoublesSchedulerService for ${totalPlayers} players`);
+    } else {
+      console.log(`⚠️ WARNING: Generated ${finalMatchCount} matches but expected ${targetTotalMatches} for ${totalPlayers} players`);
+    }
+    
+    // Final validation: Ensure no player exceeds 2 matches
+    const finalPlayerMatchCount = new Map<string, number>();
+    poll.openPlayEvent.confirmedPlayers.forEach(playerId => {
+      finalPlayerMatchCount.set(playerId, 0);
+    });
+    
+    poll.openPlayEvent.matches?.forEach(match => {
+      match.players?.forEach((playerId: string) => {
+        const currentCount = finalPlayerMatchCount.get(playerId) || 0;
+        finalPlayerMatchCount.set(playerId, currentCount + 1);
+      });
+    });
+    
+    let maxMatchViolations = 0;
+    console.log(`🔍 Final player match distribution:`);
+    finalPlayerMatchCount.forEach((count, playerId) => {
+      console.log(`  ${playerId}: ${count} matches`);
+      if (count > 2) {
+        maxMatchViolations++;
+        console.log(`❌ VIOLATION: ${playerId} exceeds 2-match limit with ${count} matches`);
+      }
+    });
+    
+    if (maxMatchViolations === 0) {
+      console.log(`✅ SUCCESS: All players respect the 2-match maximum limit`);
+    } else {
+      console.log(`❌ ERROR: ${maxMatchViolations} players exceed the 2-match limit`);
+    }
     poll.openPlayEvent.matchesGenerated = true;
+    
+    // Normalize court field for all matches (fix any string values to numbers)
+    if (poll.openPlayEvent.matches) {
+      poll.openPlayEvent.matches = poll.openPlayEvent.matches.map((match: any) => ({
+        ...match,
+        court: typeof match.court === 'string' ? 1 : match.court
+      }));
+    }
     
     console.log('🔄 About to save poll with matches...');
     console.log('🔍 Final matches before save:', poll.openPlayEvent.matches?.map((m: any, i: number) => ({
@@ -819,7 +971,9 @@ export const generateMatches = asyncHandler(async (req: AuthenticatedRequest, re
       team1Length: m.team1?.length,
       team2Length: m.team2?.length,
       team1Valid: m.team1?.every((p: any) => p && typeof p === 'string'),
-      team2Valid: m.team2?.every((p: any) => p && typeof p === 'string')
+      team2Valid: m.team2?.every((p: any) => p && typeof p === 'string'),
+      courtType: typeof m.court,
+      courtValue: m.court
     })));
     
     await poll.save();
@@ -831,13 +985,23 @@ export const generateMatches = asyncHandler(async (req: AuthenticatedRequest, re
       select: 'username fullName'
     });
 
-    const message = wasGenerated ? 'Matches regenerated successfully' : 'Matches generated successfully';
+    const preservedCount = completedMatches.length;
+    const newCount = newMatchesNeeded;
+    const totalMatches = poll.openPlayEvent.matches?.length || 0;
+    
+    const message = preservedCount > 0 
+      ? `Matches regenerated using exact distribution table. ${preservedCount} completed matches preserved, ${newCount} new matches generated for ${totalPlayers} players (${totalMatches} total matches).`
+      : `Matches generated using exact distribution table for ${totalPlayers} players (${totalMatches} matches total).`;
 
     return res.status(200).json({
       success: true,
       data: {
         matches: poll.openPlayEvent.matches,
-        confirmedPlayers: poll.openPlayEvent.confirmedPlayers
+        confirmedPlayers: poll.openPlayEvent.confirmedPlayers,
+        preservedMatches: preservedCount,
+        newMatches: newCount,
+        totalMatches: totalMatches,
+        distributionTable: { maxMatches: targetTotalMatches, playerCount: totalPlayers }
       },
       message: message
     });
@@ -964,7 +1128,7 @@ export const updateMatchOrder = asyncHandler(async (req: AuthenticatedRequest, r
       });
       
       return {
-        court: match.court,
+        court: typeof match.court === 'string' ? 1 : match.court, // Ensure court is always a number
         matchNumber: match.matchNumber,
         players: match.players,
         team1: team1,
@@ -975,6 +1139,14 @@ export const updateMatchOrder = asyncHandler(async (req: AuthenticatedRequest, r
     
     // Ensure matchesGenerated flag remains true
     poll.openPlayEvent.matchesGenerated = true;
+    
+    // Final validation: ensure all court values are numbers before saving
+    if (poll.openPlayEvent.matches) {
+      poll.openPlayEvent.matches = poll.openPlayEvent.matches.map((match: any) => ({
+        ...match,
+        court: typeof match.court === 'string' ? 1 : match.court
+      }));
+    }
     
     await poll.save();
 
@@ -990,6 +1162,182 @@ export const updateMatchOrder = asyncHandler(async (req: AuthenticatedRequest, r
     return res.status(500).json({
       success: false,
       error: 'Failed to update match order'
+    });
+  }
+});
+
+// Remove player from future matches and regenerate incomplete matches only
+export const removePlayerFromFutureMatches = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { playerId } = req.body;
+
+  if (!req.user || req.user.role !== 'superadmin') {
+    return res.status(403).json({
+      success: false,
+      error: 'Only superadmins can remove players from matches'
+    });
+  }
+
+  if (!playerId) {
+    return res.status(400).json({
+      success: false,
+      error: 'Player ID is required'
+    });
+  }
+
+  const poll = await Poll.findById(id);
+  
+  if (!poll || !poll.openPlayEvent) {
+    return res.status(404).json({
+      success: false,
+      error: 'Open Play event not found'
+    });
+  }
+
+  if (!poll.openPlayEvent.matchesGenerated || !poll.openPlayEvent.matches) {
+    return res.status(400).json({
+      success: false,
+      error: 'No matches generated yet'
+    });
+  }
+
+  try {
+    console.log(`🎾 Removing player ${playerId} from future matches in poll ${id}`);
+    
+    // Separate completed and incomplete matches
+    const completedMatches = poll.openPlayEvent.matches.filter(match => match.status === 'completed');
+    const incompleteMatches = poll.openPlayEvent.matches.filter(match => match.status !== 'completed');
+    
+    console.log(`📊 Found ${completedMatches.length} completed matches and ${incompleteMatches.length} incomplete matches`);
+    
+    // Get all players from incomplete matches, excluding the player to remove
+    const remainingPlayers = new Set<string>();
+    incompleteMatches.forEach(match => {
+      match.players.forEach(player => {
+        if (player !== playerId) {
+          remainingPlayers.add(player);
+        }
+      });
+    });
+    
+    const remainingPlayersArray = Array.from(remainingPlayers);
+    console.log(`👥 Remaining players for regeneration: ${remainingPlayersArray.length}`);
+    
+    if (remainingPlayersArray.length < 4) {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot regenerate matches - need at least 4 players, but only ${remainingPlayersArray.length} remaining`
+      });
+    }
+    
+    // Generate new matches for remaining players using enhanced regeneration
+    const { DoublesSchedulerService } = require('../services/DoublesSchedulerService');
+    
+    // Calculate the starting match number based on completed matches
+    const lastCompletedMatchNumber = completedMatches.length > 0 
+      ? Math.max(...completedMatches.map(m => m.matchNumber))
+      : 0;
+    
+    // Use the new generateRemainingMatches method to avoid player conflicts
+    let renumberedNewMatches;
+    try {
+      // Validate completed matches data structure
+      const validatedCompletedMatches = completedMatches.map(match => ({
+        ...match,
+        players: Array.isArray(match.players) ? match.players : [],
+        matchNumber: typeof match.matchNumber === 'number' ? match.matchNumber : 0
+      }));
+      
+      console.log(`🔍 Validated completed matches for player removal:`, validatedCompletedMatches.map(m => 
+        `Match ${m.matchNumber}: ${m.players?.length || 0} players`
+      ));
+      
+      renumberedNewMatches = DoublesSchedulerService.generateRemainingMatches(
+        Array.from(poll.openPlayEvent.confirmedPlayers), // All original players
+        validatedCompletedMatches, // Validated completed matches
+        lastCompletedMatchNumber + 1
+      );
+    } catch (regenerationError: any) {
+      console.error('❌ Enhanced regeneration failed during player removal:', regenerationError.message);
+      console.error('❌ Error stack:', regenerationError.stack);
+      return res.status(400).json({
+        success: false,
+        error: `Failed to regenerate matches after player removal: ${regenerationError.message}`
+      });
+    }
+    
+    console.log(`🔢 Renumbered ${renumberedNewMatches.length} new matches starting from match ${lastCompletedMatchNumber + 1}`);
+    
+    // Combine completed matches with new matches
+    poll.openPlayEvent.matches = [
+      ...completedMatches,
+      ...renumberedNewMatches
+    ];
+    
+    // Update confirmed players list to reflect the removal
+    if (poll.openPlayEvent.confirmedPlayers.includes(playerId)) {
+      poll.openPlayEvent.confirmedPlayers = poll.openPlayEvent.confirmedPlayers.filter(id => id !== playerId);
+      console.log(`✅ Removed ${playerId} from confirmed players list`);
+      
+      // Also remove the vote from poll options
+      const yesOption = poll.options.find(option => option.text.toLowerCase() === 'yes');
+      if (yesOption && yesOption.voters.includes(playerId)) {
+        yesOption.voters = yesOption.voters.filter(id => id !== playerId);
+        yesOption.votes = yesOption.voters.length;
+        console.log(`✅ Removed ${playerId} vote from poll options`);
+        
+        // Handle payment removal/refund
+        const existingPayment = await Payment.findOne({
+          pollId: (poll._id as any).toString(),
+          userId: playerId,
+          status: { $in: ['pending', 'completed'] }
+        });
+        
+        if (existingPayment) {
+          // If payment was completed with credits, refund the credits
+          if (existingPayment.status === 'completed' && (existingPayment.paymentMethod as any) === 'credits') {
+            try {
+              const CreditTransaction = require('../models/CreditTransaction');
+              console.log(`💳 Auto-refunding ₱${existingPayment.amount} credits for player removal`);
+              
+              await (CreditTransaction as any).refundOpenPlay(
+                playerId,
+                (poll._id as any).toString(),
+                existingPayment.amount
+              );
+              
+              console.log(`✅ Successfully refunded ₱${existingPayment.amount} credits`);
+            } catch (error) {
+              console.error('Failed to auto-refund credits:', error);
+            }
+          }
+          
+          // Delete the payment record
+          await Payment.deleteOne({ _id: existingPayment._id });
+          console.log(`✅ Removed payment record for ${playerId}`);
+        }
+      }
+    }
+    
+    await poll.save();
+    console.log(`✅ Successfully updated poll with ${poll.openPlayEvent.matches.length} total matches`);
+    
+    return res.status(200).json({
+      success: true,
+      data: {
+        completedMatches: completedMatches.length,
+        newMatches: renumberedNewMatches.length,
+        totalMatches: poll.openPlayEvent.matches.length,
+        remainingPlayers: remainingPlayersArray.length,
+        matches: poll.openPlayEvent.matches
+      },
+      message: `Player removed and ${renumberedNewMatches.length} matches regenerated. ${completedMatches.length} completed matches preserved.`
+    });
+  } catch (error: any) {
+    console.error('❌ Error removing player from future matches:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to remove player from matches'
     });
   }
 });

@@ -35,7 +35,7 @@ interface Payment {
   };
   amount: number;
   currency: string;
-  paymentMethod: 'cash' | 'bank_transfer' | 'gcash' | 'coins';
+  paymentMethod: 'cash' | 'bank_transfer' | 'gcash';
   status: 'pending' | 'completed' | 'failed' | 'refunded' | 'record';
   transactionId?: string;
   referenceNumber: string;
@@ -404,7 +404,6 @@ interface Notification {
                 <div class="payment-amount">
                   <span class="amount">{{getDisplayAmount()}}</span>
                   <span class="currency">PHP</span>
-                  <small class="admin-override" *ngIf="isAdmin() && hasCustomAmount()">⚡ Custom Amount</small>
                 </div>
               </div>
             </div>
@@ -458,6 +457,26 @@ interface Notification {
 
               <form [formGroup]="paymentForm" (ngSubmit)="onSubmit()" class="payment-form">
                 <!-- Payment Method -->
+                <!-- Court Fee -->
+                <div class="field">
+                  <label for="courtFee">Court Fee (₱) *</label>
+                  <input 
+                    type="number" 
+                    id="courtFee"
+                    formControlName="courtFee"
+                    placeholder="0.00"
+                    min="0.01"
+                    step="0.01">
+                  <small class="help-text">Auto-populated with calculated fee, but you can edit if needed</small>
+                  <small class="error" *ngIf="paymentForm.get('courtFee')?.hasError('required') && paymentForm.get('courtFee')?.touched">
+                    Court fee is required
+                  </small>
+                  <small class="error" *ngIf="paymentForm.get('courtFee')?.hasError('min') && paymentForm.get('courtFee')?.touched">
+                    Court fee must be greater than 0
+                  </small>
+                </div>
+
+                <!-- Payment Method -->
                 <div class="field">
                   <label for="paymentMethod">Payment Method *</label>
                   <select id="paymentMethod" formControlName="paymentMethod">
@@ -465,7 +484,6 @@ interface Notification {
                     <option value="cash">Cash</option>
                     <option value="gcash">GCash</option>
                     <option value="bank_transfer">Bank Transfer</option>
-                    <option value="coins">Use Coins</option>
                   </select>
                   <small class="error" *ngIf="paymentForm.get('paymentMethod')?.hasError('required') && paymentForm.get('paymentMethod')?.touched">
                     Please select a payment method
@@ -473,7 +491,7 @@ interface Notification {
                 </div>
 
                 <!-- Transaction Details -->
-                <div class="field" *ngIf="paymentForm.get('paymentMethod')?.value && paymentForm.get('paymentMethod')?.value !== 'cash' && paymentForm.get('paymentMethod')?.value !== 'coins'">
+                <div class="field" *ngIf="paymentForm.get('paymentMethod')?.value && paymentForm.get('paymentMethod')?.value !== 'cash'">
                   <label for="transactionId">Transaction/Reference Number</label>
                   <input 
                     type="text" 
@@ -483,32 +501,6 @@ interface Notification {
                   <small class="help-text">Optional: Provide reference number for tracking</small>
                 </div>
 
-                <!-- Coin Balance Info -->
-                <div class="coin-info" *ngIf="paymentForm.get('paymentMethod')?.value === 'coins'">
-                  <div class="balance-display">
-                    <span class="label">Available Coins:</span>
-                    <span class="balance">{{currentUser?.coinBalance || 0}}</span>
-                  </div>
-                  <div class="warning" *ngIf="(currentUser?.coinBalance || 0) < selectedReservation.totalFee">
-                    ⚠️ Insufficient coins. You need {{selectedReservation.totalFee - (currentUser?.coinBalance || 0)}} more coins.
-                  </div>
-                </div>
-
-                <!-- Admin-only Custom Amount -->
-                <div class="field" *ngIf="isAdmin()">
-                  <label for="customAmount">Custom Amount (Admin Override) *</label>
-                  <input 
-                    type="number" 
-                    id="customAmount"
-                    formControlName="customAmount"
-                    placeholder="Enter custom amount"
-                    min="0"
-                    step="0.01">
-                  <small class="help-text admin-note">⚡ Admin Override: Leave blank to use calculated amount ({{getCorrectReservationAmount()}})</small>
-                  <small class="error" *ngIf="paymentForm.get('customAmount')?.hasError('min') && paymentForm.get('customAmount')?.touched">
-                    Amount must be greater than 0
-                  </small>
-                </div>
 
                 <!-- Notes -->
                 <div class="field">
@@ -524,7 +516,7 @@ interface Notification {
                 <div class="form-actions">
                   <button 
                     type="submit"
-                    [disabled]="paymentForm.invalid || loading || (paymentForm.get('paymentMethod')?.value === 'coins' && (currentUser?.coinBalance || 0) < getPaymentAmount()) || (isAdmin() && paymentForm.get('customAmount')?.value && paymentForm.get('customAmount')?.invalid)"
+                    [disabled]="paymentForm.invalid || loading"
                     class="submit-btn">
                     {{loading ? 'Processing Payment...' : 'Complete Payment'}}
                   </button>
@@ -720,10 +712,10 @@ export class PaymentsComponent implements OnInit {
   ) {
     this.paymentForm = this.fb.group({
       reservationId: ['', Validators.required],
+      courtFee: ['', [Validators.required, Validators.min(0.01)]], // Editable court fee for all users
       paymentMethod: ['', Validators.required],
       transactionId: [''],
-      notes: [''],
-      customAmount: ['', [Validators.min(0.01)]] // Admin-only custom amount field with validation
+      notes: ['']
     });
 
     this.manualPaymentForm = this.fb.group({
@@ -976,11 +968,8 @@ export class PaymentsComponent implements OnInit {
         transactionId: formValue.transactionId || undefined
       };
       
-      // Add custom amount if admin override is used
-      if (this.hasCustomAmount()) {
-        updateData.customAmount = this.paymentForm.get('customAmount')?.value;
-        updateData.notes = (formValue.notes || '') + `\n[Admin Override: Custom amount ₱${parseFloat(this.paymentForm.get('customAmount')?.value).toFixed(2)}]`.trim();
-      }
+      // Add court fee from form input
+      updateData.customAmount = formValue.courtFee;
       
       this.http.put<any>(`${this.apiUrl}/payments/${existingPaymentId}`, updateData).subscribe({
         next: (response) => {
@@ -1020,17 +1009,9 @@ export class PaymentsComponent implements OnInit {
       notes: formValue.notes || undefined
     };
     
-    // Add custom amount if admin override is used
-    if (this.hasCustomAmount()) {
-      paymentData.customAmount = this.paymentForm.get('customAmount')?.value;
-      paymentData.notes = (paymentData.notes || '') + `\n[Admin Override: Custom amount ₱${parseFloat(this.paymentForm.get('customAmount')?.value).toFixed(2)}]`.trim();
-    }
+    // Add court fee from form input
+    paymentData.customAmount = formValue.courtFee;
 
-    // If using coins, use the coin payment endpoint
-    if (formValue.paymentMethod === 'coins') {
-      this.payWithCoins(formValue.reservationId);
-      return;
-    }
 
     this.http.post<any>(`${this.apiUrl}/payments`, paymentData).subscribe({
       next: (response) => {
@@ -1061,49 +1042,6 @@ export class PaymentsComponent implements OnInit {
     });
   }
 
-  payWithCoins(reservationId: string): void {
-    const paymentData: any = {
-      reservationId: reservationId,
-      paymentMethod: 'coins'
-    };
-    
-    // Add custom amount if admin override is used
-    if (this.hasCustomAmount()) {
-      paymentData.customAmount = this.paymentForm.get('customAmount')?.value;
-    }
-    
-    // First create the payment record
-    this.http.post<any>(`${this.apiUrl}/payments`, paymentData).subscribe({
-      next: (paymentResponse) => {
-        // Then use coins to pay for it
-        this.http.post<any>(`${this.apiUrl}/coins/use-payment`, {
-          paymentId: paymentResponse.data._id
-        }).subscribe({
-          next: (coinResponse) => {
-            this.loading = false;
-            this.showSuccess('Payment Successful', 'Payment completed using coins');
-            this.resetForm();
-            this.loadPendingPayments();
-            
-            // Update current user's coin balance
-            if (this.currentUser) {
-              this.currentUser.coinBalance = coinResponse.data.newBalance;
-            }
-          },
-          error: (error) => {
-            this.loading = false;
-            const message = error.error?.error || 'Failed to process coin payment';
-            this.showError('Coin Payment Failed', message);
-          }
-        });
-      },
-      error: (error) => {
-        this.loading = false;
-        const message = error.error?.error || 'Failed to create payment record';
-        this.showError('Payment Failed', message);
-      }
-    });
-  }
 
   processPayment(paymentId: string, silent = false): void {
     this.processing.push(paymentId);
@@ -1276,14 +1214,6 @@ export class PaymentsComponent implements OnInit {
         this.showSuccess('Reservation Cancelled', 
           response.message || `Reservation cancelled successfully. ${reason ? 'Reason: ' + reason : ''}`);
         this.loadPendingPayments();
-        // Refresh coin balance from the server to get the accurate amount
-        this.http.get<any>(`${this.apiUrl}/coins/balance`).subscribe(
-          coinResponse => {
-            if (coinResponse.success && this.authService.currentUser) {
-              this.authService.updateCoinBalance(coinResponse.data.balance);
-            }
-          }
-        );
       },
       error: (error) => {
         this.processing = this.processing.filter(id => id !== reservationId);
@@ -1436,7 +1366,8 @@ export class PaymentsComponent implements OnInit {
       this.isDirectPayment = true;
       this.selectedReservation = targetReservation;
       this.paymentForm.patchValue({
-        reservationId: reservationId
+        reservationId: reservationId,
+        courtFee: targetReservation.totalFee || 0
       });
       
       // Clear the query parameters to clean up the URL
@@ -1468,10 +1399,10 @@ export class PaymentsComponent implements OnInit {
     this.paymentForm.reset();
     this.paymentForm.patchValue({
       reservationId: '',
+      courtFee: '',
       paymentMethod: '',
       transactionId: '',
-      notes: '',
-      customAmount: ''
+      notes: ''
     });
   }
 
@@ -1529,7 +1460,8 @@ export class PaymentsComponent implements OnInit {
     reservation.totalFee = calculatedFee;
     this.selectedReservation = reservation;
     this.paymentForm.patchValue({
-      reservationId: reservation._id
+      reservationId: reservation._id,
+      courtFee: calculatedFee
     });
   }
 
@@ -1548,7 +1480,8 @@ export class PaymentsComponent implements OnInit {
           reservation.totalFee = response.data.amount;
           this.selectedReservation = reservation;
           this.paymentForm.patchValue({
-            reservationId: reservation._id
+            reservationId: reservation._id,
+            courtFee: response.data.amount
           });
         } else {
           this.showError('Calculation Error', 'Failed to calculate payment amount');
@@ -1560,7 +1493,8 @@ export class PaymentsComponent implements OnInit {
         // Still set the reservation but with 0 fee as fallback
         this.selectedReservation = reservation;
         this.paymentForm.patchValue({
-          reservationId: reservation._id
+          reservationId: reservation._id,
+          courtFee: reservation.totalFee || 0
         });
       }
     });
@@ -1667,29 +1601,7 @@ export class PaymentsComponent implements OnInit {
     this.http.put<any>(requestUrl, updateData).subscribe({
       next: (response) => {
         // Handle different payment methods
-        if (paymentMethod === 'coins') {
-          // For coins, use the coin payment endpoint
-          this.http.post<any>(`${this.apiUrl}/coins/use-payment`, {
-            paymentId: paymentId
-          }).subscribe({
-            next: (coinResponse) => {
-              this.loading = false;
-              this.showSuccess('Payment Successful', 'Open Play payment completed using coins');
-              this.resetForm();
-              this.loadPendingPayments();
-              
-              // Update current user's coin balance
-              if (this.currentUser) {
-                this.currentUser.coinBalance = coinResponse.data.newBalance;
-              }
-            },
-            error: (error) => {
-              this.loading = false;
-              const message = error.error?.error || 'Failed to process coin payment';
-              this.showError('Coin Payment Failed', message);
-            }
-          });
-        } else if (paymentMethod === 'cash') {
+        if (paymentMethod === 'cash') {
           // For cash, automatically mark as completed
           this.processPayment(paymentId, true);
           this.loading = false;
@@ -2046,30 +1958,13 @@ export class PaymentsComponent implements OnInit {
     this.cancelReservationDirectly(reservation);
   }
 
-  // Calculate correct payment amount based on current member categorization
+  // Calculate correct payment amount based on stored amount (respects user-edited court fees)
   getCorrectPaymentAmount(payment: any): string {
-    // FIRST: Check if this is a custom amount set by admin (has metadata or admin override notes)
-    if (payment.metadata?.isAdminOverride || 
-        (payment.notes && payment.notes.includes('Admin override'))) {
-      console.log(`💰 Admin custom amount detected for payment ${payment._id}: ₱${payment.amount}`);
+    // Always use the stored amount since users can now edit court fees
+    // This respects both user-edited amounts and admin overrides
+    if (payment.amount !== undefined && payment.amount !== null) {
+      console.log(`💰 Using stored payment amount for ${payment._id}: ₱${payment.amount}`);
       return '₱' + payment.amount.toFixed(2);
-    }
-
-    // For court reservations, recalculate based on member data (only for non-admin override payments)
-    if (payment.reservationId && payment.reservationId.players && payment.reservationId.timeSlot) {
-      const feeInfo = this.getPlayerFeeInfo(payment);
-      const calculatedTotalFee = (feeInfo.memberCount * feeInfo.memberFee) + (feeInfo.nonMemberCount * feeInfo.nonMemberFee);
-      
-      // Add comparison logging for debugging
-      console.log(`💰 Payment calculation for ${payment.reservationId.players.join(', ')}:`);
-      console.log(`💰 Time slot: ${payment.reservationId.timeSlot} (${payment.reservationId.timeSlot === 6 ? '6:00-7:00 AM OFF-PEAK' : 'other'})`);
-      console.log(`💰 Player breakdown: ${feeInfo.memberCount} members, ${feeInfo.nonMemberCount} non-members`);
-      console.log(`💰 Fee breakdown: ${feeInfo.memberCount} × ₱${feeInfo.memberFee} + ${feeInfo.nonMemberCount} × ₱${feeInfo.nonMemberFee} = ₱${calculatedTotalFee}`);
-      console.log(`💰 Stored: ₱${payment.amount}, Calculated: ₱${calculatedTotalFee}`);
-      
-      // For payment history, always use the recalculated amount based on proper member categorization
-      // This fixes the issue where ₱60 should be ₱90 for off-peak reservations
-      return '₱' + calculatedTotalFee.toFixed(2);
     }
     
     // For Open Play Events and other payment types, use stored amount
@@ -2119,29 +2014,24 @@ export class PaymentsComponent implements OnInit {
     return this.currentUser?.role === 'admin' || this.currentUser?.role === 'superadmin';
   }
 
-  // Check if admin has entered a custom amount
-  hasCustomAmount(): boolean {
-    if (!this.isAdmin()) return false;
-    const customAmount = this.paymentForm.get('customAmount')?.value;
-    return customAmount && customAmount > 0 && this.paymentForm.get('customAmount')?.valid;
-  }
 
-  // Get display amount (custom if admin override, otherwise calculated)
+  // Get display amount from court fee field
   getDisplayAmount(): string {
-    if (this.hasCustomAmount()) {
-      const customAmount = this.paymentForm.get('customAmount')?.value;
-      return '₱' + parseFloat(customAmount).toFixed(2);
+    const courtFee = this.paymentForm.get('courtFee')?.value;
+    if (courtFee && courtFee > 0) {
+      return '₱' + parseFloat(courtFee).toFixed(2);
     }
     return this.getCorrectReservationAmount();
   }
 
   // Get the actual amount to use for payment processing
   getPaymentAmount(): number {
-    if (this.hasCustomAmount()) {
-      return parseFloat(this.paymentForm.get('customAmount')?.value);
+    const courtFee = this.paymentForm.get('courtFee')?.value;
+    if (courtFee && courtFee > 0) {
+      return parseFloat(courtFee);
     }
     
-    // Calculate based on current logic
+    // Fallback to calculated logic
     if (!this.selectedReservation) return 0;
     
     if (this.isOpenPlayPayment()) {

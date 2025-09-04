@@ -248,16 +248,19 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
       const updateData: any = {};
       if (paymentMethod) updateData.paymentMethod = paymentMethod;
       
-      // Handle admin custom amount override
+      // Handle custom amount (now available to all users)
       if (customAmount) {
         const newAmount = parseFloat(customAmount);
         if (newAmount > 0) {
           updateData.amount = newAmount;
-          updateData.notes = `Admin override: Custom amount ₱${newAmount.toFixed(2)} set by ${req.user.username}`;
+          const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+          updateData.notes = isAdmin 
+            ? `Admin override: Custom amount ₱${newAmount.toFixed(2)} set by ${req.user.username}`
+            : `Custom amount ₱${newAmount.toFixed(2)} set by ${req.user.username}`;
           updateData.metadata = {
             ...existingPayment.metadata,
             discounts: existingPayment.metadata?.discounts || [], // Preserve existing discounts or initialize empty array
-            isAdminOverride: true,
+            isAdminOverride: isAdmin,
             originalFee: newAmount
           };
         }
@@ -301,10 +304,10 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
       }
     };
   } else {
-    // Check for admin custom amount override
-    if (customAmount && (req.user.role === 'admin' || req.user.role === 'superadmin')) {
+    // Check for custom amount (now available to all users)
+    if (customAmount) {
       paymentAmount = parseFloat(customAmount);
-      isAdminOverride = true;
+      isAdminOverride = req.user.role === 'admin' || req.user.role === 'superadmin';
     } else if (!paymentAmount && reservation) {
       // Calculate payment amount with proper member/non-member pricing
       const peakHours = (process.env.PEAK_HOURS || '5,18,19,21').split(',').map(h => parseInt(h));
@@ -812,17 +815,20 @@ export const updatePayment = asyncHandler(async (req: AuthenticatedRequest, res:
     payment.referenceNumber = referenceNumber;
   }
   
-  // Handle admin custom amount override
-  if (customAmount && (req.user?.role === 'admin' || req.user?.role === 'superadmin')) {
+  // Handle custom amount (now available to all users)
+  if (customAmount) {
     const newAmount = parseFloat(customAmount);
     if (newAmount > 0) {
       payment.amount = newAmount;
-      // Add or update notes about admin override
-      const adminNote = `Admin override: Custom amount ₱${newAmount.toFixed(2)} set by ${req.user.username}`;
+      // Add or update notes about custom amount
+      const isAdmin = req.user?.role === 'admin' || req.user?.role === 'superadmin';
+      const amountNote = isAdmin 
+        ? `Admin override: Custom amount ₱${newAmount.toFixed(2)} set by ${req.user?.username || 'admin'}`
+        : `Custom amount ₱${newAmount.toFixed(2)} set by ${req.user?.username || 'user'}`;
       if (payment.notes) {
-        payment.notes += `\n${adminNote}`;
+        payment.notes += `\n${amountNote}`;
       } else {
-        payment.notes = adminNote;
+        payment.notes = amountNote;
       }
       // Update metadata (create if it doesn't exist)
       if (!payment.metadata) {

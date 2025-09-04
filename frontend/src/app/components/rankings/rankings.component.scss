@@ -525,13 +525,13 @@
 .table-header,
 .table-row {
   display: grid;
-  grid-template-columns: 80px 1fr;
+  grid-template-columns: 80px 1fr 120px 140px;
   align-items: center;
   padding: 24px 32px;
   gap: 24px;
   
   @media (max-width: 768px) {
-    grid-template-columns: 60px 1fr;
+    grid-template-columns: 60px 1fr 100px 120px;
     padding: 16px 24px;
     gap: 16px;
   }
@@ -644,6 +644,82 @@
   @media (max-width: 768px) {
     font-size: 0.8125rem;
     margin-bottom: 4px;
+  }
+}
+
+// Points Column
+.points-col {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.points-display {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  text-align: center;
+}
+
+.points-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1976d2;
+}
+
+.points-label {
+  font-size: 0.75rem;
+  color: #666;
+  text-transform: lowercase;
+}
+
+// Stats Column
+.stats-col {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.stats-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.wins {
+  color: #4caf50;
+  font-weight: 600;
+}
+
+.separator {
+  color: #ccc;
+}
+
+.total {
+  color: #666;
+  font-weight: 500;
+}
+
+.win-rate {
+  font-size: 0.75rem;
+  color: #666;
+  margin-left: 4px;
+}
+
+@media (max-width: 768px) {
+  .points-value {
+    font-size: 1.125rem;
+  }
+  
+  .stats-display {
+    font-size: 0.8125rem;
+    gap: 4px;
+  }
+  
+  .win-rate {
+    font-size: 0.6875rem;
   }
 }
 

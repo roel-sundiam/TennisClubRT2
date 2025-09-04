@@ -1,5 +1,7 @@
 import User from '../models/User';
 import Reservation from '../models/Reservation';
+import Poll from '../models/Poll';
+import SeedingPoint from '../models/SeedingPoint';
 import { PlayerRanking, PlayerStats, MatchResult } from '../types';
 
 export class SeedingService {
@@ -257,7 +259,14 @@ export class SeedingService {
   /**
    * Award seeding points to a specific player
    */
-  static async awardPoints(userId: string, points: number, reason: string): Promise<void> {
+  static async awardPoints(
+    userId: string, 
+    points: number, 
+    reason: string, 
+    tournamentTier: string = '100',
+    pollId?: string,
+    matchId?: string
+  ): Promise<void> {
     try {
       console.log(`🔍 DEBUGGING: Attempting to award ${points} points to user ID: ${userId} for: ${reason}`);
       
@@ -271,6 +280,20 @@ export class SeedingService {
       console.log(`✅ DEBUGGING: Found user: ${user.fullName || user.username} (ID: ${userId})`);
       console.log(`🔍 DEBUGGING: User current stats - Points: ${user.seedPoints}, Wins: ${user.matchesWon}, Played: ${user.matchesPlayed}`);
       
+      // Create SeedingPoint record for tracking and rankings
+      const seedingPoint = new SeedingPoint({
+        userId: userId,
+        points: points,
+        description: reason,
+        tournamentTier: tournamentTier,
+        pollId: pollId,
+        matchId: matchId
+      });
+      
+      await seedingPoint.save();
+      console.log(`📝 DEBUGGING: Created SeedingPoint record with ${points} points`);
+      
+      // Update user stats
       const updateResult = await User.findByIdAndUpdate(
         userId,
         {
@@ -309,28 +332,17 @@ export class SeedingService {
     activeMembers: number;
   }> {
     try {
-      // Count polls/open play events instead of matches
-      const Poll = require('../models/Poll');
-      const [eventStats, userStats] = await Promise.all([
-        Poll.aggregate([
-          { $match: { status: { $in: ['active', 'completed'] } } },
-          {
-            $group: {
-              _id: '$tier',
-              count: { $sum: 1 }
-            }
-          }
-        ]),
-        User.aggregate([
-          { $match: { isActive: true, isApproved: true } },
-          {
-            $group: {
-              _id: null,
-              activeMembers: { $sum: 1 }
-            }
-          }
-        ])
-      ]);
+      // Count polls with open play events by tournament tier
+      const eventStats = await Poll.find({
+        status: { $in: ['active', 'completed'] },
+        'openPlayEvent.tournamentTier': { $exists: true }
+      }).select('openPlayEvent.tournamentTier');
+
+      // Count active members
+      const activeMembers = await User.countDocuments({
+        isActive: true,
+        isApproved: true
+      });
 
       const matchesByTier: Record<string, number> = {
         '100': 0,
@@ -339,20 +351,21 @@ export class SeedingService {
       };
       let totalEvents = 0;
 
-      eventStats.forEach((stat: any) => {
-        if (stat._id) {
-          matchesByTier[stat._id] = stat.count;
-          totalEvents += stat.count;
+      eventStats.forEach((poll: any) => {
+        if (poll.openPlayEvent && poll.openPlayEvent.tournamentTier) {
+          const tier = poll.openPlayEvent.tournamentTier;
+          if (matchesByTier[tier] !== undefined) {
+            matchesByTier[tier]++;
+            totalEvents++;
+          }
         }
       });
 
-      const stats = userStats[0] || { activeMembers: 0 };
-
       return {
-        totalMatches: 0, // No longer tracking matches
+        totalMatches: 0, // No longer tracking individual matches
         matchesByTier,
         totalEvents,
-        activeMembers: stats.activeMembers
+        activeMembers
       };
     } catch (error) {
       console.error('Error getting tournament stats:', error);
