@@ -4,6 +4,7 @@ import { PageVisitTrackerService } from './services/page-visit-tracker.service';
 import { AnalyticsService } from './services/analytics.service';
 import { PWANotificationService } from './services/pwa-notification.service';
 import { WebSocketService } from './services/websocket.service';
+import { AppUpdateService } from './services/app-update.service';
 import { LayoutComponent } from './shared/layout/layout.component';
 
 @Component({
@@ -19,7 +20,8 @@ export class App implements OnInit {
     private pageVisitTracker: PageVisitTrackerService,
     private analyticsService: AnalyticsService,
     private pwaNotificationService: PWANotificationService,
-    private webSocketService: WebSocketService
+    private webSocketService: WebSocketService,
+    private appUpdateService: AppUpdateService
   ) {
     console.log('🚀 App component constructor called');
     // Services will be initialized automatically
@@ -28,6 +30,9 @@ export class App implements OnInit {
     // Initialize PWA notification service
     this.pwaNotificationService.init();
     console.log('📱 PWA notification service initialized');
+    // Initialize app update service
+    this.appUpdateService.init();
+    console.log('🔄 App update service initialized');
     // WebSocket service will auto-initialize when user is authenticated
     console.log('🔌 WebSocket service initialized');
   }

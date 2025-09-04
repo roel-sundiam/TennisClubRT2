@@ -53,6 +53,32 @@
       }
     },
     {
+      "name": "polls-api-fresh",
+      "urls": [
+        "https://tennis-club-rt2-backend.onrender.com/api/polls/**"
+      ],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 50,
+        "maxAge": "5m",
+        "timeout": "8s"
+      }
+    },
+    {
+      "name": "dynamic-api-fresh",
+      "urls": [
+        "https://tennis-club-rt2-backend.onrender.com/api/reservations/**",
+        "https://tennis-club-rt2-backend.onrender.com/api/notifications/**",
+        "https://tennis-club-rt2-backend.onrender.com/api/payments/**"
+      ],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 100,
+        "maxAge": "1h",
+        "timeout": "8s"
+      }
+    },
+    {
       "name": "api-cache",
       "urls": [
         "https://tennis-club-rt2-backend.onrender.com/api/**"
@@ -60,7 +86,7 @@
       "cacheConfig": {
         "strategy": "performance",
         "maxSize": 100,
-        "maxAge": "1d",
+        "maxAge": "6h",
         "timeout": "5s"
       }
     }

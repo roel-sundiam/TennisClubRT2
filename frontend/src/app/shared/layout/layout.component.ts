@@ -6,6 +6,7 @@ import { ToolbarComponent } from '../toolbar/toolbar.component';
 import { PaymentAlertsComponent } from '../../components/payment-alerts/payment-alerts.component';
 import { CoinBalanceAlertsComponent } from '../../components/coin-balance-alerts/coin-balance-alerts.component';
 import { PWAInstallPromptComponent } from '../../components/pwa-install-prompt/pwa-install-prompt.component';
+import { UpdateBannerComponent } from '../../components/update-banner/update-banner.component';
 
 @Component({
   selector: 'app-layout',
@@ -16,12 +17,16 @@ import { PWAInstallPromptComponent } from '../../components/pwa-install-prompt/p
     ToolbarComponent,
     PaymentAlertsComponent,
     CoinBalanceAlertsComponent,
-    PWAInstallPromptComponent
+    PWAInstallPromptComponent,
+    UpdateBannerComponent
   ],
   template: `
     <div class="app-layout" [class.authenticated]="isAuthenticated">
       <!-- Global Toolbar (only on authenticated pages) -->
       <app-toolbar *ngIf="isAuthenticated"></app-toolbar>
+      
+      <!-- Update Banner (always available) -->
+      <app-update-banner></app-update-banner>
       
       <!-- Payment & Coin Alerts (only on authenticated pages) -->
       <app-payment-alerts *ngIf="isAuthenticated"></app-payment-alerts>

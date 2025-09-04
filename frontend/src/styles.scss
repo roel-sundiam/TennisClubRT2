@@ -555,3 +555,41 @@ app-reservations {
   color: white !important;
 }
 
+/* App Update Snackbar Styles */
+.update-snackbar {
+  .mat-mdc-snack-bar-container {
+    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%) !important;
+    color: white !important;
+    font-weight: 500 !important;
+    box-shadow: 0 8px 25px rgba(25, 118, 210, 0.3) !important;
+    border-radius: 8px !important;
+  }
+  
+  .mat-mdc-button.mat-mdc-snack-bar-action {
+    color: white !important;
+    background: rgba(255, 255, 255, 0.2) !important;
+    border-radius: 4px !important;
+    font-weight: 600 !important;
+    min-width: auto !important;
+    padding: 8px 16px !important;
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.3) !important;
+    }
+  }
+}
+
+.success-snackbar {
+  .mat-mdc-snack-bar-container {
+    background: #4caf50 !important;
+    color: white !important;
+  }
+}
+
+.error-snackbar {
+  .mat-mdc-snack-bar-container {
+    background: #f44336 !important;
+    color: white !important;
+  }
+}
+
