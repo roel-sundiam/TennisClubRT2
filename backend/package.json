@@ -13,7 +13,8 @@
     "create-superadmin": "ts-node src/scripts/createSuperAdmin.ts",
     "import-members": "ts-node src/scripts/importMembers.ts",
     "create-overdue-test": "ts-node src/scripts/createOverduePayment.ts",
-    "clean-test-data": "ts-node src/scripts/cleanTestData.ts"
+    "clean-test-data": "ts-node src/scripts/cleanTestData.ts",
+    "clear-data": "ts-node scripts/clear-data.ts"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
