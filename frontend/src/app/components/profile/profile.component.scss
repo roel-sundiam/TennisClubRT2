@@ -1,0 +1,302 @@
+.profile-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem;
+  min-height: calc(100vh - 120px);
+
+  @media (max-width: 768px) {
+    padding: 0.5rem;
+  }
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #2563eb 100%);
+  border-radius: 16px;
+  color: white;
+  box-shadow: 0 8px 32px rgba(30, 64, 175, 0.3);
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    text-align: center;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .profile-avatar {
+    margin-right: 1.5rem;
+
+    @media (max-width: 768px) {
+      margin-right: 0;
+      margin-bottom: 1rem;
+    }
+
+    .avatar-icon {
+      font-size: 80px;
+      width: 80px;
+      height: 80px;
+      color: rgba(255, 255, 255, 0.9);
+
+      @media (max-width: 768px) {
+        font-size: 60px;
+        width: 60px;
+        height: 60px;
+      }
+    }
+  }
+
+  .profile-info {
+    flex: 1;
+
+    .profile-name {
+      font-size: 2rem;
+      font-weight: 600;
+      margin: 0 0 0.25rem 0;
+      color: white;
+
+      @media (max-width: 768px) {
+        font-size: 1.5rem;
+      }
+    }
+
+    .profile-username {
+      font-size: 1.1rem;
+      margin: 0 0 0.25rem 0;
+      color: rgba(255, 255, 255, 0.8);
+      font-weight: 400;
+    }
+
+    .profile-role {
+      font-size: 0.9rem;
+      margin: 0;
+      color: rgba(255, 255, 255, 0.7);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 500;
+    }
+  }
+}
+
+.profile-tabs {
+  .mat-mdc-tab-group {
+    --mdc-tab-indicator-active-indicator-color: #3b82f6;
+  }
+
+  ::ng-deep .mat-mdc-tab-label {
+    min-width: 160px;
+    font-weight: 500;
+
+    @media (max-width: 768px) {
+      min-width: auto;
+      flex: 1;
+    }
+  }
+
+  ::ng-deep .mat-mdc-tab-label-content {
+    font-size: 1rem;
+
+    @media (max-width: 768px) {
+      font-size: 0.9rem;
+    }
+  }
+}
+
+.tab-content {
+  padding-top: 1.5rem;
+
+  @media (max-width: 768px) {
+    padding-top: 1rem;
+  }
+}
+
+.profile-card {
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+
+  .mat-mdc-card-header {
+    padding: 1.5rem 1.5rem 1rem 1.5rem;
+
+    .mat-mdc-card-title {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #1a202c;
+      margin: 0;
+
+      mat-icon {
+        color: #3b82f6;
+        font-size: 24px;
+        width: 24px;
+        height: 24px;
+      }
+    }
+
+    .mat-mdc-card-subtitle {
+      margin-top: 0.5rem;
+      color: #6b7280;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+  }
+
+  .mat-mdc-card-content {
+    padding: 0 1.5rem 1.5rem 1.5rem;
+  }
+}
+
+.profile-form {
+  .form-row {
+    margin-bottom: 1rem;
+
+    @media (max-width: 768px) {
+      margin-bottom: 0.75rem;
+    }
+
+    .full-width {
+      width: 100%;
+    }
+
+    .mat-mdc-form-field {
+      ::ng-deep .mat-mdc-text-field-wrapper {
+        border-radius: 12px;
+      }
+
+      ::ng-deep .mdc-text-field--outlined .mdc-notched-outline .mdc-notched-outline__leading {
+        border-radius: 12px 0 0 12px;
+      }
+
+      ::ng-deep .mdc-text-field--outlined .mdc-notched-outline .mdc-notched-outline__trailing {
+        border-radius: 0 12px 12px 0;
+      }
+
+      ::ng-deep .mat-mdc-form-field-label {
+        font-weight: 500;
+      }
+
+      ::ng-deep .mat-mdc-input-element {
+        font-size: 16px;
+        line-height: 1.5;
+
+        @media (max-width: 768px) {
+          font-size: 16px; // Prevent zoom on iOS
+        }
+      }
+    }
+  }
+}
+
+.form-actions {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: center;
+
+  @media (max-width: 768px) {
+    margin-top: 1.5rem;
+  }
+
+  .update-btn {
+    min-width: 200px;
+    height: 48px;
+    border-radius: 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+
+    @media (max-width: 768px) {
+      width: 100%;
+      min-width: auto;
+    }
+
+    &:not(:disabled):hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    mat-icon {
+      margin-right: 0.5rem;
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+  }
+}
+
+// Password visibility toggle
+::ng-deep .mat-mdc-form-field-suffix {
+  .mat-mdc-icon-button {
+    width: 40px;
+    height: 40px;
+    
+    mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+  }
+}
+
+// Snackbar styles
+::ng-deep .success-snackbar {
+  background-color: #4CAF50;
+  color: white;
+
+  .mat-mdc-snack-bar-label {
+    color: white;
+  }
+
+  .mat-mdc-button {
+    color: white;
+  }
+}
+
+::ng-deep .error-snackbar {
+  background-color: #e53e3e;
+  color: white;
+
+  .mat-mdc-snack-bar-label {
+    color: white;
+  }
+
+  .mat-mdc-button {
+    color: white;
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .profile-container {
+    .profile-tabs {
+      ::ng-deep .mat-mdc-tab-header {
+        .mat-mdc-tab-labels {
+          justify-content: space-around;
+        }
+
+        .mat-mdc-tab-label {
+          padding: 12px 8px;
+        }
+      }
+    }
+  }
+}
+
+// Enhanced accessibility
+@media (prefers-reduced-motion: reduce) {
+  .update-btn:not(:disabled):hover {
+    transform: none;
+  }
+}

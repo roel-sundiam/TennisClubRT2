@@ -130,7 +130,7 @@ interface PollOption {
 
       <mat-tab-group class="polls-tabs">
         <!-- Active Polls Tab -->
-        <mat-tab label="Active Polls">
+        <mat-tab label="Active Open Play">
           <div class="tab-content">
             <div *ngIf="loading" class="loading-container">
               <mat-spinner></mat-spinner>
@@ -139,8 +139,8 @@ interface PollOption {
 
             <div *ngIf="!loading && activePolls.length === 0" class="no-polls">
               <mat-icon>ballot</mat-icon>
-              <h3>No Active Polls</h3>
-              <p>There are currently no polls available for voting.</p>
+              <h3>No Active Open Play</h3>
+              <p>There are currently no open play events available for registration.</p>
             </div>
 
             <div *ngFor="let poll of activePolls" class="poll-card-container">
@@ -504,48 +504,159 @@ interface PollOption {
         </mat-tab>
 
         <!-- Closed Polls Tab -->
-        <mat-tab label="Past Polls">
+        <mat-tab label="Past Open Plays">
           <div class="tab-content">
             <div *ngIf="!loading && closedPolls.length === 0" class="no-polls">
               <mat-icon>history</mat-icon>
-              <h3>No Past Polls</h3>
-              <p>Past polls and events will appear here.</p>
+              <h3>No Past Open Plays</h3>
+              <p>Past open play events will appear here.</p>
             </div>
 
-            <div *ngFor="let poll of closedPolls" class="poll-card-container">
-              <mat-card class="poll-card closed-poll">
-                <mat-card-header>
-                  <mat-icon mat-card-avatar class="closed-icon">
-                    {{getPollIcon(poll)}}
-                  </mat-icon>
-                  <mat-card-title>{{poll.title}}</mat-card-title>
-                  <mat-card-subtitle>
-                    {{poll.description}}
-                    <div class="poll-meta">
-                      <mat-chip-set>
-                        <mat-chip class="closed-status">CLOSED</mat-chip>
-                        <mat-chip *ngIf="poll.metadata?.category" class="category-chip">
-                          {{getCategoryLabel(poll.metadata.category)}}
-                        </mat-chip>
-                      </mat-chip-set>
+            <div *ngFor="let poll of closedPolls" class="past-event-card-container">
+              <mat-card class="past-event-card">
+                <!-- Modern Past Event Header -->
+                <div class="past-event-header">
+                  <div class="event-main-info">
+                    <div class="event-status-icon">
+                      <mat-icon>event_available</mat-icon>
                     </div>
-                  </mat-card-subtitle>
-                </mat-card-header>
-
-                <mat-card-content>
-                  <div class="poll-results">
-                    <div *ngFor="let option of poll.options" class="result-option">
-                      <div class="option-header">
-                        <span class="option-text">{{option.text}}</span>
-                        <span class="option-percentage">{{getVotePercentage(poll, option)}}%</span>
+                    <div class="event-details">
+                      <h2 class="event-title">{{poll.title}}</h2>
+                      <p class="event-description">{{poll.description}}</p>
+                      <div class="event-dates" *ngIf="poll.openPlayEvent">
+                        <div class="event-date-item">
+                          <mat-icon>event</mat-icon>
+                          <span>{{formatEventDate(poll.openPlayEvent.eventDate)}}</span>
+                        </div>
+                        <div class="event-time-item">
+                          <mat-icon>schedule</mat-icon>
+                          <span>{{formatTimeRange(poll.openPlayEvent.startTime, poll.openPlayEvent.endTime)}}</span>
+                        </div>
                       </div>
-                      <div class="vote-bar">
-                        <div class="vote-fill" [style.width.%]="getVotePercentage(poll, option)"></div>
-                      </div>
-                      <div class="vote-count">{{option.votes}} vote{{option.votes !== 1 ? 's' : ''}}</div>
                     </div>
                   </div>
-                </mat-card-content>
+                  <div class="event-badges">
+                    <div class="status-badge completed">
+                      <mat-icon>check_circle</mat-icon>
+                      <span>COMPLETED</span>
+                    </div>
+                    <div class="tier-badge" *ngIf="poll.openPlayEvent">
+                      <mat-icon>emoji_events</mat-icon>
+                      <span>{{poll.openPlayEvent.tournamentTier}} Series</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Modern Results Section -->
+                <div class="past-event-content">
+                  <!-- Participation Summary -->
+                  <div class="participation-summary" *ngIf="poll.openPlayEvent">
+                    <h3 class="summary-title">
+                      <mat-icon>groups</mat-icon>
+                      Event Participation
+                    </h3>
+                    <div class="participation-grid">
+                      <div class="participation-stat confirmed">
+                        <div class="stat-icon">
+                          <mat-icon>thumb_up</mat-icon>
+                        </div>
+                        <div class="stat-content">
+                          <div class="stat-number">{{getConfirmedPlayerCount(poll)}}</div>
+                          <div class="stat-label">Players Joined</div>
+                        </div>
+                      </div>
+                      <div class="participation-stat declined">
+                        <div class="stat-icon">
+                          <mat-icon>thumb_down</mat-icon>
+                        </div>
+                        <div class="stat-content">
+                          <div class="stat-number">{{getDeclinedPlayerCount(poll)}}</div>
+                          <div class="stat-label">Players Declined</div>
+                        </div>
+                      </div>
+                      <div class="participation-stat total">
+                        <div class="stat-icon">
+                          <mat-icon>people</mat-icon>
+                        </div>
+                        <div class="stat-content">
+                          <div class="stat-number">{{getTotalVoters(poll)}}</div>
+                          <div class="stat-label">Total Responses</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Confirmed Players List -->
+                  <div class="confirmed-players-archive" *ngIf="poll.openPlayEvent && getConfirmedPlayers(poll).length > 0">
+                    <h4 class="players-title">
+                      <mat-icon>group</mat-icon>
+                      Players Who Participated ({{getConfirmedPlayers(poll).length}})
+                    </h4>
+                    <div class="players-grid">
+                      <div *ngFor="let playerName of getConfirmedPlayers(poll)" class="player-card">
+                        <div class="player-avatar">
+                          <mat-icon>person</mat-icon>
+                        </div>
+                        <span class="player-name">{{playerName}}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Match Results (if available) -->
+                  <div class="match-results-summary" *ngIf="poll.openPlayEvent?.matches && poll.openPlayEvent.matches.length > 0">
+                    <h4 class="results-title">
+                      <mat-icon>sports_tennis</mat-icon>
+                      Tournament Results
+                    </h4>
+                    <div class="results-grid">
+                      <div class="result-stat">
+                        <mat-icon>emoji_events</mat-icon>
+                        <div class="result-content">
+                          <div class="result-number">{{poll.openPlayEvent.matches.length}}</div>
+                          <div class="result-label">Matches Played</div>
+                        </div>
+                      </div>
+                      <div class="result-stat completed-matches">
+                        <mat-icon>check_circle</mat-icon>
+                        <div class="result-content">
+                          <div class="result-number">{{getCompletedMatchesCount(poll)}}</div>
+                          <div class="result-label">Matches Completed</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Traditional Poll Results for non-Open Play polls -->
+                  <div class="poll-results" *ngIf="!poll.openPlayEvent">
+                    <div *ngFor="let option of poll.options" class="result-option-modern">
+                      <div class="option-header">
+                        <div class="option-info">
+                          <mat-icon>{{option.text === 'Yes' ? 'thumb_up' : 'thumb_down'}}</mat-icon>
+                          <span class="option-text">{{option.text}}</span>
+                        </div>
+                        <span class="option-percentage">{{getVotePercentage(poll, option)}}%</span>
+                      </div>
+                      <div class="vote-bar-modern">
+                        <div class="vote-fill-modern" [style.width.%]="getVotePercentage(poll, option)"></div>
+                      </div>
+                      <div class="vote-count-modern">{{option.votes}} {{option.votes === 1 ? 'vote' : 'votes'}}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Event Footer -->
+                <div class="past-event-footer">
+                  <div class="event-meta">
+                    <div class="meta-item">
+                      <mat-icon>schedule</mat-icon>
+                      <span>Closed {{formatRelativeTime(poll.createdAt)}}</span>
+                    </div>
+                    <div class="meta-item" *ngIf="poll.openPlayEvent">
+                      <mat-icon>payments</mat-icon>
+                      <span>₱{{poll.openPlayEvent.playerFee}} per player</span>
+                    </div>
+                  </div>
+                </div>
               </mat-card>
             </div>
           </div>
@@ -991,6 +1102,43 @@ export class PollsComponent implements OnInit, OnDestroy {
       default:
         return 'Scheduled';
     }
+  }
+
+  getConfirmedPlayerCount(poll: Poll): number {
+    const yesOption = poll.options.find(option => option.text.toLowerCase() === 'yes');
+    return yesOption?.votes || 0;
+  }
+
+  getDeclinedPlayerCount(poll: Poll): number {
+    const noOption = poll.options.find(option => option.text.toLowerCase() === 'no');
+    return noOption?.votes || 0;
+  }
+
+  getTotalVoters(poll: Poll): number {
+    return poll.options.reduce((total, option) => total + option.votes, 0);
+  }
+
+  getCompletedMatchesCount(poll: Poll): number {
+    if (!poll.openPlayEvent?.matches) return 0;
+    return poll.openPlayEvent.matches.filter((match: any) => match.status === 'completed').length;
+  }
+
+  formatRelativeTime(dateString: string): string {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'just now';
+    if (diffInHours < 24) return `${diffInHours} hour${diffInHours !== 1 ? 's' : ''} ago`;
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 30) return `${diffInDays} day${diffInDays !== 1 ? 's' : ''} ago`;
+    
+    const diffInMonths = Math.floor(diffInDays / 30);
+    if (diffInMonths < 12) return `${diffInMonths} month${diffInMonths !== 1 ? 's' : ''} ago`;
+    
+    const diffInYears = Math.floor(diffInMonths / 12);
+    return `${diffInYears} year${diffInYears !== 1 ? 's' : ''} ago`;
   }
 
   private showMessage(message: string, type: 'success' | 'error' | 'warning'): void {

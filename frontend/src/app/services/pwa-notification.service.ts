@@ -4,6 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom, Subject } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { OpenPlayNotificationModalComponent } from '../components/open-play-notification-modal/open-play-notification-modal.component';
+import { ModalManagerService } from './modal-manager.service';
 import { environment } from '../../environments/environment';
 
 @Injectable({
@@ -20,7 +21,8 @@ export class PWANotificationService {
     private swPush: SwPush,
     private swUpdate: SwUpdate,
     private http: HttpClient,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private modalManagerService: ModalManagerService
   ) {
     this.fetchVapidKey();
   }
@@ -342,25 +344,20 @@ export class PWANotificationService {
 
         // Show modal with small delay to ensure app is fully loaded
         setTimeout(() => {
-          const dialogRef = this.dialog.open(OpenPlayNotificationModalComponent, {
-            width: '90vw',
-            maxWidth: '500px',
-            height: 'auto',
-            maxHeight: '80vh',
-            data: {
-              notifications: [modalNotification]
-            },
-            disableClose: false,
-            hasBackdrop: true,
-            panelClass: ['open-play-modal', 'pwa-triggered']
-          });
+          const dialogRef = this.modalManagerService.showOpenPlayModal(
+            { notifications: [modalNotification] },
+            { panelClass: ['open-play-modal', 'pwa-triggered'] }
+          );
 
-          dialogRef.afterClosed().subscribe(result => {
-            console.log('🎾 PWA-triggered modal closed with result:', result);
-            if (result === 'navigate-polls') {
-              window.location.href = '/polls';
-            }
-          });
+          // Handle modal result if modal was actually opened
+          if (dialogRef) {
+            dialogRef.afterClosed().subscribe(result => {
+              console.log('🎾 PWA-triggered modal closed with result:', result);
+              if (result === 'navigate-polls') {
+                window.location.href = '/polls';
+              }
+            });
+          }
         }, 500);
 
       } catch (error) {

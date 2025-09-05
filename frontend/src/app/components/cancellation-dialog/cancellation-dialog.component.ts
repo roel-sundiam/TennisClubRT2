@@ -104,11 +104,13 @@ export interface CancellationResult {
       <!-- Actions -->
       <div mat-dialog-actions class="dialog-actions">
         <button 
-          mat-stroked-button
+          mat-raised-button
           (click)="onCancel()"
           class="cancel-action-btn">
-          <mat-icon>close</mat-icon>
-          Keep Payment
+          <mat-icon>check_circle</mat-icon>
+          <span class="button-text">
+            <span class="button-title">Keep Reservation</span>
+          </span>
         </button>
         
         <button 
@@ -117,8 +119,11 @@ export interface CancellationResult {
           (click)="onConfirmCancellation()"
           [disabled]="!isFormValid()"
           class="confirm-cancel-btn">
-          <mat-icon>delete</mat-icon>
-          Cancel Payment
+          <mat-icon>cancel</mat-icon>
+          <span class="button-text">
+            <span class="button-title">Cancel Payment</span>
+            <span class="button-subtitle">Process refund</span>
+          </span>
         </button>
       </div>
     </div>
@@ -232,6 +237,7 @@ export interface CancellationResult {
           gap: 12px;
           padding: 16px 16px 16px 0;
           width: 100%;
+          text-align: left;
           
           .reason-icon {
             width: 24px;
@@ -250,6 +256,7 @@ export interface CancellationResult {
           
           .reason-text {
             flex: 1;
+            text-align: left;
             
             .reason-title {
               display: block;
@@ -257,6 +264,7 @@ export interface CancellationResult {
               font-weight: 500;
               color: #212121;
               margin-bottom: 2px;
+              text-align: left;
             }
             
             .reason-description {
@@ -264,6 +272,7 @@ export interface CancellationResult {
               font-size: 12px;
               color: #666;
               line-height: 1.3;
+              text-align: left;
             }
           }
         }
@@ -285,26 +294,112 @@ export interface CancellationResult {
     .dialog-actions {
       padding: 16px 24px 24px 24px !important;
       border-top: 1px solid #e0e0e0;
-      display: flex;
-      justify-content: flex-end;
-      gap: 12px;
+      display: flex !important;
+      flex-direction: row !important;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
       margin: 0 !important;
       
       .cancel-action-btn {
-        color: #666;
-        border-color: #e0e0e0;
+        background: #4caf50;
+        color: white;
+        min-width: 160px;
+        min-height: 56px;
+        flex: 0 0 auto;
+        order: 1;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+        transition: all 0.3s ease;
         
         &:hover {
-          background: rgba(0, 0, 0, 0.04);
-          border-color: #666;
+          background: #45a049;
+          box-shadow: 0 4px 8px rgba(76, 175, 80, 0.4);
+          transform: translateY(-1px);
+        }
+        
+        mat-icon {
+          font-size: 20px;
+          width: 20px;
+          height: 20px;
+        }
+        
+        .button-text {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          text-align: left;
+          
+          .button-title {
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.2;
+          }
+          
+          .button-subtitle {
+            font-size: 11px;
+            font-weight: 400;
+            opacity: 0.9;
+            line-height: 1.2;
+          }
         }
       }
       
       .confirm-cancel-btn {
-        min-width: 140px;
+        background: #f44336;
+        color: white;
+        min-width: 160px;
+        min-height: 56px;
+        flex: 0 0 auto;
+        order: 2;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(244, 67, 54, 0.3);
+        transition: all 0.3s ease;
+        
+        &:hover:not(:disabled) {
+          background: #e53935;
+          box-shadow: 0 4px 8px rgba(244, 67, 54, 0.4);
+          transform: translateY(-1px);
+        }
         
         &:disabled {
           opacity: 0.6;
+          transform: none;
+          box-shadow: none;
+        }
+        
+        mat-icon {
+          font-size: 20px;
+          width: 20px;
+          height: 20px;
+        }
+        
+        .button-text {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          text-align: left;
+          
+          .button-title {
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.2;
+          }
+          
+          .button-subtitle {
+            font-size: 11px;
+            font-weight: 400;
+            opacity: 0.9;
+            line-height: 1.2;
+          }
         }
       }
     }
@@ -323,9 +418,48 @@ export interface CancellationResult {
       }
       
       .reason-content {
-        flex-direction: column;
-        text-align: center;
-        gap: 8px;
+        flex-direction: row;
+        text-align: left;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      
+      .dialog-actions {
+        flex-direction: row !important;
+        justify-content: space-between;
+        gap: 12px;
+        
+        .cancel-action-btn {
+          min-width: 140px;
+          min-height: 50px;
+          flex: 1;
+          
+          .button-text {
+            .button-title {
+              font-size: 13px;
+            }
+            
+            .button-subtitle {
+              font-size: 10px;
+            }
+          }
+        }
+        
+        .confirm-cancel-btn {
+          min-width: 140px;
+          min-height: 50px;
+          flex: 1;
+          
+          .button-text {
+            .button-title {
+              font-size: 13px;
+            }
+            
+            .button-subtitle {
+              font-size: 10px;
+            }
+          }
+        }
       }
     }
   `]

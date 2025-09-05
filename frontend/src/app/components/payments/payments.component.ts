@@ -282,13 +282,16 @@ interface Notification {
               
               <div class="payment-header">
                 <div class="payment-info">
-                  <h3>{{payment.description}}</h3>
+                  <h3>{{formatPaymentDescriptionForMobile(payment)}}</h3>
                   <p class="reference">Ref: {{payment.referenceNumber}}</p>
                 </div>
                 <div class="payment-amount">
                   <span class="amount">{{getCorrectPaymentAmount(payment)}}</span>
                   <span class="status" [class]="'status-' + payment.status">
                     {{payment.statusDisplay}}
+                  </span>
+                  <span class="payment-method-mobile">
+                    {{formatPaymentMethod(payment.paymentMethod)}}
                   </span>
                 </div>
               </div>
@@ -1276,13 +1279,35 @@ export class PaymentsComponent implements OnInit {
 
   formatPaymentReservation(payment: Payment): string {
     if (payment.reservationId) {
-      const date = new Date(payment.reservationId.date).toLocaleDateString();
-      return `${date} - ${payment.reservationId.timeSlot}:00-${payment.reservationId.timeSlot + 1}:00`;
+      const date = new Date(payment.reservationId.date).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short', 
+        day: 'numeric',
+        year: 'numeric'
+      });
+      const startTime = this.formatTime(payment.reservationId.timeSlot);
+      const endTime = this.formatTime(payment.reservationId.timeSlot + 1);
+      return `${date} ${startTime}-${endTime}`;
     } else if (payment.pollId?.openPlayEvent) {
-      const date = new Date(payment.pollId.openPlayEvent.eventDate).toLocaleDateString();
+      const date = new Date(payment.pollId.openPlayEvent.eventDate).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric', 
+        year: 'numeric'
+      });
       return `${date} - ${payment.pollId.title}`;
     }
     return 'N/A';
+  }
+
+  /**
+   * Convert 24-hour time to 12-hour AM/PM format
+   */
+  formatTime(hour: number): string {
+    if (hour === 0) return '12AM';
+    if (hour < 12) return `${hour}AM`;
+    if (hour === 12) return '12PM';
+    return `${hour - 12}PM`;
   }
 
   formatPaymentMethod(method: string): string {
@@ -2225,5 +2250,42 @@ export class PaymentsComponent implements OnInit {
       const remaining = players.length - 3;
       return `${firstThree} and ${remaining} other${remaining !== 1 ? 's' : ''}`;
     }
+  }
+
+  /**
+   * Format payment description for mobile with proper AM/PM time and wrapping
+   */
+  formatPaymentDescriptionForMobile(payment: Payment): string {
+    if (payment.reservationId) {
+      const date = new Date(payment.reservationId.date).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short', 
+        day: 'numeric'
+      });
+      const startTime = this.formatTime(payment.reservationId.timeSlot);
+      const endTime = this.formatTime(payment.reservationId.timeSlot + 1);
+      
+      // Create a more compact description for mobile
+      return `Court reservation ${date} ${startTime}-${endTime}`;
+    } else if (payment.pollId?.title) {
+      const date = new Date(payment.pollId.openPlayEvent?.eventDate || new Date()).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+      });
+      return `${payment.pollId.title} ${date}`;
+    } else if (payment.metadata?.isManualPayment) {
+      const date = payment.metadata.courtUsageDate 
+        ? new Date(payment.metadata.courtUsageDate).toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric'
+          })
+        : 'Unknown date';
+      return `Manual payment ${date}`;
+    }
+    
+    // Fallback to original description but make it more compact
+    return payment.description || 'Payment';
   }
 }

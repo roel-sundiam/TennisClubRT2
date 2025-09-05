@@ -12,6 +12,7 @@ import { WebSocketService, OpenPlayNotificationEvent } from '../../services/webs
 import { NotificationService } from '../../services/notification.service';
 import { PWANotificationService } from '../../services/pwa-notification.service';
 import { OpenPlayNotificationModalComponent } from '../open-play-notification-modal/open-play-notification-modal.component';
+import { ModalManagerService } from '../../services/modal-manager.service';
 import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
@@ -78,6 +79,85 @@ import { environment } from '../../../environments/environment';
               <button mat-raised-button class="info-btn" (click)="navigateTo('/my-reservations')">
                 <mat-icon>event</mat-icon>
                 View All Bookings
+              </button>
+            </mat-card-actions>
+          </mat-card>
+
+          <!-- Payments -->
+          <mat-card class="action-card" data-icon="payment" data-title="Payments" (click)="navigateTo('/payments')">
+            <!-- Mobile Icon -->
+            <div class="mobile-card-icon">
+              <mat-icon>payment</mat-icon>
+            </div>
+            <div class="mobile-card-title">Payments</div>
+            
+            <!-- Desktop Content -->
+            <mat-card-header>
+              <mat-icon mat-card-avatar class="action-icon">payment</mat-icon>
+              <mat-card-title>Payments</mat-card-title>
+              <mat-card-subtitle>Manage your payments and coins</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <p>View payment history and manage your coin balance.</p>
+            </mat-card-content>
+            <mat-card-actions>
+              <button mat-raised-button class="primary-btn" (click)="navigateTo('/payments')">
+                <mat-icon>payment</mat-icon>
+                Manage Payments
+              </button>
+              <button mat-raised-button class="warning-btn" (click)="navigateTo('/coins')">
+                <mat-icon>monetization_on</mat-icon>
+                Coin Management
+              </button>
+            </mat-card-actions>
+          </mat-card>
+
+          <!-- Open Play -->
+          <mat-card class="action-card" data-icon="sports_tennis" data-title="Open Play" (click)="navigateTo('/polls')">
+            <!-- Mobile Icon -->
+            <div class="mobile-card-icon">
+              <mat-icon>sports_tennis</mat-icon>
+            </div>
+            <div class="mobile-card-title">Open Play</div>
+            
+            <!-- Desktop Content -->
+            <mat-card-header>
+              <mat-icon mat-card-avatar class="action-icon">sports_tennis</mat-icon>
+              <mat-card-title>Open Play</mat-card-title>
+              <mat-card-subtitle>Join casual tennis sessions</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <p>Find and join open play sessions with other members.</p>
+            </mat-card-content>
+            <mat-card-actions>
+              <button mat-raised-button class="info-btn" (click)="navigateTo('/polls')">
+                <mat-icon>sports_tennis</mat-icon>
+                Join Open Play
+              </button>
+            </mat-card-actions>
+          </mat-card>
+
+          <!-- Rankings -->
+          <mat-card class="action-card" data-icon="leaderboard" data-title="Player Rankings" (click)="navigateTo('/rankings')">
+            <!-- Mobile Icon -->
+            <div class="mobile-card-icon">
+              <mat-icon>leaderboard</mat-icon>
+            </div>
+            <div class="mobile-card-title">Player Rankings</div>
+            
+            <!-- Desktop Content -->
+            <mat-card-header>
+              <mat-icon mat-card-avatar class="action-icon">leaderboard</mat-icon>
+              <mat-card-title>Player Rankings</mat-card-title>
+              <mat-card-subtitle>See how you stack up</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <p>View player rankings and tournament standings.</p>
+            </mat-card-content>
+            <mat-card-actions>
+              <button mat-raised-button class="success-btn" (click)="navigateTo('/rankings')">
+                <mat-icon>leaderboard</mat-icon>
+                View Rankings
               </button>
             </mat-card-actions>
           </mat-card>
@@ -157,56 +237,27 @@ import { environment } from '../../../environments/environment';
             </mat-card-actions>
           </mat-card>
 
-          <!-- Open Play -->
-          <mat-card class="action-card" data-icon="sports_tennis" data-title="Open Play" (click)="navigateTo('/polls')">
+          <!-- Rules & Regulations -->
+          <mat-card class="action-card" data-icon="gavel" data-title="Rules & Regulations" (click)="navigateTo('/rules')">
             <!-- Mobile Icon -->
             <div class="mobile-card-icon">
-              <mat-icon>sports_tennis</mat-icon>
+              <mat-icon>gavel</mat-icon>
             </div>
-            <div class="mobile-card-title">Open Play</div>
+            <div class="mobile-card-title">Rules & Regulations</div>
             
             <!-- Desktop Content -->
             <mat-card-header>
-              <mat-icon mat-card-avatar class="action-icon">sports_tennis</mat-icon>
-              <mat-card-title>Open Play</mat-card-title>
-              <mat-card-subtitle>Join casual tennis sessions</mat-card-subtitle>
+              <mat-icon mat-card-avatar class="action-icon">gavel</mat-icon>
+              <mat-card-title>Rules & Regulations</mat-card-title>
+              <mat-card-subtitle>Club guidelines and policies</mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
-              <p>Find and join open play sessions with other members.</p>
+              <p>Review club rules, court usage policies, and coin system guidelines.</p>
             </mat-card-content>
             <mat-card-actions>
-              <button mat-raised-button class="info-btn" (click)="navigateTo('/polls')">
-                <mat-icon>sports_tennis</mat-icon>
-                Join Open Play
-              </button>
-            </mat-card-actions>
-          </mat-card>
-
-          <!-- Payments -->
-          <mat-card class="action-card" data-icon="payment" data-title="Payments" (click)="navigateTo('/payments')">
-            <!-- Mobile Icon -->
-            <div class="mobile-card-icon">
-              <mat-icon>payment</mat-icon>
-            </div>
-            <div class="mobile-card-title">Payments</div>
-            
-            <!-- Desktop Content -->
-            <mat-card-header>
-              <mat-icon mat-card-avatar class="action-icon">payment</mat-icon>
-              <mat-card-title>Payments</mat-card-title>
-              <mat-card-subtitle>Manage your payments and coins</mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content>
-              <p>View payment history and manage your coin balance.</p>
-            </mat-card-content>
-            <mat-card-actions>
-              <button mat-raised-button class="primary-btn" (click)="navigateTo('/payments')">
-                <mat-icon>payment</mat-icon>
-                Manage Payments
-              </button>
-              <button mat-raised-button class="warning-btn" (click)="navigateTo('/coins')">
-                <mat-icon>monetization_on</mat-icon>
-                Coin Management
+              <button mat-raised-button class="info-btn" (click)="navigateTo('/rules')">
+                <mat-icon>description</mat-icon>
+                View Rules
               </button>
             </mat-card-actions>
           </mat-card>
@@ -236,31 +287,6 @@ import { environment } from '../../../environments/environment';
               <button mat-raised-button class="primary-btn" (click)="navigateTo('/credit-topup')">
                 <mat-icon>add</mat-icon>
                 Add Credits
-              </button>
-            </mat-card-actions>
-          </mat-card>
-
-          <!-- Rankings -->
-          <mat-card class="action-card" data-icon="leaderboard" data-title="Player Rankings" (click)="navigateTo('/rankings')">
-            <!-- Mobile Icon -->
-            <div class="mobile-card-icon">
-              <mat-icon>leaderboard</mat-icon>
-            </div>
-            <div class="mobile-card-title">Player Rankings</div>
-            
-            <!-- Desktop Content -->
-            <mat-card-header>
-              <mat-icon mat-card-avatar class="action-icon">leaderboard</mat-icon>
-              <mat-card-title>Player Rankings</mat-card-title>
-              <mat-card-subtitle>See how you stack up</mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content>
-              <p>View player rankings and tournament standings.</p>
-            </mat-card-content>
-            <mat-card-actions>
-              <button mat-raised-button class="success-btn" (click)="navigateTo('/rankings')">
-                <mat-icon>leaderboard</mat-icon>
-                View Rankings
               </button>
             </mat-card-actions>
           </mat-card>
@@ -559,7 +585,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private http: HttpClient,
     private webSocketService: WebSocketService,
     private notificationService: NotificationService,
-    private pwaNotificationService: PWANotificationService
+    private pwaNotificationService: PWANotificationService,
+    private modalManagerService: ModalManagerService
   ) {}
 
   ngOnInit(): void {
@@ -643,28 +670,22 @@ export class DashboardComponent implements OnInit, OnDestroy {
         hasVoted: false
       };
 
-      // Show the modal automatically
-      const dialogRef = this.dialog.open(OpenPlayNotificationModalComponent, {
-        width: '90vw',
-        maxWidth: '500px',
-        height: 'auto',
-        maxHeight: '80vh',
-        data: {
-          notifications: [modalNotification]
-        },
-        disableClose: false,
-        hasBackdrop: true,
-        panelClass: ['open-play-modal', 'auto-triggered']
-      });
+      // Show the modal automatically using the modal manager
+      const dialogRef = this.modalManagerService.showOpenPlayModal(
+        { notifications: [modalNotification] },
+        { panelClass: ['open-play-modal', 'auto-triggered'] }
+      );
 
-      // Handle modal result
-      dialogRef.afterClosed().subscribe(result => {
-        console.log('🎾 Dashboard: Auto-modal closed with result:', result);
-        if (result === 'navigate-polls') {
-          console.log('🎾 Dashboard: Navigating to polls page');
-          this.navigateTo('/polls');
-        }
-      });
+      // Handle modal result if modal was actually opened
+      if (dialogRef) {
+        dialogRef.afterClosed().subscribe(result => {
+          console.log('🎾 Dashboard: Auto-modal closed with result:', result);
+          if (result === 'navigate-polls') {
+            console.log('🎾 Dashboard: Navigating to polls page');
+            this.navigateTo('/polls');
+          }
+        });
+      }
 
       // Refresh notifications to keep them in sync
       this.notificationService.refreshNotifications();

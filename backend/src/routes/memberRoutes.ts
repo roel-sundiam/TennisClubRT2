@@ -8,7 +8,8 @@ import {
   getMembersValidation,
   updateMemberApproval,
   deleteMember,
-  getPendingMembers
+  getPendingMembers,
+  resetMemberPassword
 } from '../controllers/memberController';
 import { authenticateToken, requireRole, AuthenticatedRequest } from '../middleware/auth';
 import { validationResult } from 'express-validator';
@@ -95,5 +96,12 @@ router.put('/:id/approval', authenticateToken, requireRole(['admin', 'superadmin
  * @access Private (Admin/SuperAdmin)
  */
 router.delete('/:id', authenticateToken, requireRole(['admin', 'superadmin']), deleteMember);
+
+/**
+ * @route PUT /api/members/:id/reset-password
+ * @desc Reset member password to default (admin only)
+ * @access Private (Admin/SuperAdmin)
+ */
+router.put('/:id/reset-password', authenticateToken, requireRole(['admin', 'superadmin']), resetMemberPassword);
 
 export default router;

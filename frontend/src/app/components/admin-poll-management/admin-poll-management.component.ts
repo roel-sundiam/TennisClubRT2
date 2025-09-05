@@ -16,12 +16,14 @@ import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { AuthService } from '../../services/auth.service';
 import { NotificationService } from '../../services/notification.service';
+import { CloseEventModalComponent, CloseEventModalData } from '../close-event-modal/close-event-modal.component';
 import { environment } from '../../../environments/environment';
 
 interface OpenPlayEvent {
@@ -474,6 +476,14 @@ interface OpenPlayEvent {
                         (click)="recordMatchResults(event)">
                         <mat-icon>emoji_events</mat-icon>
                         Record Results
+                      </button>
+                      <button 
+                        mat-button
+                        color="warn"
+                        *ngIf="event.status === 'active'"
+                        (click)="closeOpenPlayEvent(event)">
+                        <mat-icon>stop</mat-icon>
+                        Close Event
                       </button>
                     </mat-card-actions>
                   </mat-card>
@@ -2918,6 +2928,22 @@ interface OpenPlayEvent {
       }
     }
 
+    /* Global Modal Styles */
+    :host ::ng-deep .modern-dialog-panel {
+      border-radius: 24px !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+    }
+
+    :host ::ng-deep .modern-dialog-backdrop {
+      background: rgba(0, 0, 0, 0.6) !important;
+      backdrop-filter: blur(8px) !important;
+    }
+
+    :host ::ng-deep .cdk-overlay-pane {
+      border-radius: 24px !important;
+    }
+
   `]
 })
 export class AdminPollManagementComponent implements OnInit, OnDestroy {
@@ -2972,7 +2998,8 @@ export class AdminPollManagementComponent implements OnInit, OnDestroy {
     private router: Router,
     private snackBar: MatSnackBar,
     private authService: AuthService,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    private dialog: MatDialog
   ) {
     this.openPlayForm = this.fb.group({
       title: ['', [Validators.required, Validators.minLength(5)]],
@@ -3842,18 +3869,110 @@ export class AdminPollManagementComponent implements OnInit, OnDestroy {
   }
 
   closePoll(poll: any): void {
-    if (confirm(`Are you sure you want to close the poll "${poll.title}"?`)) {
-      this.http.post(`${this.apiUrl}/polls/${poll._id}/close`, {}).subscribe({
-        next: (response) => {
-          this.snackBar.open('Poll closed successfully', 'Close', { duration: 3000 });
-          this.loadTraditionalPolls();
-        },
-        error: (error) => {
-          console.error('Error closing poll:', error);
-          this.snackBar.open('Error closing poll', 'Close', { duration: 3000 });
-        }
-      });
-    }
+    const eventType = poll.metadata?.category === 'open_play' ? 'Open Play Event' : 'Poll';
+    const confirmedCount = poll.options?.find((opt: any) => opt.text?.toLowerCase() === 'yes')?.votes || 0;
+    
+    const modalData: CloseEventModalData = {
+      eventTitle: poll.title,
+      eventType: eventType,
+      confirmedPlayerCount: confirmedCount
+    };
+
+    const dialogRef = this.dialog.open(CloseEventModalComponent, {
+      width: '540px',
+      maxWidth: '95vw',
+      panelClass: 'modern-dialog-panel',
+      data: modalData,
+      disableClose: false,
+      hasBackdrop: true,
+      backdropClass: 'modern-dialog-backdrop'
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.http.post(`${this.apiUrl}/polls/${poll._id}/close`, {}).subscribe({
+          next: (response) => {
+            this.snackBar.open(`${eventType} closed successfully`, 'Close', { 
+              duration: 4000,
+              panelClass: 'snackbar-success'
+            });
+            this.loadTraditionalPolls();
+          },
+          error: (error) => {
+            console.error(`Error closing ${eventType}:`, error);
+            this.snackBar.open(`Error closing ${eventType}`, 'Close', { 
+              duration: 4000,
+              panelClass: 'snackbar-error'
+            });
+          }
+        });
+      }
+    });
+  }
+
+  closeOpenPlayEvent(event: any): void {
+    const confirmedCount = event.openPlayEvent?.confirmedPlayers?.length || 0;
+    const eventType = event.openPlayEvent ? 'Open Play Event' : 'Poll';
+    
+    // Format event date and time for display
+    const eventDate = event.openPlayEvent?.eventDate 
+      ? new Date(event.openPlayEvent.eventDate).toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long', 
+          day: 'numeric'
+        })
+      : undefined;
+      
+    const eventTime = (event.openPlayEvent?.startTime && event.openPlayEvent?.endTime)
+      ? `${this.formatTimeSlot(event.openPlayEvent.startTime)} - ${this.formatTimeSlot(event.openPlayEvent.endTime)}`
+      : undefined;
+    
+    const modalData: CloseEventModalData = {
+      eventTitle: event.title,
+      eventType: eventType,
+      confirmedPlayerCount: confirmedCount,
+      eventDate: eventDate,
+      eventTime: eventTime
+    };
+
+    const dialogRef = this.dialog.open(CloseEventModalComponent, {
+      width: '540px',
+      maxWidth: '95vw',
+      panelClass: 'modern-dialog-panel',
+      data: modalData,
+      disableClose: false,
+      hasBackdrop: true,
+      backdropClass: 'modern-dialog-backdrop'
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.http.post(`${this.apiUrl}/polls/${event._id}/close`, {}).subscribe({
+          next: (response) => {
+            this.snackBar.open(`${eventType} closed successfully`, 'Close', { 
+              duration: 4000,
+              panelClass: 'snackbar-success'
+            });
+            this.loadOpenPlayEvents();
+          },
+          error: (error) => {
+            console.error(`Error closing ${eventType}:`, error);
+            this.snackBar.open(`Error closing ${eventType}`, 'Close', { 
+              duration: 4000,
+              panelClass: 'snackbar-error'
+            });
+          }
+        });
+      }
+    });
+  }
+
+  private formatTimeSlot(timeSlot: number): string {
+    const time = timeSlot;
+    const suffix = time >= 12 ? 'PM' : 'AM';
+    const displayTime = time > 12 ? time - 12 : time;
+    return `${displayTime}:00 ${suffix}`;
   }
 
   activatePoll(poll: any): void {

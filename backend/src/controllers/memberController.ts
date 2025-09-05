@@ -515,6 +515,63 @@ export const getPendingMembers = asyncHandler(async (req: AuthenticatedRequest, 
   }
 });
 
+// Reset member password to default (Admin only)
+export const resetMemberPassword = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const defaultPassword = 'RT2Tennis'; // Fixed default password
+
+  if (!id) {
+    return res.status(400).json({
+      success: false,
+      error: 'Member ID is required'
+    });
+  }
+
+  // Check if user is admin
+  if (req.user?.role !== 'admin' && req.user?.role !== 'superadmin') {
+    return res.status(403).json({
+      success: false,
+      error: 'Access denied. Admin privileges required.'
+    });
+  }
+
+  try {
+    const member = await User.findById(id);
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        error: 'Member not found'
+      });
+    }
+
+    // Don't allow resetting admin/superadmin passwords unless you're a superadmin
+    if (member.role === 'superadmin' || (member.role === 'admin' && req.user?.role !== 'superadmin')) {
+      return res.status(403).json({
+        success: false,
+        error: 'Cannot reset password for this user level'
+      });
+    }
+
+    // Update password directly - the pre-save hook will hash it
+    member.password = defaultPassword;
+    await member.save();
+
+    console.log(`🔑 Password reset for ${member.username} by ${req.user?.username}`);
+
+    return res.status(200).json({
+      success: true,
+      message: `Password for ${member.fullName} has been reset to "RT2Tennis"`
+    });
+
+  } catch (error) {
+    console.error('Error resetting member password:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to reset password'
+    });
+  }
+});
+
 // Validation rules
 export const getMembersValidation = [
   query('page')

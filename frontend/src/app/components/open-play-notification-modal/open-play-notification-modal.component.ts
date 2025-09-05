@@ -4,7 +4,9 @@ import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/materia
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCardModule } from '@angular/material/card';
+import { Router } from '@angular/router';
 import { OpenPlayNotification } from '../../services/notification.service';
+import { ModalManagerService } from '../../services/modal-manager.service';
 
 export interface OpenPlayModalData {
   notifications: OpenPlayNotification[];
@@ -98,7 +100,9 @@ export class OpenPlayNotificationModalComponent {
   
   constructor(
     public dialogRef: MatDialogRef<OpenPlayNotificationModalComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: OpenPlayModalData
+    @Inject(MAT_DIALOG_DATA) public data: OpenPlayModalData,
+    private router: Router,
+    private modalManagerService: ModalManagerService
   ) {}
 
   @HostListener('touchstart', ['$event'])
@@ -192,7 +196,20 @@ export class OpenPlayNotificationModalComponent {
 
   viewPolls(): void {
     console.log('🗳️ Modal: View & Vote button clicked');
-    this.dialogRef.close('navigate-polls');
+    
+    // Ensure all Open Play modals are closed
+    this.modalManagerService.closeOpenPlayModal();
+    
+    // Navigate directly using router for more reliable navigation
+    this.router.navigate(['/polls']).then(success => {
+      if (success) {
+        console.log('🗳️ Modal: Successfully navigated to polls');
+      } else {
+        console.error('🗳️ Modal: Navigation to polls failed');
+        // Fallback to window location
+        window.location.href = '/polls';
+      }
+    });
   }
 
   isMobileDevice(): boolean {

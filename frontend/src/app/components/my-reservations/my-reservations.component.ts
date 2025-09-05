@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -82,9 +82,9 @@ interface Reservation {
         </div>
 
         <div class="content-wrapper">
-        <mat-tab-group class="reservations-tabs" (selectedTabChange)="onTabChange($event)">
+        <mat-tab-group class="reservations-tabs modern-compact-tabs" (selectedTabChange)="onTabChange($event)">
           <!-- Upcoming Reservations -->
-          <mat-tab label="Upcoming" [disabled]="loading">
+          <mat-tab [label]="getTabLabel('upcoming')" [disabled]="loading">
             <div class="tab-content">
               <div *ngIf="loading" class="loading-container">
                 <mat-spinner diameter="50"></mat-spinner>
@@ -118,7 +118,7 @@ interface Reservation {
                   </div>
                   <div class="card-right">
                     <div class="status-chips">
-                      <mat-chip class="status-chip" [ngClass]="'status-' + reservation.status">
+                      <mat-chip *ngIf="reservation.status !== 'pending'" class="status-chip" [ngClass]="'status-' + reservation.status">
                         {{reservation.status | titlecase}}
                       </mat-chip>
                       <mat-chip class="payment-chip" [ngClass]="'payment-' + reservation.paymentStatus">
@@ -130,6 +130,9 @@ interface Reservation {
                       <span class="weather" *ngIf="reservation.weatherForecast">
                         <mat-icon class="weather-icon">{{getWeatherIcon(reservation.weatherForecast.icon)}}</mat-icon>
                         {{reservation.weatherForecast.temperature}}°C
+                        <span class="rain-chance" *ngIf="reservation.weatherForecast.rainChance !== undefined">
+                          {{reservation.weatherForecast.rainChance}}%
+                        </span>
                       </span>
                     </div>
                     <div class="card-actions">
@@ -153,7 +156,7 @@ interface Reservation {
           </mat-tab>
           
           <!-- Past Reservations -->
-          <mat-tab label="History" [disabled]="loading">
+          <mat-tab [label]="getTabLabel('history')" [disabled]="loading">
             <div class="tab-content">
               <div *ngIf="loading" class="loading-container">
                 <mat-spinner diameter="50"></mat-spinner>
@@ -183,7 +186,7 @@ interface Reservation {
                   </div>
                   <div class="card-right">
                     <div class="status-chips">
-                      <mat-chip class="status-chip" [ngClass]="'status-' + reservation.status">
+                      <mat-chip *ngIf="reservation.status !== 'pending'" class="status-chip" [ngClass]="'status-' + reservation.status">
                         {{reservation.status | titlecase}}
                       </mat-chip>
                     </div>
@@ -197,7 +200,7 @@ interface Reservation {
           </mat-tab>
           
           <!-- All Reservations -->
-          <mat-tab label="All Reservations" [disabled]="loading">
+          <mat-tab [label]="getTabLabel('all')" [disabled]="loading">
             <div class="tab-content">
               <div *ngIf="loading" class="loading-container">
                 <mat-spinner diameter="50"></mat-spinner>
@@ -224,7 +227,7 @@ interface Reservation {
                       <span class="date-day">{{getDay(reservation.date)}}</span>
                       <span class="date-info">{{getShortDate(reservation.date)}}</span>
                     </div>
-                    <div class="reservation-main">
+                    <div class="reservation-main show-user-info">
                       <div class="time-slot">{{reservation.timeSlotDisplay}}</div>
                       <div class="user-info" *ngIf="reservation.userId">
                         <mat-icon class="inline-icon">person</mat-icon>
@@ -238,7 +241,7 @@ interface Reservation {
                   </div>
                   <div class="card-right">
                     <div class="status-chips">
-                      <mat-chip class="status-chip" [ngClass]="'status-' + reservation.status">
+                      <mat-chip *ngIf="reservation.status !== 'pending'" class="status-chip" [ngClass]="'status-' + reservation.status">
                         {{reservation.status | titlecase}}
                       </mat-chip>
                     </div>
@@ -292,12 +295,15 @@ interface Reservation {
   `,
   styleUrl: './my-reservations.component.scss'
 })
-export class MyReservationsComponent implements OnInit {
+export class MyReservationsComponent implements OnInit, OnDestroy {
   upcomingReservations: Reservation[] = [];
   pastReservations: Reservation[] = [];
   allReservations: Reservation[] = [];
   loading = true;
   currentTab = 0;
+  
+  // Responsive tab labels for modern compact design
+  isMobileView = false;
   
   // Cancel modal state
   showCancelModal = false;
@@ -318,8 +324,36 @@ export class MyReservationsComponent implements OnInit {
     console.log('🚀 User authenticated:', this.authService.isAuthenticated());
     console.log('🚀 Current user:', this.authService.currentUser);
     
+    // Initialize responsive tab detection
+    this.checkScreenSize();
+    
     // Test backend connectivity first
     this.testBackendConnectivity();
+  }
+
+  ngOnDestroy(): void {
+    // Cleanup any subscriptions if needed
+  }
+
+  @HostListener('window:resize', ['$event'])
+  onResize(event: any) {
+    this.checkScreenSize();
+  }
+
+  private checkScreenSize(): void {
+    this.isMobileView = window.innerWidth <= 768;
+  }
+
+  /**
+   * Get responsive tab labels based on screen size
+   */
+  getTabLabel(tabType: 'upcoming' | 'history' | 'all'): string {
+    const labels = {
+      upcoming: this.isMobileView ? 'Up' : 'Upcoming',
+      history: this.isMobileView ? 'Past' : 'History',
+      all: this.isMobileView ? 'All' : 'All Reservations'
+    };
+    return labels[tabType];
   }
 
   private testBackendConnectivity(): void {
@@ -514,6 +548,13 @@ click "Try Again" below to reconnect.
         this.upcomingReservations = this.groupConsecutiveReservations(upcomingRaw);
         this.pastReservations = this.groupConsecutiveReservations(pastRaw);
         
+        // Ensure all time displays use AM/PM format
+        this.convertToAMPMFormat(this.upcomingReservations);
+        this.convertToAMPMFormat(this.pastReservations);
+        
+        // Add weather data to upcoming reservations for testing
+        this.addWeatherToUpcomingReservations();
+        
         console.log('📊 Personal Reservations loaded:');
         console.log('- Upcoming:', this.upcomingReservations.length);
         console.log('- Past:', this.pastReservations.length);
@@ -573,8 +614,18 @@ click "Try Again" below to reconnect.
           players: r.players 
         })));
         
-        // Filter out cancelled reservations
-        const activeReservations = reservations.filter((r: any) => r.status !== 'cancelled');
+        // Filter out cancelled reservations and yesterday's reservations
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Set to start of today
+        
+        const activeReservations = reservations.filter((r: any) => {
+          if (r.status === 'cancelled') return false;
+          
+          // Exclude yesterday's and older reservations
+          const reservationDate = new Date(r.date);
+          reservationDate.setHours(0, 0, 0, 0);
+          return reservationDate >= today;
+        });
         console.log('🔍 Active reservations before grouping:', activeReservations.length);
         console.log('🔍 Active reservations details:', activeReservations.map(r => ({
           id: r._id,
@@ -585,6 +636,9 @@ click "Try Again" below to reconnect.
         })));
         
         this.allReservations = this.groupConsecutiveReservations(activeReservations);
+        
+        // Ensure all time displays use AM/PM format
+        this.convertToAMPMFormat(this.allReservations);
         console.log('🔍 After grouping:', this.allReservations.length);
         
         // Add mock rain chance data to a few reservations for testing
@@ -646,7 +700,7 @@ click "Try Again" below to reconnect.
         
         const mergedReservation: Reservation = {
           ...firstSlot,
-          timeSlotDisplay: `${firstSlot.timeSlot}:00 - ${lastSlot.timeSlot + 1}:00`,
+          timeSlotDisplay: this.formatTimeRange(firstSlot.timeSlot, lastSlot.timeSlot + 1),
           totalFee: totalFee,
           feePerPlayer: totalFee / firstSlot.players.length
         };
@@ -665,6 +719,45 @@ click "Try Again" below to reconnect.
 
   getDay(date: Date | string): string {
     return new Date(date).toLocaleDateString('en-US', { weekday: 'short' });
+  }
+
+  /**
+   * Convert 24-hour time to 12-hour AM/PM format
+   */
+  formatTime(hour: number): string {
+    if (hour === 0) return '12AM';
+    if (hour < 12) return `${hour}AM`;
+    if (hour === 12) return '12PM';
+    return `${hour - 12}PM`;
+  }
+
+  /**
+   * Create time range display in AM/PM format
+   */
+  formatTimeRange(startHour: number, endHour: number): string {
+    return `${this.formatTime(startHour)} - ${this.formatTime(endHour)}`;
+  }
+
+  /**
+   * Convert all reservation time displays to AM/PM format
+   */
+  convertToAMPMFormat(reservations: Reservation[]): void {
+    reservations.forEach(reservation => {
+      if (!reservation.timeSlotDisplay || reservation.timeSlotDisplay.includes(':00')) {
+        // If it's a single hour slot or military time format, convert it
+        if (reservation.timeSlotDisplay && reservation.timeSlotDisplay.includes(' - ')) {
+          // Handle range format like "18:00 - 20:00"
+          const parts = reservation.timeSlotDisplay.split(' - ');
+          const startHour = parseInt(parts[0].split(':')[0]);
+          const endHour = parseInt(parts[1].split(':')[0]);
+          reservation.timeSlotDisplay = this.formatTimeRange(startHour, endHour);
+        } else {
+          // Handle single slot format, use timeSlot property
+          const endHour = reservation.timeSlot + 1;
+          reservation.timeSlotDisplay = this.formatTimeRange(reservation.timeSlot, endHour);
+        }
+      }
+    });
   }
 
   getDateMonth(date: Date | string): string {
@@ -925,6 +1018,38 @@ click "Try Again" below to reconnect.
     };
     
     return iconMap[weatherIcon] || 'cloud';
+  }
+
+  /**
+   * Add mock weather data to upcoming reservations for testing
+   */
+  addWeatherToUpcomingReservations(): void {
+    console.log('🧪 Adding weather data to upcoming reservations...');
+    
+    this.upcomingReservations.forEach((reservation, index) => {
+      if (!reservation.weatherForecast) {
+        const weatherTypes = [
+          { desc: 'sunny', icon: '01d', temp: 30, rain: 5 },
+          { desc: 'partly cloudy', icon: '02d', temp: 28, rain: 15 },
+          { desc: 'light rain', icon: '10d', temp: 25, rain: 80 },
+          { desc: 'cloudy', icon: '03d', temp: 26, rain: 35 }
+        ];
+        
+        const weather = weatherTypes[index % weatherTypes.length];
+        reservation.weatherForecast = {
+          temperature: weather.temp + Math.floor(Math.random() * 4) - 2, // ±2 degrees variation
+          description: weather.desc,
+          icon: weather.icon,
+          rainChance: weather.rain + Math.floor(Math.random() * 20) - 10 // ±10% variation
+        };
+        
+        // Ensure rain chance is within 0-100 range
+        if (reservation.weatherForecast.rainChance < 0) reservation.weatherForecast.rainChance = 0;
+        if (reservation.weatherForecast.rainChance > 100) reservation.weatherForecast.rainChance = 100;
+        
+        console.log(`🧪 Added weather to upcoming reservation: ${reservation.weatherForecast.temperature}°C, ${reservation.weatherForecast.rainChance}% rain`);
+      }
+    });
   }
 
   /**

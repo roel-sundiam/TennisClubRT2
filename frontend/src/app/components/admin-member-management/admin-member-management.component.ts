@@ -16,6 +16,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
+import { MemberService } from '../../services/member.service';
+import { ConfirmationDialogComponent, ConfirmationDialogData } from '../../shared/confirmation-dialog/confirmation-dialog.component';
 import { environment } from '../../../environments/environment';
 
 interface Member {
@@ -264,6 +266,14 @@ interface MemberResponse {
                         </button>
                         <button 
                           mat-icon-button 
+                          color="accent" 
+                          (click)="resetPassword(member)"
+                          matTooltip="Reset Password to RT2Tennis"
+                          [disabled]="updating === member._id">
+                          <mat-icon>lock_reset</mat-icon>
+                        </button>
+                        <button 
+                          mat-icon-button 
                           color="warn" 
                           (click)="deactivateMember(member)"
                           matTooltip="Deactivate Member">
@@ -310,6 +320,7 @@ export class AdminMemberManagementComponent implements OnInit {
   constructor(
     private http: HttpClient,
     private authService: AuthService,
+    private memberService: MemberService,
     private router: Router,
     private snackBar: MatSnackBar,
     private dialog: MatDialog
@@ -428,28 +439,84 @@ export class AdminMemberManagementComponent implements OnInit {
   }
 
   deactivateMember(member: Member): void {
-    if (confirm(`Are you sure you want to deactivate ${member.fullName}? This action cannot be undone.`)) {
-      const headers = { 'Authorization': `Bearer ${this.authService.token}` };
+    const dialogData: ConfirmationDialogData = {
+      title: 'Deactivate Member',
+      message: `Are you sure you want to deactivate ${member.fullName}? This action cannot be undone and will remove their access to the system.`,
+      confirmText: 'Deactivate',
+      cancelText: 'Cancel',
+      type: 'danger',
+      icon: 'person_remove'
+    };
 
-      this.http.delete<any>(`${this.apiUrl}/members/${member._id}`, { headers })
-        .subscribe({
-          next: (response) => {
-            this.snackBar.open(`${member.fullName} has been deactivated`, 'Close', { 
-              duration: 3000,
-              panelClass: ['warning-snackbar']
-            });
-            this.loadAllMembers();
-          },
-          error: (error) => {
-            console.error('Error deactivating member:', error);
-            this.snackBar.open('Failed to deactivate member', 'Close', { duration: 3000 });
-          }
-        });
-    }
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '450px',
+      data: dialogData,
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result === true) {
+        const headers = { 'Authorization': `Bearer ${this.authService.token}` };
+
+        this.http.delete<any>(`${this.apiUrl}/members/${member._id}`, { headers })
+          .subscribe({
+            next: (response) => {
+              this.snackBar.open(`${member.fullName} has been deactivated`, 'Close', { 
+                duration: 3000,
+                panelClass: ['warning-snackbar']
+              });
+              this.loadAllMembers();
+            },
+            error: (error) => {
+              console.error('Error deactivating member:', error);
+              this.snackBar.open('Failed to deactivate member', 'Close', { duration: 3000 });
+            }
+          });
+      }
+    });
   }
 
   viewMemberDetails(member: Member): void {
     this.router.navigate(['/members', member._id]);
+  }
+
+  resetPassword(member: Member): void {
+    const dialogData: ConfirmationDialogData = {
+      title: 'Reset Password',
+      message: `Are you sure you want to reset the password for ${member.fullName} to "RT2Tennis"? This action cannot be undone.`,
+      confirmText: 'Reset Password',
+      cancelText: 'Cancel',
+      type: 'warning',
+      icon: 'lock_reset'
+    };
+
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '450px',
+      data: dialogData,
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result === true) {
+        this.updating = member._id;
+        
+        this.memberService.resetMemberPassword(member._id)
+          .subscribe({
+            next: (response) => {
+              this.updating = '';
+              this.snackBar.open(response.message, 'Close', { 
+                duration: 5000,
+                panelClass: ['success-snackbar']
+              });
+            },
+            error: (error) => {
+              this.updating = '';
+              console.error('Error resetting password:', error);
+              this.snackBar.open('Failed to reset password', 'Close', { duration: 3000 });
+            }
+          });
+      }
+    });
   }
 
   onPageChange(event: PageEvent): void {

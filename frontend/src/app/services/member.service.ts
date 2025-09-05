@@ -141,4 +141,10 @@ export class MemberService {
       headers: this.getHeaders()
     });
   }
+
+  resetMemberPassword(memberId: string): Observable<{success: boolean, message: string}> {
+    return this.http.put<{success: boolean, message: string}>(`${this.apiUrl}/members/${memberId}/reset-password`, {}, {
+      headers: this.getHeaders()
+    });
+  }
 }

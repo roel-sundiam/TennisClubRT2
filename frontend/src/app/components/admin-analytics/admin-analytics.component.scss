@@ -36,6 +36,21 @@
   .header-actions {
     display: flex;
     gap: 12px;
+    
+    .marketing-button {
+      background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+      color: white;
+      
+      &:hover {
+        background: linear-gradient(135deg, #e55a2e 0%, #de831a 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(255, 107, 53, 0.3);
+      }
+      
+      mat-icon {
+        margin-right: 4px;
+      }
+    }
   }
 }
 

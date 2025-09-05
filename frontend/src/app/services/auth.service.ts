@@ -14,6 +14,8 @@ export interface User {
   seedPoints?: number;
   matchesWon?: number;
   matchesPlayed?: number;
+  phone?: string;
+  dateOfBirth?: string;
 }
 
 export interface AuthResponse {
@@ -25,6 +27,19 @@ export interface AuthResponse {
 export interface LoginRequest {
   username: string;
   password: string;
+}
+
+export interface UpdateProfileRequest {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  dateOfBirth?: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
 }
 
 @Injectable({
@@ -127,5 +142,36 @@ export class AuthService {
    */
   getCoinBalance(): number {
     return this.currentUser?.coinBalance || 0;
+  }
+
+  /**
+   * Get user profile from server
+   */
+  getProfile(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/auth/profile`);
+  }
+
+  /**
+   * Update user profile
+   */
+  updateProfile(profileData: UpdateProfileRequest): Observable<any> {
+    return this.http.put(`${this.apiUrl}/auth/profile`, profileData)
+      .pipe(
+        tap((response: any) => {
+          // Update local user data if response contains updated user
+          if (response.data?.user) {
+            const updatedUser = response.data.user;
+            this.currentUserSubject.next(updatedUser);
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+          }
+        })
+      );
+  }
+
+  /**
+   * Change user password
+   */
+  changePassword(passwordData: ChangePasswordRequest): Observable<any> {
+    return this.http.put(`${this.apiUrl}/auth/change-password`, passwordData);
   }
 }

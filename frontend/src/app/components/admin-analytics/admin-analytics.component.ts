@@ -70,6 +70,10 @@ interface ActivityHistoryItem {
           Site Analytics Dashboard
         </h1>
         <div class="header-actions">
+          <button mat-raised-button color="accent" (click)="openMarketingPage()" class="marketing-button">
+            <mat-icon>campaign</mat-icon>
+            Marketing Page
+          </button>
           <button mat-raised-button color="primary" (click)="refreshData()" [disabled]="loading">
             <mat-icon>refresh</mat-icon>
             Refresh
@@ -694,6 +698,13 @@ export class AdminAnalyticsComponent implements OnInit, OnDestroy {
         percentage: Math.round((count / total) * 100)
       }))
       .sort((a, b) => b.count - a.count);
+  }
+
+  openMarketingPage(): void {
+    // Open marketing page in a new tab
+    // Update this URL to your actual marketing page URL when deployed
+    const marketingUrl = window.location.origin + '/marketing/simple.html';
+    window.open(marketingUrl, '_blank');
   }
 
   private showMessage(message: string, type: 'success' | 'error' | 'warning'): void {

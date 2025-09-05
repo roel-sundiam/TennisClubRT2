@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Tennis Club RT2 App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e0 100%);
+            color: #1e40af;
+            padding: 20px;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        
+        .header {
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 15px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+            margin-bottom: 30px;
+        }
+        
+        .announcement {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(30, 64, 175, 0.3);
+        }
+        
+        .announcement h2 {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+        }
+        
+        .announcement p {
+            font-size: 1rem;
+            margin-bottom: 15px;
+        }
+        
+        .features {
+            text-align: left;
+            margin: 20px 0;
+        }
+        
+        .features li {
+            list-style: none;
+            padding: 8px 0;
+            font-size: 0.95rem;
+        }
+        
+        .features li:before {
+            content: "✓ ";
+            color: #4ade80;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        
+        .button {
+            background: rgba(255, 255, 255, 0.95);
+            color: #1e40af;
+            padding: 15px 30px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            display: inline-block;
+            margin: 15px 0;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .button:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+        }
+        
+        .note {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-top: 20px;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+        }
+        
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            margin: 20px;
+            padding: 25px;
+            border-radius: 20px;
+            max-width: 400px;
+            width: 90%;
+            color: #1e40af;
+            position: relative;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .modal-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-header h3 {
+            font-size: 1.4rem;
+            margin-bottom: 10px;
+            color: #1e40af;
+        }
+        
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        .install-steps {
+            text-align: left;
+            margin: 20px 0;
+        }
+        
+        .install-steps h4 {
+            font-size: 1.1rem;
+            margin: 15px 0 10px 0;
+            color: #1e40af;
+        }
+        
+        .install-steps ol {
+            padding-left: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .install-steps li {
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 25px;
+        }
+        
+        .modal-btn {
+            padding: 12px 20px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .modal-btn.primary {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+        }
+        
+        .modal-btn.secondary {
+            background: rgba(30, 64, 175, 0.1);
+            color: #1e40af;
+            border: 1px solid rgba(30, 64, 175, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <img src="assets/images/rich-town-2-tennis-logo.png" alt="Rich Town 2 Tennis Logo">
+            </div>
+            <h1>Rich Town 2 Tennis Club</h1>
+            <p class="subtitle">New & Improved App</p>
+        </div>
+        
+        <div class="announcement">
+            <h2>📱 We've Gone Digital!</h2>
+            <p>Our tennis club now has a brand new, modern app replacing the old system.</p>
+            
+            <div class="features">
+                <ul>
+                    <li>Mobile-friendly design</li>
+                    <li>Easy court booking</li>
+                    <li>Secure online payments</li>
+                    <li>Coin balance & rewards system</li>
+                    <li>Real-time availability</li>
+                    <li>Weather updates</li>
+                    <li>Member directory</li>
+                    <li>Business sponsorship opportunities</li>
+                </ul>
+            </div>
+            
+            <div style="background: rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 15px; margin: 20px 0; font-size: 0.9rem;">
+                <p><strong>🪙 Coin System:</strong> Earn coins for activities, use them for bookings and special features!</p>
+                <p><strong>🏢 For Businesses:</strong> Want to sponsor or advertise? Contact us to feature your business in our app!</p>
+            </div>
+            
+            <a href="#" class="button" onclick="showInstallModal()">🚀 Open New App</a>
+            
+            <div class="note">
+                <p>Use your existing username and password to login to the new system.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Install Modal -->
+    <div id="installModal" class="modal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeInstallModal()">&times;</button>
+            <div class="modal-header">
+                <h3>📱 Install Rich Town 2 Tennis Club</h3>
+                <p>Get the best experience by installing our app on your phone!</p>
+            </div>
+            
+            <div class="install-steps">
+                <h4>📱 For iPhone/iPad (Safari):</h4>
+                <ol>
+                    <li>Tap the <strong>Share</strong> button at the bottom</li>
+                    <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+                    <li>Tap <strong>"Add"</strong> to confirm</li>
+                    <li>The app icon will appear on your home screen!</li>
+                </ol>
+                
+                <h4>🤖 For Android (Chrome):</h4>
+                <ol>
+                    <li>Tap the <strong>menu</strong> (3 dots) at the top right</li>
+                    <li>Select <strong>"Add to Home screen"</strong></li>
+                    <li>Tap <strong>"Add"</strong> to confirm</li>
+                    <li>The app icon will appear on your home screen!</li>
+                </ol>
+                
+                <p style="font-size: 0.85rem; color: #666; margin-top: 15px;">
+                    💡 <strong>Tip:</strong> Once installed, the app works like a native mobile app with offline features!
+                </p>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeInstallModal()">Maybe Later</button>
+                <a href="http://localhost:4200/login" class="modal-btn primary">Continue to App</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showInstallModal() {
+            document.getElementById('installModal').classList.add('active');
+        }
+        
+        function closeInstallModal() {
+            document.getElementById('installModal').classList.remove('active');
+        }
+        
+        // Close modal when clicking outside
+        document.getElementById('installModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeInstallModal();
+            }
+        });
+    </script>
+</body>
+</html>
