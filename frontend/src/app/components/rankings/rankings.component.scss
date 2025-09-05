@@ -1,15 +1,21 @@
 // Rankings Component - Modern Glassmorphism Theme
 
 .page-container {
-  min-height: calc(100vh - 70px);
-  background: transparent;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e0 100%);
   position: relative;
 }
 
 .page-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
   position: relative;
   z-index: 2;
-  padding: 0;
+  
+  @media (max-width: 768px) {
+    padding: 1rem;
+  }
 }
 
 // Page Header
@@ -153,10 +159,10 @@
 
 // Stats Section
 .stats-section {
-  padding: 32px;
+  padding: 0 0 2rem 0;
   
   @media (max-width: 768px) {
-    padding: 24px;
+    padding: 0 0 1.5rem 0;
   }
 }
 
@@ -173,17 +179,18 @@
 }
 
 .stat-card {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
   border-radius: 20px;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   overflow: hidden;
+  min-height: 120px;
   
   &:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
   }
   
   &.players-card {
@@ -382,7 +389,7 @@
 }
 
 .retry-button {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #2563eb 100%);
   color: white;
   border: none;
   border-radius: 12px;
@@ -404,20 +411,21 @@
 
 // Rankings Section
 .rankings-section {
-  padding: 0 32px 32px;
+  padding: 0 0 2rem 0;
   
   @media (max-width: 768px) {
-    padding: 0 24px 24px;
+    padding: 0 0 1.5rem 0;
   }
 }
 
 .rankings-card {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
   border-radius: 20px;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  transition: all 0.3s ease;
 }
 
 .card-header {
@@ -517,24 +525,129 @@
   padding: 0;
 }
 
+// Table Scroll Container
+.table-scroll-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
+  
+  &::-webkit-scrollbar {
+    height: 8px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.3);
+    border-radius: 4px;
+    
+    &:hover {
+      background: rgba(59, 130, 246, 0.5);
+    }
+  }
+  
+  // Add scroll shadow indicators
+  background: 
+    linear-gradient(90deg, rgba(255, 255, 255, 0.9) 0%, transparent 20px),
+    linear-gradient(-90deg, rgba(255, 255, 255, 0.9) 0%, transparent 20px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.1) 0%, transparent 5px),
+    linear-gradient(-90deg, rgba(0, 0, 0, 0.1) 0%, transparent 5px);
+  background-attachment: local, local, scroll, scroll;
+  background-size: 20px 100%, 20px 100%, 5px 100%, 5px 100%;
+  background-repeat: no-repeat;
+  background-position: 0 0, 100% 0, 0 0, 100% 0;
+}
+
 // Rankings Table
 .rankings-table {
   width: 100%;
+  min-width: 600px; // Ensures horizontal scroll on small screens
+  
+  @media (max-width: 768px) {
+    min-width: 500px; // Smaller minimum width for mobile
+  }
+  
+  @media (max-width: 480px) {
+    min-width: 450px; // Even smaller for very small screens
+  }
 }
 
 .table-header,
 .table-row {
   display: grid;
-  grid-template-columns: 80px 1fr 120px 140px;
+  grid-template-columns: 80px minmax(200px, 1fr) 120px 140px;
   align-items: center;
   padding: 24px 32px;
   gap: 24px;
   
   @media (max-width: 768px) {
-    grid-template-columns: 60px 1fr 100px 120px;
+    grid-template-columns: 60px minmax(180px, 1fr) 100px 120px;
     padding: 16px 24px;
     gap: 16px;
   }
+}
+
+// Sticky first columns for better mobile UX
+.rank-col,
+.player-col {
+  position: sticky;
+  z-index: 10;
+}
+
+.table-header .rank-col,
+.table-header .player-col {
+  background: rgba(245, 245, 245, 0.95);
+  backdrop-filter: blur(10px);
+}
+
+.table-row .rank-col,
+.table-row .player-col {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+}
+
+.table-row:hover .rank-col,
+.table-row:hover .player-col {
+  background: rgba(248, 250, 252, 0.95);
+  backdrop-filter: blur(10px);
+}
+
+.table-row.current-user .rank-col,
+.table-row.current-user .player-col {
+  background: rgba(76, 175, 80, 0.15);
+  backdrop-filter: blur(10px);
+}
+
+.table-row.top-3 .rank-col,
+.table-row.top-3 .player-col {
+  background: linear-gradient(90deg, rgba(255, 193, 7, 0.2), rgba(255, 255, 255, 0.95));
+  backdrop-filter: blur(10px);
+}
+
+.rank-col {
+  left: 0;
+  
+  @media (max-width: 768px) {
+    left: 0;
+  }
+}
+
+.player-col {
+  left: 104px; // 80px rank + 24px gap
+  
+  @media (max-width: 768px) {
+    left: 76px; // 60px rank + 16px gap
+  }
+}
+
+// Add shadow to indicate sticky columns
+.table-header .player-col,
+.table-row .player-col {
+  box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.1);
 }
 
 .table-header {
@@ -758,20 +871,21 @@
 
 // My Stats Section
 .my-stats-section {
-  padding: 0 32px 32px;
+  padding: 0 0 2rem 0;
   
   @media (max-width: 768px) {
-    padding: 0 24px 24px;
+    padding: 0 0 1.5rem 0;
   }
 }
 
 .my-stats-card {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
   border-radius: 20px;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  transition: all 0.3s ease;
 }
 
 .header-icon {
@@ -781,7 +895,7 @@
   width: 48px;
   height: 48px;
   border-radius: 16px;
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #2563eb 100%);
   
   mat-icon {
     color: white;

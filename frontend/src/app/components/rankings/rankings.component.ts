@@ -181,13 +181,14 @@ interface TournamentStats {
             </div>
             
             <div class="card-content">
-          <div class="rankings-table">
-            <div class="table-header">
-              <div class="rank-col">Rank</div>
-              <div class="player-col">Player</div>
-              <div class="points-col">Points</div>
-              <div class="stats-col">Record</div>
-            </div>
+              <div class="table-scroll-container">
+                <div class="rankings-table">
+                  <div class="table-header">
+                    <div class="rank-col">Rank</div>
+                    <div class="player-col">Player</div>
+                    <div class="points-col">Points</div>
+                    <div class="stats-col">Record</div>
+                  </div>
 
             <div 
               *ngFor="let player of rankings; trackBy: trackPlayer"
@@ -227,8 +228,9 @@ interface TournamentStats {
                 </div>
               </div>
 
-            </div>
-          </div>
+                  </div>
+                </div>
+              </div>
 
               <div *ngIf="rankings.length >= currentLimit" class="load-more-section">
                 <button mat-stroked-button (click)="loadMoreRankings()" [disabled]="loadingMore" class="load-more-button">
