@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { SwUpdate } from '@angular/service-worker';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
+import { Router } from '@angular/router';
 import { interval, fromEvent } from 'rxjs';
 import { first } from 'rxjs/operators';
 
@@ -15,7 +16,8 @@ export class AppUpdateService {
   constructor(
     private swUpdate: SwUpdate,
     private snackBar: MatSnackBar,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private router: Router
   ) {
     this.checkForServiceWorker();
   }
@@ -168,8 +170,11 @@ export class AppUpdateService {
 
     this.swUpdate.activateUpdate().then(() => {
       console.log('✅ Update applied successfully');
-      // Reload the page to complete the update
-      window.location.reload();
+      // Navigate to dashboard after update instead of full reload
+      this.router.navigate(['/dashboard']).then(() => {
+        // Force a page refresh to ensure the update is fully applied
+        window.location.reload();
+      });
     }).catch(error => {
       console.error('❌ Error applying update:', error);
       this.showErrorNotification('Failed to apply update. Please refresh manually.');
