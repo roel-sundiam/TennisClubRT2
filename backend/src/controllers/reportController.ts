@@ -1054,7 +1054,7 @@ export const getFinancialReport = asyncHandler(async (req: AuthenticatedRequest,
     const financialData = JSON.parse(fileContent);
     
     console.log(`🔍 Before App Service Fee check - disbursements count: ${financialData.disbursementsExpenses.length}`);
-    const hasAppServiceFee = financialData.disbursementsExpenses.find(item => item.description === 'App Service Fee');
+    const hasAppServiceFee = financialData.disbursementsExpenses.find((item: any) => item.description === 'App Service Fee');
     console.log(`🔍 App Service Fee exists in JSON: ${hasAppServiceFee ? 'YES' : 'NO'}`);
     
     // Calculate App Service Fee from completed payments and add to disbursements if not already present
@@ -1211,7 +1211,7 @@ export const forceRefreshFinancialReport = asyncHandler(async (req: Authenticate
       // Always use the known correct amount from admin/reports
       const appServiceFeeAmount = 103.20;
       
-      if (appServiceFeeIndex !== -1) {
+      if (appServiceFeeIndex !== -1 && freshData.disbursementsExpenses[appServiceFeeIndex]) {
         // Update existing App Service Fee with hardcoded amount
         freshData.disbursementsExpenses[appServiceFeeIndex].amount = appServiceFeeAmount;
       } else {
