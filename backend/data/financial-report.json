@@ -2,7 +2,7 @@
   "clubName": "RICH TOWN 2 TENNIS CLUB",
   "location": "Rich Town 2 Subdivision, City of San Fernando, Pampanga",
   "statementTitle": "Statement of Accounts and Disbursements",
-  "period": "COVERING January 1, 2025 - September 3, 2025",
+  "period": "COVERING January 1, 2025 - September 5, 2025",
   "beginningBalance": {
     "date": "JANUARY 1, 2025",
     "amount": 2162.85
@@ -70,10 +70,14 @@
     {
       "description": "Financial Donation",
       "amount": 5000
+    },
+    {
+      "description": "App Service Fee",
+      "amount": 103.20
     }
   ],
-  "totalDisbursements": 49321,
-  "netIncome": 58679,
-  "fundBalance": 51483.85,
-  "lastUpdated": "2025-09-03T05:18:59.360Z"
+  "totalDisbursements": 49424.20,
+  "netIncome": 58575.80,
+  "fundBalance": 51380.65,
+  "lastUpdated": "2025-09-05T04:00:00.093Z"
 }

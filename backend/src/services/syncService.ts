@@ -156,9 +156,35 @@ export class SyncService {
         fs.mkdirSync(dir, { recursive: true });
       }
       
+      // Ensure App Service Fee is preserved in disbursements
+      let appServiceFee = 103.20; // Use the known correct amount
+      const appServiceFeeIndex = data.disbursementsExpenses.findIndex(
+        (item: any) => item.description === 'App Service Fee'
+      );
+      
+      if (appServiceFeeIndex === -1) {
+        // Add App Service Fee if it doesn't exist
+        data.disbursementsExpenses.push({
+          description: 'App Service Fee',
+          amount: appServiceFee
+        });
+        console.log('💰 Added missing App Service Fee to financial report (sync)');
+      } else {
+        // Preserve existing App Service Fee amount
+        appServiceFee = data.disbursementsExpenses[appServiceFeeIndex].amount;
+        console.log(`💰 Preserved existing App Service Fee: ₱${appServiceFee} (sync)`);
+      }
+      
+      // Recalculate total disbursements to include App Service Fee
+      data.totalDisbursements = data.disbursementsExpenses.reduce((sum: number, item: any) => sum + item.amount, 0);
+      
+      // Recalculate net income and fund balance
+      data.netIncome = data.totalReceipts - data.totalDisbursements;
+      data.fundBalance = data.beginningBalance.amount + data.netIncome;
+      
       // Write formatted JSON
       fs.writeFileSync(this.JSON_FILE_PATH, JSON.stringify(data, null, 2), 'utf8');
-      console.log('💾 JSON file updated successfully');
+      console.log('💾 JSON file updated successfully with App Service Fee preserved');
       
     } catch (error) {
       console.error('❌ Error writing JSON file:', error);

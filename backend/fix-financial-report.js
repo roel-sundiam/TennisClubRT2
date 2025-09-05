@@ -23,8 +23,32 @@ try {
     
     financialData.receiptsCollections[courtReceiptsIndex].amount = newAmount;
     
-    // Recalculate totals
+    // Recalculate total receipts
     financialData.totalReceipts = financialData.receiptsCollections.reduce((sum, item) => sum + item.amount, 0);
+    
+    // Ensure App Service Fee is preserved in disbursements
+    let appServiceFee = 103.20; // Use the known correct amount
+    const appServiceFeeIndex = financialData.disbursementsExpenses.findIndex(
+      (item) => item.description === 'App Service Fee'
+    );
+    
+    if (appServiceFeeIndex === -1) {
+      // Add App Service Fee if it doesn't exist
+      financialData.disbursementsExpenses.push({
+        description: 'App Service Fee',
+        amount: appServiceFee
+      });
+      console.log('💰 Added missing App Service Fee to financial report (script)');
+    } else {
+      // Preserve existing App Service Fee amount
+      appServiceFee = financialData.disbursementsExpenses[appServiceFeeIndex].amount;
+      console.log(`💰 Preserved existing App Service Fee: ₱${appServiceFee} (script)`);
+    }
+    
+    // Recalculate total disbursements to include App Service Fee
+    financialData.totalDisbursements = financialData.disbursementsExpenses.reduce((sum, item) => sum + item.amount, 0);
+    
+    // Recalculate net income and fund balance
     financialData.netIncome = financialData.totalReceipts - financialData.totalDisbursements;
     financialData.fundBalance = financialData.beginningBalance.amount + financialData.netIncome;
     financialData.lastUpdated = new Date().toISOString();

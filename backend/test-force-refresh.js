@@ -31,8 +31,32 @@ async function testForceRefresh() {
         
         courtReceiptsItem.amount = newAmount;
         
-        // Recalculate totals
+        // Recalculate total receipts
         freshData.totalReceipts = freshData.receiptsCollections.reduce((sum, item) => sum + item.amount, 0);
+        
+        // Ensure App Service Fee is preserved in disbursements
+        let appServiceFee = 103.20; // Use the known correct amount
+        const appServiceFeeIndex = freshData.disbursementsExpenses.findIndex(
+          (item) => item.description === 'App Service Fee'
+        );
+        
+        if (appServiceFeeIndex === -1) {
+          // Add App Service Fee if it doesn't exist
+          freshData.disbursementsExpenses.push({
+            description: 'App Service Fee',
+            amount: appServiceFee
+          });
+          console.log('💰 Added missing App Service Fee to financial report (test)');
+        } else {
+          // Preserve existing App Service Fee amount
+          appServiceFee = freshData.disbursementsExpenses[appServiceFeeIndex].amount;
+          console.log(`💰 Preserved existing App Service Fee: ₱${appServiceFee} (test)`);
+        }
+        
+        // Recalculate total disbursements to include App Service Fee
+        freshData.totalDisbursements = freshData.disbursementsExpenses.reduce((sum, item) => sum + item.amount, 0);
+        
+        // Recalculate net income and fund balance
         freshData.netIncome = freshData.totalReceipts - freshData.totalDisbursements;
         freshData.fundBalance = freshData.beginningBalance.amount + freshData.netIncome;
         freshData.lastUpdated = new Date().toISOString();

@@ -255,22 +255,86 @@ router.get('/dashboard', (req, res, next) => {
       }
     }
 
-    // Get basic counts first
-    const pageViewCount = await PageView.countDocuments({
-      timestamp: { $gte: fromDate, $lte: toDate }
-    });
+    // Get basic counts first - exclude superadmin users
+    const pageViewCount = await PageView.aggregate([
+      { $match: { timestamp: { $gte: fromDate, $lte: toDate } } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $match: {
+          $or: [
+            { userId: { $exists: false } }, // Anonymous users
+            { 'user.role': { $ne: 'superadmin' } }
+          ]
+        }
+      },
+      { $count: 'total' }
+    ]);
 
-    const userActivityCount = await UserActivity.countDocuments({
-      timestamp: { $gte: fromDate, $lte: toDate }
-    });
+    const userActivityCount = await UserActivity.aggregate([
+      { $match: { timestamp: { $gte: fromDate, $lte: toDate } } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $match: {
+          'user.role': { $ne: 'superadmin' }
+        }
+      },
+      { $count: 'total' }
+    ]);
 
-    const sessionCount = await SessionInfo.countDocuments({
-      startTime: { $gte: fromDate, $lte: toDate }
-    });
+    const sessionCount = await SessionInfo.aggregate([
+      { $match: { startTime: { $gte: fromDate, $lte: toDate } } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $match: {
+          $or: [
+            { userId: { $exists: false } }, // Anonymous sessions
+            { 'user.role': { $ne: 'superadmin' } }
+          ]
+        }
+      },
+      { $count: 'total' }
+    ]);
 
-    // Get simple aggregated data
+    // Get simple aggregated data - exclude superadmin users
     const popularPages = await PageView.aggregate([
       { $match: { timestamp: { $gte: fromDate, $lte: toDate } } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $match: {
+          $or: [
+            { userId: { $exists: false } }, // Anonymous users
+            { 'user.role': { $ne: 'superadmin' } }
+          ]
+        }
+      },
       {
         $group: {
           _id: '$page',
@@ -295,6 +359,19 @@ router.get('/dashboard', (req, res, next) => {
     const userActivity = await UserActivity.aggregate([
       { $match: { timestamp: { $gte: fromDate, $lte: toDate } } },
       {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $match: {
+          'user.role': { $ne: 'superadmin' }
+        }
+      },
+      {
         $group: {
           _id: '$action',
           count: { $sum: 1 }
@@ -311,15 +388,47 @@ router.get('/dashboard', (req, res, next) => {
       }
     ]);
 
-    // Device and browser breakdown
+    // Device and browser breakdown - exclude superadmin users
     const deviceStats = await PageView.aggregate([
       { $match: { timestamp: { $gte: fromDate, $lte: toDate } } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $match: {
+          $or: [
+            { userId: { $exists: false } }, // Anonymous users
+            { 'user.role': { $ne: 'superadmin' } }
+          ]
+        }
+      },
       { $group: { _id: '$deviceType', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
 
     const browserStats = await PageView.aggregate([
       { $match: { timestamp: { $gte: fromDate, $lte: toDate } } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $match: {
+          $or: [
+            { userId: { $exists: false } }, // Anonymous users
+            { 'user.role': { $ne: 'superadmin' } }
+          ]
+        }
+      },
       { $group: { _id: '$browser', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
@@ -334,26 +443,47 @@ router.get('/dashboard', (req, res, next) => {
       browserBreakdown[stat._id] = stat.count;
     });
 
-    // Calculate average session duration
+    // Calculate average session duration - exclude superadmin users
     const avgSessionDuration = await SessionInfo.aggregate([
       { $match: { startTime: { $gte: fromDate, $lte: toDate }, duration: { $exists: true } } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $match: {
+          $or: [
+            { userId: { $exists: false } }, // Anonymous sessions
+            { 'user.role': { $ne: 'superadmin' } }
+          ]
+        }
+      },
       { $group: { _id: null, avgDuration: { $avg: '$duration' } } }
     ]);
 
+    // Extract counts from aggregation results
+    const totalPageViews = pageViewCount[0]?.total || 0;
+    const totalUserActivity = userActivityCount[0]?.total || 0;
+    const totalSessions = sessionCount[0]?.total || 0;
+
     const analyticsData = {
       pageViews: {
-        totalViews: pageViewCount,
-        uniqueUsers: Math.ceil(pageViewCount * 0.7), // Estimate
-        uniqueSessions: sessionCount,
+        totalViews: totalPageViews,
+        uniqueUsers: Math.ceil(totalPageViews * 0.7), // Estimate
+        uniqueSessions: totalSessions,
         avgDuration: 45000 // Default for now
       },
       popularPages: popularPages || [],
       userActivity: userActivity || [],
       engagement: {
-        totalSessions: sessionCount,
+        totalSessions: totalSessions,
         avgDuration: avgSessionDuration[0]?.avgDuration || 45000,
-        avgPageViews: sessionCount > 0 ? Math.round((pageViewCount / sessionCount) * 10) / 10 : 0,
-        avgActions: sessionCount > 0 ? Math.round((userActivityCount / sessionCount) * 10) / 10 : 0,
+        avgPageViews: totalSessions > 0 ? Math.round((totalPageViews / totalSessions) * 10) / 10 : 0,
+        avgActions: totalSessions > 0 ? Math.round((totalUserActivity / totalSessions) * 10) / 10 : 0,
         bounceRate: 25 // Estimate for now
       },
       deviceBreakdown,
@@ -408,16 +538,42 @@ router.get('/activity-history', authenticateToken, requireAdmin, async (req, res
 
     const activities = await UserActivity
       .find(matchConditions)
-      .populate('userId', 'fullName username')
+      .populate({
+        path: 'userId',
+        select: 'fullName username role',
+        match: { role: { $ne: 'superadmin' } }
+      })
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(Number(limit));
 
-    const totalCount = await UserActivity.countDocuments(matchConditions);
+    // Filter out activities where user population returned null (superadmin users)
+    const filteredActivities = activities.filter(activity => activity.userId !== null);
+
+    // Get total count excluding superadmin activities
+    const totalCountResult = await UserActivity.aggregate([
+      { $match: matchConditions },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $match: {
+          'user.role': { $ne: 'superadmin' }
+        }
+      },
+      { $count: 'total' }
+    ]);
+
+    const totalCount = totalCountResult[0]?.total || 0;
 
     res.json({
       success: true,
-      data: activities,
+      data: filteredActivities,
       pagination: {
         currentPage: Number(page),
         totalPages: Math.ceil(totalCount / Number(limit)),
