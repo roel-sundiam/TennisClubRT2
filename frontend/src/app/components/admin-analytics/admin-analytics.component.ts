@@ -74,6 +74,10 @@ interface ActivityHistoryItem {
             <mat-icon>campaign</mat-icon>
             Marketing Page
           </button>
+          <button mat-raised-button color="warn" (click)="openVideoDemo()" class="video-demo-button">
+            <mat-icon>play_circle_filled</mat-icon>
+            Video Demo
+          </button>
           <button mat-raised-button color="primary" (click)="refreshData()" [disabled]="loading">
             <mat-icon>refresh</mat-icon>
             Refresh
@@ -705,6 +709,28 @@ export class AdminAnalyticsComponent implements OnInit, OnDestroy {
     // Update this URL to your actual marketing page URL when deployed
     const marketingUrl = window.location.origin + '/marketing/simple.html';
     window.open(marketingUrl, '_blank');
+  }
+
+  openVideoDemo(): void {
+    // Create a direct link element and click it to bypass Angular routing
+    const link = document.createElement('a');
+    link.href = '/showcase/video-output/tennis-club-rt2-demo.html';
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    
+    // Temporarily add to DOM, click, and remove
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Track the video demo view
+    this.analyticsService.trackButtonClick('Video Demo', 'admin-analytics', { 
+      action: 'view_demo_video',
+      component: 'admin_analytics',
+      timestamp: new Date().toISOString()
+    });
+    
+    this.showMessage('Opening video demo in new tab', 'success');
   }
 
   private showMessage(message: string, type: 'success' | 'error' | 'warning'): void {

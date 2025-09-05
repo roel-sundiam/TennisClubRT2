@@ -1,0 +1,31 @@
+{
+  "name": "tennis-club-showcase",
+  "version": "1.0.0",
+  "description": "Automated screenshot and video showcase generator for Tennis Club RT2",
+  "scripts": {
+    "test": "node test-showcase.js",
+    "generate-all": "node generate-all.js",
+    "generate-simple": "node generate-simple.js",
+    "capture": "node capture-screenshots.js",
+    "showcase": "node build-showcase.js",
+    "video": "node create-video.js",
+    "video-simple": "node simple-video-generator.js",
+    "demo": "node create-demo-video.js",
+    "demo-view": "start video-output/tennis-club-rt2-demo.html",
+    "deploy-demo": "node deploy-demo.js",
+    "demo-deploy": "node create-demo-video.js && node deploy-demo.js",
+    "serve": "node simple-server.js",
+    "serve-alt": "http-server showcase-web -p 8080 -o",
+    "clean": "rm -rf screenshots showcase-web videos temp",
+    "help": "echo 'Tennis Club RT2 Showcase Commands:\n  npm test - Test system requirements\n  npm run generate-all - Create complete showcase\n  npm run capture - Screenshots only\n  npm run showcase - Interactive web showcase only\n  npm run video - Video only\n  npm run serve - View showcase locally\n  npm run clean - Remove generated files'"
+  },
+  "dependencies": {
+    "fs-extra": "^11.1.1",
+    "path": "^0.12.7",
+    "puppeteer": "^21.5.0",
+    "sharp": "^0.32.6"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

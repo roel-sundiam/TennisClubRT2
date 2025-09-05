@@ -1,0 +1,13 @@
+{
+  "generatedAt": "2025-09-05T10:54:04.146Z",
+  "appName": "Tennis Club RT2 (Sample)",
+  "description": "Sample manifest for testing",
+  "screenshots": {
+    "captured": 0,
+    "failed": 0,
+    "total": 0
+  },
+  "features": {
+    "Sample Feature": "This is a test feature description"
+  }
+}
