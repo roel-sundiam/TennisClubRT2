@@ -13,7 +13,7 @@ import {
   triggerSync,
   getSyncStatus
 } from '../controllers/reportController';
-const { getStaticCourtUsageReport } = require('../controllers/staticReportController');
+import { getStaticCourtUsageReport } from '../controllers/staticReportController';
 import { authenticateToken, requireRole } from '../middleware/auth';
 
 const router = Router();

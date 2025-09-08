@@ -1,12 +1,13 @@
-const CourtUsageReport = require('../models/CourtUsageReport.ts').default;
+import { Request, Response } from 'express';
+import CourtUsageReport from '../models/CourtUsageReport';
 
 // Controller for court usage data from database
-const getStaticCourtUsageReport = async (req, res) => {
+export const getStaticCourtUsageReport = async (req: Request, res: Response) => {
   try {
     console.log('📊 Loading court usage data from database...');
 
     // Get year parameter, default to 2025
-    const year = parseInt(req.query.year) || 2025;
+    const year = parseInt(req.query.year as string) || 2025;
 
     // Fetch data from database, sorted by total amount (highest first)
     const courtUsageRecords = await CourtUsageReport.find({ year }).sort({ totalAmount: -1 });
@@ -35,7 +36,7 @@ const getStaticCourtUsageReport = async (req, res) => {
 
     // Convert database records to the frontend format
     const rawData = courtUsageRecords.map(record => {
-      const row = {
+      const row: any = {
         'Players/Members': record.memberName
       };
       
@@ -45,7 +46,8 @@ const getStaticCourtUsageReport = async (req, res) => {
       // Map each month's data
       monthNames.forEach((monthName, index) => {
         const monthField = monthFields[index];
-        const amount = record[monthField] || 0;
+        if (!monthField) return;
+        const amount = (record as any)[monthField] || 0;
         calculatedTotal += amount;
         row[monthName] = amount > 0 ? `₱${amount.toFixed(2)}` : '₱0.00';
       });
@@ -61,7 +63,7 @@ const getStaticCourtUsageReport = async (req, res) => {
     
     const totalRecordedPayments = courtUsageRecords.reduce((sum, record) => {
       // Count non-zero monthly payments
-      return sum + monthFields.filter(field => (record[field] || 0) > 0).length;
+      return sum + monthFields.filter(field => ((record as any)[field] || 0) > 0).length;
     }, 0);
 
     const headers = ['Players/Members', ...monthNames, 'Total'];
@@ -72,7 +74,7 @@ const getStaticCourtUsageReport = async (req, res) => {
         totalRecordedPayments,
         totalRevenue: `₱${totalRevenue.toFixed(2)}`,
         lastUpdated: courtUsageRecords.length > 0 
-          ? (courtUsageRecords[0].updatedAt || new Date()).toISOString() 
+          ? (courtUsageRecords[0]?.updatedAt || new Date()).toISOString() 
           : new Date().toISOString()
       },
       rawData,
@@ -87,7 +89,7 @@ const getStaticCourtUsageReport = async (req, res) => {
       metadata: {
         source: 'mongodb_database',
         lastModified: courtUsageRecords.length > 0 
-          ? (courtUsageRecords[0].updatedAt || new Date()).toISOString() 
+          ? (courtUsageRecords[0]?.updatedAt || new Date()).toISOString() 
           : new Date().toISOString(),
         cached: false,
         timestamp: new Date().toISOString(),
@@ -96,7 +98,7 @@ const getStaticCourtUsageReport = async (req, res) => {
       }
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error loading court usage data from database:', error);
     
     res.status(500).json({
@@ -106,5 +108,3 @@ const getStaticCourtUsageReport = async (req, res) => {
     });
   }
 };
-
-module.exports = { getStaticCourtUsageReport };
