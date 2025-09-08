@@ -13,7 +13,6 @@ const reservationSchema = new Schema<IReservationDocument>({
   date: {
     type: Date,
     required: [true, 'Reservation date is required'],
-    index: true,
     validate: {
       validator: function(v: Date) {
         const today = new Date();
@@ -27,8 +26,7 @@ const reservationSchema = new Schema<IReservationDocument>({
     type: Number,
     required: [true, 'Time slot is required'],
     min: [5, 'Court operates from 5 AM'],
-    max: [22, 'Court operates until 10 PM'],
-    index: true
+    max: [22, 'Court operates until 10 PM']
   },
   players: [{
     type: String,
@@ -97,6 +95,26 @@ const reservationSchema = new Schema<IReservationDocument>({
     type: Boolean,
     default: false,
     index: true
+  },
+  // Multi-hour reservation support
+  duration: {
+    type: Number,
+    min: [1, 'Duration must be at least 1 hour'],
+    max: [4, 'Duration cannot exceed 4 hours'],
+    default: 1,
+    required: true,
+    index: true
+  },
+  endTimeSlot: {
+    type: Number,
+    min: [6, 'End time cannot be before 6 AM'],
+    max: [23, 'End time cannot be after 11 PM'],
+    index: true
+  },
+  isMultiHour: {
+    type: Boolean,
+    default: false,
+    index: true
   }
 }, {
   timestamps: true,
@@ -106,11 +124,12 @@ const reservationSchema = new Schema<IReservationDocument>({
 
 // Compound indexes for better query performance
 reservationSchema.index({ userId: 1, date: -1 });
-reservationSchema.index({ date: 1, timeSlot: 1 });
+reservationSchema.index({ date: 1, timeSlot: 1, endTimeSlot: 1 }); // Multi-hour support
 reservationSchema.index({ status: 1, paymentStatus: 1 });
 reservationSchema.index({ date: 1, status: 1 });
 reservationSchema.index({ tournamentTier: 1, status: 1 });
 reservationSchema.index({ pointsProcessed: 1, status: 1 });
+reservationSchema.index({ isMultiHour: 1, status: 1 }); // Multi-hour queries
 
 // Unique compound index to prevent double booking
 reservationSchema.index(
@@ -123,61 +142,103 @@ reservationSchema.index(
   }
 );
 
-// Pre-save middleware to calculate total fee
+// Pre-save middleware to calculate derived fields and total fee
 reservationSchema.pre('save', function(next) {
   const reservation = this;
   
-  // Only calculate fee if not explicitly provided (for backward compatibility)
-  // Frontend now calculates the correct fee considering member vs non-member pricing
-  if ((reservation.isNew || reservation.isModified('timeSlot') || reservation.isModified('players')) && 
+  // Calculate endTimeSlot and isMultiHour
+  if (reservation.isNew || reservation.isModified('timeSlot') || reservation.isModified('duration')) {
+    reservation.endTimeSlot = reservation.timeSlot + reservation.duration;
+    reservation.isMultiHour = reservation.duration > 1;
+    
+    // Validate that booking doesn't extend beyond court hours
+    if (reservation.endTimeSlot > 23) {
+      return next(new Error(`Booking extends beyond court hours. Court closes at 10 PM (22:00). Duration: ${reservation.duration} hours from ${reservation.timeSlot}:00 would end at ${reservation.endTimeSlot}:00.`));
+    }
+  }
+  
+  // Calculate total fee for multi-hour reservations if not explicitly provided
+  if ((reservation.isNew || reservation.isModified('timeSlot') || reservation.isModified('players') || reservation.isModified('duration')) && 
       (!reservation.totalFee || reservation.totalFee === 0)) {
     const peakHours = (process.env.PEAK_HOURS || '5,18,19,21').split(',').map(h => parseInt(h));
     const peakHourFee = parseInt(process.env.PEAK_HOUR_FEE || '100');
     const offPeakFeePerMember = parseInt(process.env.OFF_PEAK_FEE_PER_MEMBER || '20');
     const offPeakFeePerNonMember = parseInt(process.env.OFF_PEAK_FEE_PER_NON_MEMBER || '50');
     
-    if (peakHours.includes(reservation.timeSlot)) {
-      // Peak hours: 100 pesos fixed fee
-      reservation.totalFee = peakHourFee;
-    } else {
-      // Off-peak hours: use proper member/non-member calculation if frontend didn't provide
-      // This is a fallback - the frontend should handle proper categorization
-      try {
-        // Simple heuristic: assume 2/3 are members, 1/3 are non-members for mixed groups
-        const totalPlayers = reservation.players.length;
-        if (totalPlayers <= 2) {
-          // Small groups: assume all members
-          reservation.totalFee = totalPlayers * offPeakFeePerMember;
-        } else {
-          // Larger groups: use heuristic for mixed member/non-member pricing
-          const estimatedMembers = Math.ceil(totalPlayers * 0.67); // 67% members
-          const estimatedNonMembers = totalPlayers - estimatedMembers;
-          reservation.totalFee = (estimatedMembers * offPeakFeePerMember) + (estimatedNonMembers * offPeakFeePerNonMember);
+    let totalFee = 0;
+    
+    // Calculate fee for each hour in the duration
+    const calculatedEndTimeSlot = reservation.endTimeSlot || (reservation.timeSlot + reservation.duration);
+    for (let hour = reservation.timeSlot; hour < calculatedEndTimeSlot; hour++) {
+      let hourFee = 0;
+      
+      if (peakHours.includes(hour)) {
+        // Peak hours: 100 pesos fixed fee per hour
+        hourFee = peakHourFee;
+      } else {
+        // Off-peak hours: use proper member/non-member calculation if frontend didn't provide
+        // This is a fallback - the frontend should handle proper categorization
+        try {
+          // Simple heuristic: assume 2/3 are members, 1/3 are non-members for mixed groups
+          const totalPlayers = reservation.players.length;
+          if (totalPlayers <= 2) {
+            // Small groups: assume all members
+            hourFee = totalPlayers * offPeakFeePerMember;
+          } else {
+            // Larger groups: use heuristic for mixed member/non-member pricing
+            const estimatedMembers = Math.ceil(totalPlayers * 0.67); // 67% members
+            const estimatedNonMembers = totalPlayers - estimatedMembers;
+            hourFee = (estimatedMembers * offPeakFeePerMember) + (estimatedNonMembers * offPeakFeePerNonMember);
+          }
+        } catch (error) {
+          // Ultimate fallback: treat all as members
+          hourFee = reservation.players.length * offPeakFeePerMember;
         }
-      } catch (error) {
-        // Ultimate fallback: treat all as members
-        reservation.totalFee = reservation.players.length * offPeakFeePerMember;
       }
+      
+      totalFee += hourFee;
     }
+    
+    reservation.totalFee = totalFee;
   }
   
   next();
 });
 
-// Static method to check if slot is available
-reservationSchema.statics.isSlotAvailable = async function(date: Date, timeSlot: number, excludeId?: string) {
+// Static method to check if a range of slots is available (for multi-hour reservations)
+reservationSchema.statics.isSlotRangeAvailable = async function(date: Date, startTimeSlot: number, endTimeSlot: number, excludeId?: string) {
+  // Check for any existing reservations that would conflict with the requested range
   const query: any = {
     date: date,
-    timeSlot: timeSlot,
-    status: { $in: ['pending', 'confirmed'] }
+    status: { $in: ['pending', 'confirmed'] },
+    $or: [
+      // Case 1: Existing reservation starts within our requested range
+      {
+        timeSlot: { $gte: startTimeSlot, $lt: endTimeSlot }
+      },
+      // Case 2: Existing reservation ends within our requested range  
+      {
+        endTimeSlot: { $gt: startTimeSlot, $lte: endTimeSlot }
+      },
+      // Case 3: Existing reservation completely contains our requested range
+      {
+        timeSlot: { $lte: startTimeSlot },
+        endTimeSlot: { $gte: endTimeSlot }
+      }
+    ]
   };
   
   if (excludeId) {
     query._id = { $ne: excludeId };
   }
   
-  const existingReservation = await this.findOne(query);
-  return !existingReservation;
+  const conflictingReservations = await this.find(query);
+  return conflictingReservations.length === 0;
+};
+
+// Static method to check if slot is available (backward compatible)
+reservationSchema.statics.isSlotAvailable = async function(date: Date, timeSlot: number, excludeId?: string) {
+  return await (this as any).isSlotRangeAvailable(date, timeSlot, timeSlot + 1, excludeId);
 };
 
 // Static method to get reservations for a specific date
@@ -201,11 +262,11 @@ reservationSchema.virtual('formattedDate').get(function(this: IReservationDocume
   return this.date.toISOString().split('T')[0];
 });
 
-// Virtual for time slot display
+// Virtual for time slot display (supports multi-hour)
 reservationSchema.virtual('timeSlotDisplay').get(function(this: IReservationDocument) {
-  const hour = this.timeSlot;
-  const nextHour = hour + 1;
-  return `${hour}:00 - ${nextHour}:00`;
+  const startHour = this.timeSlot;
+  const endHour = this.endTimeSlot || (startHour + 1); // Fallback for backward compatibility
+  return `${startHour}:00 - ${endHour}:00`;
 });
 
 // Virtual for fee per player

@@ -138,6 +138,10 @@ export interface CourtReservation {
     score?: string;
   }>;
   pointsProcessed: boolean;
+  // Multi-hour reservation support
+  duration: number;
+  endTimeSlot?: number; // Calculated automatically
+  isMultiHour?: boolean; // Calculated automatically
   createdAt: Date;
   updatedAt: Date;
 }
@@ -146,13 +150,16 @@ export interface CreateReservationRequest {
   date: string;
   timeSlot: number;
   players: string[];
+  duration?: number; // Default to 1 hour if not specified
   tournamentTier?: '100' | '250' | '500';
+  totalFee?: number; // Fee calculated by frontend
 }
 
 export interface UpdateReservationRequest {
   date?: string;
   timeSlot?: number;
   players?: string[];
+  duration?: number;
 }
 
 export interface Payment {

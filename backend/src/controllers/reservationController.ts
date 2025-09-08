@@ -158,7 +158,9 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
   // Generate time slots availability with weather data and Open Play blocking
   const timeSlots = [];
   for (let hour = 5; hour <= 22; hour++) {
-    const existingReservation = reservations.find((r: any) => r.timeSlot === hour);
+    const existingReservation = reservations.find((r: any) => 
+      hour >= r.timeSlot && hour < (r.endTimeSlot || r.timeSlot + (r.duration || 1))
+    );
     const isBlockedByOpenPlay = blockedSlots.has(hour);
     const openPlayEvent = isBlockedByOpenPlay ? 
       openPlayEvents.find(event => event.openPlayEvent?.blockedTimeSlots && Array.isArray(event.openPlayEvent.blockedTimeSlots) && event.openPlayEvent.blockedTimeSlots.includes(hour)) : null;
@@ -236,7 +238,7 @@ export const getReservation = asyncHandler(async (req: AuthenticatedRequest, res
 
 // Create new reservation
 export const createReservation = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { date, timeSlot, players, tournamentTier = '100' }: CreateReservationRequest = req.body;
+  const { date, timeSlot, players, duration = 1, tournamentTier = '100', totalFee }: CreateReservationRequest = req.body;
 
   if (!req.user) {
     res.status(401).json({
@@ -268,12 +270,34 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
     return;
   }
 
-  // Check if slot is available
-  const isAvailable = await (Reservation as any).isSlotAvailable(reservationDate, timeSlot);
-  if (!isAvailable) {
+  // Validate duration
+  if (duration < 1 || duration > 4) {
     res.status(400).json({
       success: false,
-      error: 'Time slot is already reserved'
+      error: 'Duration must be between 1 and 4 hours'
+    });
+    return;
+  }
+
+  // Validate that reservation doesn't extend beyond court hours
+  const endTimeSlot = timeSlot + duration;
+  if (endTimeSlot > 23) {
+    res.status(400).json({
+      success: false,
+      error: `Booking extends beyond court hours. Court closes at 10 PM (22:00). Duration: ${duration} hours from ${timeSlot}:00 would end at ${endTimeSlot}:00.`
+    });
+    return;
+  }
+
+  // Check if slot range is available (supports multi-hour)
+  const isAvailable = await (Reservation as any).isSlotRangeAvailable(reservationDate, timeSlot, endTimeSlot);
+  if (!isAvailable) {
+    const conflictMessage = duration > 1 
+      ? `One or more time slots in the range ${timeSlot}:00-${endTimeSlot}:00 are already reserved`
+      : 'Time slot is already reserved';
+    res.status(400).json({
+      success: false,
+      error: conflictMessage
     });
     return;
   }
@@ -395,72 +419,24 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
     return;
   }
 
-  // Calculate proper fee based on member/non-member status
+  // Use totalFee from frontend if provided, otherwise calculate fallback
   const trimmedPlayers = players.map(p => p.trim());
-  let totalFee = 0;
+  let finalTotalFee = totalFee || 0;
   
-  const peakHours = (process.env.PEAK_HOURS || '5,18,19,21').split(',').map(h => parseInt(h));
-  const peakHourFee = parseInt(process.env.PEAK_HOUR_FEE || '100');
-  const offPeakFeePerMember = parseInt(process.env.OFF_PEAK_FEE_PER_MEMBER || '20');
-  const offPeakFeePerNonMember = parseInt(process.env.OFF_PEAK_FEE_PER_NON_MEMBER || '50');
-  
-  try {
-    // Get all approved members to categorize players
-    const members = await User.find({
-      role: { $in: ['member', 'admin'] },
-      isActive: true,
-      isApproved: true
-    }).select('fullName').lean();
+  if (!finalTotalFee) {
+    // Fallback calculation if frontend doesn't provide totalFee
+    const peakHours = (process.env.PEAK_HOURS || '5,18,19,21').split(',').map(h => parseInt(h));
+    const peakHourFee = parseInt(process.env.PEAK_HOUR_FEE || '100');
+    const offPeakFeePerMember = parseInt(process.env.OFF_PEAK_FEE_PER_MEMBER || '20');
     
-    const memberNames = members.map(m => m.fullName.toLowerCase().trim());
-    
-    // Categorize players
-    let memberCount = 0;
-    let nonMemberCount = 0;
-    
-    trimmedPlayers.forEach(playerName => {
-      const cleanPlayerName = playerName.toLowerCase().trim();
-      const isFoundInMembers = memberNames.includes(cleanPlayerName);
-      
-      if (isFoundInMembers) {
-        memberCount++;
-        console.log(`✅ "${playerName}" is a MEMBER`);
-      } else {
-        // Try fuzzy matching for common name variations
-        const fuzzyMatch = memberNames.find(memberName => {
-          const similarity = calculateStringSimilarity(cleanPlayerName, memberName);
-          return similarity > 0.8;
-        });
-        
-        if (fuzzyMatch) {
-          memberCount++;
-          console.log(`✅ "${playerName}" is a MEMBER (fuzzy match: "${fuzzyMatch}")`);
-        } else {
-          nonMemberCount++;
-          console.log(`❌ "${playerName}" is a NON-MEMBER`);
-        }
-      }
-    });
-    
-    // Calculate fee based on peak/off-peak and member/non-member status
     if (peakHours.includes(timeSlot)) {
-      // Peak hours: calculate fee with ₱100 minimum
-      const calculatedFee = (memberCount * offPeakFeePerMember) + (nonMemberCount * offPeakFeePerNonMember);
-      totalFee = Math.max(peakHourFee, calculatedFee);
-      console.log(`⚽ Peak hour reservation: ${memberCount} members × ₱${offPeakFeePerMember} + ${nonMemberCount} non-members × ₱${offPeakFeePerNonMember} = ₱${calculatedFee}, minimum ₱${peakHourFee} → ₱${totalFee}`);
+      finalTotalFee = peakHourFee * duration;
     } else {
-      // Off-peak hours: calculate fee based on member/non-member rates
-      totalFee = (memberCount * offPeakFeePerMember) + (nonMemberCount * offPeakFeePerNonMember);
-      console.log(`⚽ Off-peak reservation: ${memberCount} members × ₱${offPeakFeePerMember} + ${nonMemberCount} non-members × ₱${offPeakFeePerNonMember} = ₱${totalFee}`);
+      finalTotalFee = trimmedPlayers.length * offPeakFeePerMember * duration;
     }
-  } catch (error) {
-    console.warn('Failed to categorize players, using fallback calculation:', error);
-    // Fallback to simple calculation
-    if (peakHours.includes(timeSlot)) {
-      totalFee = peakHourFee;
-    } else {
-      totalFee = trimmedPlayers.length * offPeakFeePerMember;
-    }
+    console.log(`⚠️  Using fallback calculation: ₱${finalTotalFee}`);
+  } else {
+    console.log(`✅ Using frontend calculated fee: ₱${finalTotalFee}`);
   }
 
   // Check for credit auto-deduction
@@ -469,14 +445,14 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
   let creditTransactionId = null;
 
   // Auto-deduct from credits if user has sufficient balance
-  if (user.creditBalance >= totalFee) {
+  if (user.creditBalance >= finalTotalFee) {
     try {
-      console.log(`💳 Auto-deducting ₱${totalFee} from ${user.fullName}'s credit balance (₱${user.creditBalance})`);
+      console.log(`💳 Auto-deducting ₱${finalTotalFee} from ${user.fullName}'s credit balance (₱${user.creditBalance})`);
       
       const creditTransaction = await (CreditTransaction as any).createTransaction(
         req.user._id,
         'deduction',
-        totalFee,
+        finalTotalFee,
         `Court reservation fee for ${reservationDate.toISOString().split('T')[0]} at ${timeSlot}:00`,
         {
           referenceType: 'reservation',
@@ -493,7 +469,7 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
       creditUsed = true;
       creditTransactionId = creditTransaction._id;
       
-      console.log(`✅ Successfully deducted ₱${totalFee} from credits. New balance: ₱${user.creditBalance - totalFee}`);
+      console.log(`✅ Successfully deducted ₱${finalTotalFee} from credits. New balance: ₱${user.creditBalance - finalTotalFee}`);
     } catch (error) {
       console.error('Failed to auto-deduct credits:', error);
       // Continue with normal flow - payment will be pending
@@ -506,11 +482,12 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
     userId: req.user._id,
     date: reservationDate,
     timeSlot,
+    duration,
     players: trimmedPlayers,
     status: 'pending',
     paymentStatus,
     tournamentTier,
-    totalFee,
+    totalFee: finalTotalFee,
     weatherForecast
   });
 
@@ -524,15 +501,15 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
   }
 
   const message = creditUsed 
-    ? `Reservation created successfully. ₱${totalFee} automatically deducted from your credit balance. ${coinsRequired} coins deducted.`
-    : `Reservation created successfully. Payment of ₱${totalFee} is pending. ${coinsRequired} coins deducted.`;
+    ? `Reservation created successfully. ₱${finalTotalFee} automatically deducted from your credit balance. ${coinsRequired} coins deducted.`
+    : `Reservation created successfully. Payment of ₱${finalTotalFee} is pending. ${coinsRequired} coins deducted.`;
 
   res.status(201).json({
     success: true,
     data: {
       ...reservation.toJSON(),
       creditUsed,
-      creditBalance: user.creditBalance - (creditUsed ? totalFee : 0)
+      creditBalance: user.creditBalance - (creditUsed ? finalTotalFee : 0)
     },
     message
   });
@@ -940,6 +917,10 @@ export const createReservationValidation = [
   body('timeSlot')
     .isInt({ min: 5, max: 22 })
     .withMessage('Time slot must be between 5 and 22'),
+  body('duration')
+    .optional()
+    .isInt({ min: 1, max: 4 })
+    .withMessage('Duration must be between 1 and 4 hours'),
   body('players')
     .isArray({ min: 1, max: 4 })
     .withMessage('Players must be an array with 1-4 items'),

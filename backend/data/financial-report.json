@@ -18,14 +18,14 @@
     },
     {
       "description": "Tennis Court Usage Receipts",
-      "amount": 67800
+      "amount": 68310
     },
     {
       "description": "Men's Tournament Entries",
       "amount": 0
     }
   ],
-  "totalReceipts": 108000,
+  "totalReceipts": 108510,
   "disbursementsExpenses": [
     {
       "description": "Purchase - Miscellaneous",
@@ -73,11 +73,11 @@
     },
     {
       "description": "App Service Fee",
-      "amount": 103.20
+      "amount": 103.2
     }
   ],
-  "totalDisbursements": 49424.20,
-  "netIncome": 58575.80,
-  "fundBalance": 51380.65,
-  "lastUpdated": "2025-09-05T04:00:00.093Z"
+  "totalDisbursements": 58782.2,
+  "netIncome": 49727.8,
+  "fundBalance": 51890.65,
+  "lastUpdated": "2025-09-08T00:15:54.364Z"
 }

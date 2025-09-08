@@ -18,6 +18,7 @@ import {
   processPaymentValidation
 } from '../controllers/paymentController';
 import { authenticateToken, requireRole, AuthenticatedRequest } from '../middleware/auth';
+import { autoFixPaymentsMiddleware } from '../middleware/autoFixPayments';
 import { validationResult } from 'express-validator';
 
 const router = Router();
@@ -52,6 +53,7 @@ router.post(
   authenticateToken,
   createPaymentValidation,
   handleValidationErrors,
+  autoFixPaymentsMiddleware,
   createPayment
 );
 
@@ -195,6 +197,7 @@ router.put(
       });
     }
   },
+  autoFixPaymentsMiddleware,
   processPayment
 );
 
@@ -207,6 +210,7 @@ router.put(
   '/:id/approve',
   authenticateToken,
   requireRole(['admin', 'superadmin']),
+  autoFixPaymentsMiddleware,
   approvePayment
 );
 
