@@ -5,6 +5,7 @@ import Reservation from '../models/Reservation';
 import Payment from '../models/Payment';
 import CoinTransaction from '../models/CoinTransaction';
 import Poll from '../models/Poll';
+import Expense from '../models/Expense';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { sheetsService } from '../services/sheetsService';
@@ -1002,9 +1003,34 @@ export const getFinancialReport = asyncHandler(async (req: AuthenticatedRequest,
     const fileContent = fs.readFileSync(dataPath, 'utf8');
     const financialData = JSON.parse(fileContent);
     
+    // Load expenses from database and group by category
+    const databaseExpenses = await Expense.find({}).sort({ date: 1 });
+    
+    // Group expenses by category and calculate totals
+    const expensesByCategory = databaseExpenses.reduce((acc: any, expense: any) => {
+      const category = expense.category;
+      if (!acc[category]) {
+        acc[category] = 0;
+      }
+      acc[category] += expense.amount;
+      return acc;
+    }, {});
+    
+    // Convert grouped expenses to disbursements format
+    const databaseDisbursements = Object.entries(expensesByCategory).map(([category, amount]) => ({
+      description: category,
+      amount: amount as number
+    }));
+    
+    console.log(`🔍 Loaded ${databaseExpenses.length} expenses from database grouped into ${databaseDisbursements.length} categories`);
+    console.log('💰 Database expense categories:', Object.keys(expensesByCategory));
+    
+    // Replace JSON disbursements with database expenses
+    financialData.disbursementsExpenses = databaseDisbursements;
+    
     console.log(`🔍 Before App Service Fee check - disbursements count: ${financialData.disbursementsExpenses.length}`);
     const hasAppServiceFee = financialData.disbursementsExpenses.find((item: any) => item.description === 'App Service Fee');
-    console.log(`🔍 App Service Fee exists in JSON: ${hasAppServiceFee ? 'YES' : 'NO'}`);
+    console.log(`🔍 App Service Fee exists in database expenses: ${hasAppServiceFee ? 'YES' : 'NO'}`);
     
     // Calculate App Service Fee from completed payments and add to disbursements if not already present
     try {
