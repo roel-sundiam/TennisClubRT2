@@ -559,6 +559,17 @@
           font-weight: 600;
           color: #374151;
         }
+
+        // Override coin balance component text color in mobile menu
+        ::ng-deep app-coin-balance {
+          .balance-amount {
+            color: #374151 !important;
+          }
+          
+          .balance-label {
+            color: #6b7280 !important;
+          }
+        }
       }
     }
 

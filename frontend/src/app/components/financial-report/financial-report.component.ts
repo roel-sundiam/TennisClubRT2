@@ -6,11 +6,13 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatTabsModule } from '@angular/material/tabs';
 import { interval, Subscription } from 'rxjs';
 import { switchMap, filter, tap } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../../../environments/environment';
+import { ExpenseReportComponent } from '../expense-report/expense-report.component';
 
 interface FinancialAPIResponse {
   success: boolean;
@@ -57,7 +59,9 @@ interface FinancialStatementData {
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    MatTabsModule,
+    ExpenseReportComponent
   ],
   template: `
     <div class="financial-statement-container">
@@ -69,7 +73,7 @@ interface FinancialStatementData {
         <div class="header-content">
           <h1 class="club-name">{{ financialData.clubName }}</h1>
           <p class="club-location">{{ financialData.location }}</p>
-          <h2 class="statement-title">{{ financialData.statementTitle }}</h2>
+          <h2 class="statement-title">Financial Reports</h2>
           <p class="statement-period">{{ financialData.period }}</p>
         </div>
         <div class="refresh-section">
@@ -102,14 +106,24 @@ interface FinancialStatementData {
         <p>Loading financial statement...</p>
       </div>
 
-      <!-- Financial Statement Content -->
-      <div class="statement-content" *ngIf="!loading && financialData">
+      <!-- Tabbed Content -->
+      <div class="tabs-container" *ngIf="!loading && financialData">
+        <mat-tab-group class="financial-tabs">
+          <!-- Financial Statement Tab -->
+          <mat-tab>
+            <ng-template mat-tab-label>
+              <mat-icon>account_balance</mat-icon>
+              Financial Statement
+            </ng-template>
+            
+            <!-- Financial Statement Content -->
+            <div class="statement-content">
         <div class="statement-body">
           <!-- Beginning Balance -->
           <div class="statement-section beginning-balance">
-            <div class="section-row">
-              <div class="section-title">BEGINNING BALANCE: {{ financialData.beginningBalance.date }}</div>
-              <div class="section-amount">{{ formatCurrency(financialData.beginningBalance.amount) }}</div>
+            <div class="balance-row">
+              <div class="balance-title">BEGINNING BALANCE: {{ financialData.beginningBalance.date }}</div>
+              <div class="balance-amount">{{ formatCurrency(financialData.beginningBalance.amount) }}</div>
             </div>
           </div>
 
@@ -119,17 +133,11 @@ interface FinancialStatementData {
               <div class="section-title">RECEIPTS/COLLECTIONS</div>
             </div>
             <div class="section-items">
-              <div class="line-item" *ngFor="let item of getReceiptsWithoutTournament()" 
+              <div class="line-item" *ngFor="let item of getReceiptsWithoutTournament(); let last = last" 
                    [class.highlighted]="item.highlighted">
                 <div class="item-description">{{ item.description }}</div>
                 <div class="item-amount">{{ formatCurrency(item.amount) }}</div>
-              </div>
-            </div>
-            <div class="section-total">
-              <div class="total-line"></div>
-              <div class="total-row">
-                <div class="total-description">TOTAL RECEIPTS/COLLECTIONS</div>
-                <div class="total-amount">{{ formatCurrency(financialData.totalReceipts) }}</div>
+                <div class="total-amount" *ngIf="last">{{ formatCurrency(financialData.totalReceipts) }}</div>
               </div>
             </div>
           </div>
@@ -140,28 +148,40 @@ interface FinancialStatementData {
               <div class="section-title">DISBURSEMENTS/EXPENSES</div>
             </div>
             <div class="section-items">
-              <div class="line-item" *ngFor="let item of financialData.disbursementsExpenses">
+              <div class="line-item" *ngFor="let item of financialData.disbursementsExpenses; let last = last">
                 <div class="item-description">{{ item.description }}</div>
                 <div class="item-amount">{{ formatCurrency(item.amount) }}</div>
-              </div>
-            </div>
-            <div class="section-total">
-              <div class="total-line"></div>
-              <div class="total-row">
-                <div class="total-description">TOTAL DISBURSEMENTS/EXPENSES</div>
-                <div class="total-amount">({{ formatCurrency(financialData.netIncome) }})</div>
+                <div class="disbursement-totals" *ngIf="last">
+                  <div class="total-disbursements">({{ formatCurrency(financialData.totalDisbursements) }})</div>
+                </div>
               </div>
             </div>
           </div>
 
           <!-- Fund Balance -->
           <div class="statement-section fund-balance">
-            <div class="section-row final-balance">
-              <div class="section-title">FUND BALANCE</div>
-              <div class="section-amount">{{ formatCurrency(financialData.fundBalance) }}</div>
+            <div class="balance-row final-balance">
+              <div class="balance-title">FUND BALANCE</div>
+              <div class="balance-amount">{{ formatCurrency(financialData.fundBalance) }}</div>
             </div>
           </div>
-        </div>
+            </div>
+          </div>
+          </mat-tab>
+
+          <!-- Expense Report Tab -->
+          <mat-tab>
+            <ng-template mat-tab-label>
+              <mat-icon>receipt_long</mat-icon>
+              Expense Report
+            </ng-template>
+            
+            <!-- Expense Report Content -->
+            <div class="expense-tab-content">
+              <app-expense-report></app-expense-report>
+            </div>
+          </mat-tab>
+        </mat-tab-group>
       </div>
 
       <!-- Error State -->

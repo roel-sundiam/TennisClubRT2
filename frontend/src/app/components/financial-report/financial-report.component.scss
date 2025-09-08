@@ -220,47 +220,52 @@
   }
 }
 
-// Section Row (for single line items like Beginning Balance and Fund Balance)
-.section-row {
+// Balance Row (for Beginning Balance and Fund Balance)
+.balance-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 0;
   border-bottom: 1px solid #000;
-
-  .section-title {
+  
+  .balance-title {
     font-size: 1rem;
     font-weight: 700;
     color: #000;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    flex: 1;
   }
-
-  .section-amount {
+  
+  .balance-amount {
     font-size: 1rem;
     font-weight: 700;
     color: #000;
     font-family: 'Courier New', monospace;
+    text-align: right;
+    margin-left: 200px;
+    min-width: 150px;
     
     &::before {
       content: '₱';
     }
   }
-
+  
   &.final-balance {
     border-bottom: 2px solid #000;
     padding: 1rem 0;
     margin-top: 2rem;
-
-    .section-title {
+    
+    .balance-title {
       font-size: 1.125rem;
     }
-
-    .section-amount {
+    
+    .balance-amount {
       font-size: 1.125rem;
     }
   }
 }
+
 
 // Section Headers
 .section-header {
@@ -281,11 +286,12 @@
 }
 
 .line-item {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 150px 150px;
   align-items: center;
   padding: 0.25rem 0;
   border-bottom: none;
+  gap: 20px;
 
   .item-description {
     font-size: 0.95rem;
@@ -298,8 +304,54 @@
     color: #000;
     font-family: 'Courier New', monospace;
     text-align: right;
-    min-width: 100px;
-    margin-left: auto;
+  }
+  
+  // Total amount shown in separate column to the right of individual amounts
+  .total-amount {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #000;
+    font-family: 'Courier New', monospace;
+    text-align: right;
+    border-bottom: 1px solid #000;
+    padding-bottom: 2px;
+    
+    &::before {
+      content: '₱';
+    }
+  }
+  
+  // Disbursement totals shown inline with last expense item
+  .disbursement-totals {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+    grid-column: 3;
+    
+    .total-disbursements {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #000;
+      font-family: 'Courier New', monospace;
+      text-align: right;
+      border-bottom: 1px solid #000;
+      padding-bottom: 2px;
+    }
+    
+    .net-income {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #000;
+      font-family: 'Courier New', monospace;
+      text-align: right;
+      border-bottom: 1px solid #000;
+      padding-bottom: 2px;
+      
+      &::before {
+        content: '₱';
+      }
+    }
   }
 
   .item-amounts {
@@ -350,67 +402,6 @@
   }
 }
 
-// Section Totals
-.section-total {
-  margin-top: 1rem;
-  margin-left: 2rem;
-
-  .total-line {
-    height: 1px;
-    background: #000;
-    margin-bottom: 0.5rem;
-    width: 300px;
-    margin-left: auto;
-  }
-
-  .total-amount {
-    text-align: right;
-    font-size: 1rem;
-    font-weight: 700;
-    color: #000;
-    font-family: 'Courier New', monospace;
-  }
-
-  .total-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0;
-    font-weight: 700;
-    
-    .total-description {
-      font-size: 1rem;
-      color: #000;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    
-    .total-amount {
-      font-size: 1rem;
-      font-weight: 700;
-      color: #000;
-      font-family: 'Courier New', monospace;
-    }
-  }
-
-  .total-breakdown {
-    display: flex;
-    justify-content: flex-end;
-    gap: 2rem;
-    margin-bottom: 0.5rem;
-
-    .total-amount {
-      font-weight: 700;
-    }
-
-    .net-amount {
-      font-size: 1rem;
-      font-weight: 700;
-      color: #000;
-      font-family: 'Courier New', monospace;
-    }
-  }
-}
 
 // Disbursements section specific styling
 .disbursements-section {
@@ -613,5 +604,100 @@
     &::after {
       display: block !important;
     }
+  }
+}
+
+// Tab Styling
+.tabs-container {
+  margin-top: 2rem;
+  
+  .financial-tabs {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    overflow: hidden;
+    
+    ::ng-deep .mat-mdc-tab-group {
+      .mat-mdc-tab-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #e0e0e0;
+        
+        .mat-mdc-tab-label-container {
+          .mat-mdc-tab-label {
+            .mat-mdc-tab-label-content {
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+              font-weight: 500;
+              
+              mat-icon {
+                font-size: 1.2rem;
+                width: 1.2rem;
+                height: 1.2rem;
+              }
+            }
+          }
+        }
+      }
+      
+      .mat-mdc-tab-body-wrapper {
+        .mat-mdc-tab-body {
+          .mat-mdc-tab-body-content {
+            padding: 0;
+          }
+        }
+      }
+    }
+  }
+}
+
+.expense-tab-content {
+  // Remove the duplicate header components but keep the summary cards
+  ::ng-deep app-expense-report .page-header {
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 1rem 0 !important;
+    
+    .header-content {
+      justify-content: center !important;
+      
+      .back-button,
+      .title-section {
+        display: none !important;
+      }
+      
+      .summary-cards {
+        margin: 0 auto !important;
+        
+        .summary-card {
+          background: white !important;
+          color: #333 !important;
+          border: 1px solid #e0e0e0 !important;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+          backdrop-filter: none !important;
+          
+          mat-icon {
+            color: #1976d2 !important;
+            opacity: 1 !important;
+          }
+          
+          .summary-content {
+            .summary-value {
+              color: #333 !important;
+              font-weight: 600 !important;
+            }
+            
+            .summary-label {
+              color: #666 !important;
+              opacity: 1 !important;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  ::ng-deep app-expense-report .page-content {
+    padding: 1rem;
   }
 }

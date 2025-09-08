@@ -25,6 +25,7 @@ import { AdminSuggestionsComponent } from './components/admin-suggestions/admin-
 import { AdminAnalyticsComponent } from './components/admin-analytics/admin-analytics.component';
 import { CourtUsageReportComponent } from './components/court-usage-report/court-usage-report.component';
 import { FinancialReportComponent } from './components/financial-report/financial-report.component';
+import { ExpenseReportComponent } from './components/expense-report/expense-report.component';
 import { AdminMemberManagementComponent } from './components/admin-member-management/admin-member-management.component';
 import { ProfileComponent } from './components/profile/profile.component';
 import { RulesAndRegulationsComponent } from './components/rules-and-regulations/rules-and-regulations.component';
@@ -167,6 +168,12 @@ export const routes: Routes = [
   { 
     path: 'admin/financial-report', 
     component: FinancialReportComponent,
+    canActivate: [authGuard, adminGuard]
+  },
+  // Expense Report (Admin only)
+  { 
+    path: 'admin/expense-report', 
+    component: ExpenseReportComponent,
     canActivate: [authGuard, adminGuard]
   },
   { 

@@ -403,6 +403,35 @@
         color: #2c3e50;
       }
     }
+    
+    // Cancellation details styling
+    .cancellation-details {
+      margin-top: 16px;
+      padding: 12px;
+      background: rgba(239, 68, 68, 0.05);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: 8px;
+      
+      .cancellation-info {
+        border-bottom: 1px solid rgba(239, 68, 68, 0.15);
+        padding: 6px 0;
+        
+        &:last-child {
+          border-bottom: none;
+        }
+        
+        span:first-child {
+          color: #dc2626;
+          font-weight: 600;
+        }
+        
+        .cancellation-reason {
+          color: #dc2626;
+          font-weight: 500;
+          font-style: italic;
+        }
+      }
+    }
   }
 
   .payment-actions, .reservation-actions {

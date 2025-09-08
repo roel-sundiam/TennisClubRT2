@@ -69,6 +69,13 @@ interface Payment {
     isManualPayment?: boolean;
     playerNames?: string[];
     courtUsageDate?: Date;
+    // Cancellation metadata
+    cancellation?: {
+      reason: string;
+      cancelledAt: Date;
+      cancelledBy: string;
+      previousStatus: string;
+    };
   };
   notes?: string;
 }
@@ -337,6 +344,33 @@ interface Notification {
                 <div class="detail-row" *ngIf="payment.transactionId">
                   <span>Transaction ID:</span>
                   <span>{{payment.transactionId}}</span>
+                </div>
+                
+                <!-- Cancellation Details for Failed/Refunded Payments -->
+                <div *ngIf="payment.metadata?.cancellation || isLegacyCancelledPayment(payment)" class="cancellation-details">
+                  <!-- New cancellation with metadata -->
+                  <div *ngIf="payment.metadata?.cancellation">
+                    <div class="detail-row cancellation-info">
+                      <span>Cancellation Reason:</span>
+                      <span class="cancellation-reason">{{payment.metadata.cancellation.reason}}</span>
+                    </div>
+                    <div class="detail-row cancellation-info">
+                      <span>Cancelled On:</span>
+                      <span>{{formatDate(payment.metadata.cancellation.cancelledAt)}}</span>
+                    </div>
+                  </div>
+                  
+                  <!-- Legacy cancelled payment fallback -->
+                  <div *ngIf="!payment.metadata?.cancellation && isLegacyCancelledPayment(payment)">
+                    <div class="detail-row cancellation-info">
+                      <span>Status:</span>
+                      <span class="cancellation-reason">This payment was cancelled</span>
+                    </div>
+                    <div class="detail-row cancellation-info">
+                      <span>Note:</span>
+                      <span>Payment was cancelled before detailed tracking was available</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -621,6 +655,15 @@ interface Notification {
                         *ngIf="payment.reservationId"
                         [disabled]="processing.includes(payment.reservationId._id)">
                         Cancel Reservation
+                      </button>
+                      
+                      <!-- Cancel button for Open Play Events -->
+                      <button 
+                        class="cancel-reservation-btn"
+                        (click)="cancelPayment(payment._id)"
+                        *ngIf="payment.pollId"
+                        [disabled]="processing.includes(payment._id)">
+                        Cancel Open Play
                       </button>
                     </div>
                   </ng-container>
@@ -1525,6 +1568,31 @@ export class PaymentsComponent implements OnInit {
       return false;
     }
     return new Date() > new Date(payment.dueDate);
+  }
+
+  // Check if payment is a legacy cancelled payment (cancelled before metadata tracking)
+  isLegacyCancelledPayment(payment: Payment): boolean {
+    // Check for cancellation indicators in description or method
+    const hasCancelledDescription = payment.description && (
+      payment.description.toLowerCase().includes('cancelled') ||
+      payment.description.toLowerCase().includes('cancel')
+    );
+    
+    const hasCancelledMethod = payment.paymentMethod && (
+      (payment.paymentMethod as string).toLowerCase().includes('cancelled') ||
+      (payment.paymentMethod as string).toLowerCase().includes('cancel')
+    );
+    
+    // Check if it's a failed Open Play payment (likely cancelled)
+    const isFailedOpenPlay = payment.status === 'failed' && 
+                           payment.pollId && 
+                           payment.description && 
+                           payment.description.toLowerCase().includes('open play');
+    
+    const hasCancellationMetadata = !!payment.metadata?.cancellation;
+    
+    // It's a legacy cancellation if it has cancellation indicators or is a failed Open Play and no new metadata
+    return (hasCancelledDescription || hasCancelledMethod || isFailedOpenPlay) && !hasCancellationMetadata;
   }
 
   handleDirectPayment(reservationId: string): void {
