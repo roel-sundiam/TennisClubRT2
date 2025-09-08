@@ -14,7 +14,9 @@
     "import-members": "ts-node src/scripts/importMembers.ts",
     "create-overdue-test": "ts-node src/scripts/createOverduePayment.ts",
     "clean-test-data": "ts-node src/scripts/cleanTestData.ts",
-    "clear-data": "ts-node scripts/clear-data.ts"
+    "clear-data": "ts-node scripts/clear-data.ts",
+    "migrate-court-usage": "node scripts/migrateCourtUsageData.js",
+    "migrate-court-usage-force": "node scripts/migrateCourtUsageData.js --force"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",

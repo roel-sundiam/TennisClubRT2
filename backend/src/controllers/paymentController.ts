@@ -4,6 +4,7 @@ import Payment from '../models/Payment';
 import Reservation from '../models/Reservation';
 import Poll from '../models/Poll';
 import User from '../models/User';
+import CourtUsageReport from '../models/CourtUsageReport';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import * as fs from 'fs';
@@ -172,6 +173,161 @@ async function updateFinancialReportCourtReceipts(): Promise<void> {
   }
 }
 
+// Helper function to subtract from CourtUsageReport when payment is unrecorded
+async function subtractFromCourtUsageReport(payment: any): Promise<void> {
+  try {
+    console.log('📊 Subtracting from court usage report for unrecorded payment...');
+    
+    // Get user information to find member name
+    await payment.populate('userId', 'fullName');
+    const memberName = (payment.userId as any)?.fullName;
+    
+    if (!memberName) {
+      console.warn('⚠️ No member name found for payment, skipping court usage update');
+      return;
+    }
+    
+    // Determine the month to update based on court usage date or payment date
+    const usageDate = payment.metadata?.courtUsageDate || payment.paymentDate || new Date();
+    const month = new Date(usageDate).getMonth(); // 0-11
+    const year = new Date(usageDate).getFullYear();
+    
+    // Map month number to field name
+    const monthFields = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    const monthField = monthFields[month];
+    
+    // Only update if it's within our supported months (January-September)
+    if (month > 8 || !monthField) { // September is index 8
+      console.log(`⚠️ Payment date is in ${monthFields[month]}, which is not tracked in court usage report`);
+      return;
+    }
+    
+    console.log(`📊 Subtracting ₱${payment.amount} from ${memberName}'s ${monthField} ${year} court usage`);
+    
+    // Find the member's court usage record
+    const courtUsageRecord = await CourtUsageReport.findOne({ 
+      memberName: memberName,
+      year: year
+    });
+    
+    if (!courtUsageRecord) {
+      console.warn(`⚠️ No court usage record found for ${memberName} (${year}), skipping subtraction`);
+      return;
+    }
+    
+    // Subtract from existing amount (but don't go below 0)
+    const currentAmount = (courtUsageRecord as any)[monthField] as number || 0;
+    const newAmount = Math.max(0, currentAmount - payment.amount);
+    (courtUsageRecord as any)[monthField] = newAmount;
+    
+    console.log(`📊 Subtracted from ${memberName}'s ${monthField} from ₱${currentAmount} to ₱${newAmount}`);
+    
+    // Save the record (totalAmount will be calculated automatically by pre-save middleware)
+    await courtUsageRecord.save();
+    
+    console.log(`✅ Court usage report updated for ${memberName}: -₱${payment.amount} in ${monthField} ${year}`);
+    
+    // Emit real-time update for court usage report
+    try {
+      const { webSocketService } = await import('../services/websocketService');
+      if (webSocketService.isInitialized()) {
+        webSocketService.emitCourtUsageUpdate({
+          type: 'court_usage_data_updated',
+          data: null, // Will trigger a full refresh on the frontend
+          timestamp: new Date().toISOString(),
+          message: `📊 Court usage updated: ${memberName} -₱${payment.amount} (${monthField} ${year})`
+        });
+        console.log('📡 Real-time court usage update broadcasted');
+      }
+    } catch (error) {
+      console.error('⚠️ Failed to broadcast court usage update:', error);
+    }
+    
+  } catch (error) {
+    console.error('❌ Error updating court usage report:', error);
+    // Don't throw error - payment unrecording should still succeed even if court usage update fails
+  }
+}
+
+// Helper function to update CourtUsageReport when payment is recorded
+async function updateCourtUsageReport(payment: any): Promise<void> {
+  try {
+    console.log('📊 Updating court usage report for recorded payment...');
+    
+    // Get user information to find member name
+    await payment.populate('userId', 'fullName');
+    const memberName = (payment.userId as any)?.fullName;
+    
+    if (!memberName) {
+      console.warn('⚠️ No member name found for payment, skipping court usage update');
+      return;
+    }
+    
+    // Determine the month to update based on court usage date or payment date
+    const usageDate = payment.metadata?.courtUsageDate || payment.paymentDate || new Date();
+    const month = new Date(usageDate).getMonth(); // 0-11
+    const year = new Date(usageDate).getFullYear();
+    
+    // Map month number to field name
+    const monthFields = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    const monthField = monthFields[month];
+    
+    // Only update if it's within our supported months (January-September)
+    if (month > 8 || !monthField) { // September is index 8
+      console.log(`⚠️ Payment date is in ${monthFields[month]}, which is not tracked in court usage report`);
+      return;
+    }
+    
+    console.log(`📊 Updating ${memberName}'s ${monthField} ${year} court usage with ₱${payment.amount}`);
+    
+    // Find or create the member's court usage record
+    let courtUsageRecord = await CourtUsageReport.findOne({ 
+      memberName: memberName,
+      year: year
+    });
+    
+    if (!courtUsageRecord) {
+      // Create new record for this member
+      courtUsageRecord = new CourtUsageReport({
+        memberName: memberName,
+        year: year
+      });
+      (courtUsageRecord as any)[monthField] = payment.amount;
+      console.log(`📊 Created new court usage record for ${memberName} (${year})`);
+    } else {
+      // Update existing record - add to existing amount
+      const currentAmount = (courtUsageRecord as any)[monthField] as number || 0;
+      (courtUsageRecord as any)[monthField] = currentAmount + payment.amount;
+      console.log(`📊 Updated ${memberName}'s ${monthField} from ₱${currentAmount} to ₱${currentAmount + payment.amount}`);
+    }
+    
+    // Save the record (totalAmount will be calculated automatically by pre-save middleware)
+    await courtUsageRecord.save();
+    
+    console.log(`✅ Court usage report updated for ${memberName}: +₱${payment.amount} in ${monthField} ${year}`);
+    
+    // Emit real-time update for court usage report
+    try {
+      const { webSocketService } = await import('../services/websocketService');
+      if (webSocketService.isInitialized()) {
+        webSocketService.emitCourtUsageUpdate({
+          type: 'court_usage_data_updated',
+          data: null, // Will trigger a full refresh on the frontend
+          timestamp: new Date().toISOString(),
+          message: `📊 Court usage updated: ${memberName} +₱${payment.amount} (${monthField} ${year})`
+        });
+        console.log('📡 Real-time court usage update broadcasted');
+      }
+    } catch (error) {
+      console.error('⚠️ Failed to broadcast court usage update:', error);
+    }
+    
+  } catch (error) {
+    console.error('❌ Error updating court usage report:', error);
+    // Don't throw error - payment recording should still succeed even if court usage update fails
+  }
+}
+
 // Create payment for a reservation
 export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { reservationId, paymentMethod, amount, customAmount, isManualPayment, playerNames, courtUsageDate, notes } = req.body;
@@ -292,7 +448,7 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
       Object.assign(existingPayment, updateData);
       await existingPayment.save();
       await existingPayment.populate('userId', 'username fullName email');
-      await existingPayment.populate('reservationId', 'date timeSlot players status');
+      await existingPayment.populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee');
       await existingPayment.populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime');
       
       return res.status(200).json({
@@ -358,17 +514,60 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
       
       if (isFoundInMembers) {
         memberCount++;
+        console.log(`💰 Payment: "${playerName}" is a MEMBER (exact match)`);
       } else {
-        // Try fuzzy matching for common name variations
-        const fuzzyMatch = memberNames.find((memberName: string) => {
-          const similarity = calculateStringSimilarity(cleanPlayerName, memberName);
-          return similarity > 0.8;
-        });
+        // Enhanced fuzzy matching with multiple strategies
+        let matchFound = false;
+        let bestMatch = '';
+        let bestSimilarity = 0;
         
-        if (fuzzyMatch) {
+        for (const memberName of memberNames) {
+          // Strategy 1: Levenshtein similarity (relaxed threshold)
+          const similarity = calculateStringSimilarity(cleanPlayerName, memberName);
+          if (similarity > 0.6 && similarity > bestSimilarity) {
+            bestSimilarity = similarity;
+            bestMatch = memberName;
+            matchFound = true;
+          }
+          
+          // Strategy 2: Check if input is contained within member name (partial match)
+          if (!matchFound && memberName.includes(cleanPlayerName) && cleanPlayerName.length > 2) {
+            bestMatch = memberName;
+            matchFound = true;
+            console.log(`💰 Payment: "${playerName}" is a MEMBER (partial match: "${bestMatch}")`);
+            break;
+          }
+          
+          // Strategy 3: Check if any word in member name matches input
+          if (!matchFound) {
+            const memberWords = memberName.split(' ');
+            const inputWords = cleanPlayerName.split(' ');
+            const wordMatch = memberWords.some((mWord: string) => 
+              inputWords.some((iWord: string) => {
+                if (iWord.length > 2 && mWord.length > 2) {
+                  return calculateStringSimilarity(iWord, mWord) > 0.8;
+                }
+                return false;
+              })
+            );
+            
+            if (wordMatch) {
+              bestMatch = memberName;
+              matchFound = true;
+              console.log(`💰 Payment: "${playerName}" is a MEMBER (word match: "${bestMatch}")`);
+              break;
+            }
+          }
+        }
+        
+        if (matchFound && bestSimilarity > 0.6) {
+          memberCount++;
+          console.log(`💰 Payment: "${playerName}" is a MEMBER (fuzzy match: "${bestMatch}", similarity: ${bestSimilarity.toFixed(2)})`);
+        } else if (matchFound) {
           memberCount++;
         } else {
           nonMemberCount++;
+          console.log(`💰 Payment: "${playerName}" is a NON-MEMBER (no match found)`);
         }
       }
     });
@@ -465,7 +664,7 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
   await payment.populate('userId', 'username fullName email');
   
   if (!isManualPayment) {
-    await payment.populate('reservationId', 'date timeSlot players status');
+    await payment.populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee');
     // Update reservation payment status - since payments are automatically completed, set to paid
     reservation!.paymentStatus = 'paid';
     await reservation!.save({ validateBeforeSave: false });
@@ -607,7 +806,7 @@ export const getPayment = asyncHandler(async (req: AuthenticatedRequest, res: Re
   
   const payment = await Payment.findById(id)
     .populate('userId', 'username fullName email')
-    .populate('reservationId', 'date timeSlot players status')
+    .populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee')
     .populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime');
   
   if (!payment) {
@@ -704,7 +903,7 @@ export const processPayment = asyncHandler(async (req: AuthenticatedRequest, res
 
     // Populate related data for response
     await payment.populate('userId', 'username fullName email');
-    await payment.populate('reservationId', 'date timeSlot players status');
+    await payment.populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee');
     await payment.populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime');
 
     console.log('💰 Payment processing completed successfully:', {
@@ -885,7 +1084,7 @@ export const updatePayment = asyncHandler(async (req: AuthenticatedRequest, res:
   
   try {
     console.log('💰 Populating reservationId...');
-    await payment.populate('reservationId', 'date timeSlot players status');
+    await payment.populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee');
     console.log('💰 reservationId populated successfully');
   } catch (error: any) {
     console.error('💰 ERROR during reservationId populate:', error);
@@ -973,7 +1172,7 @@ export const cancelPayment = asyncHandler(async (req: AuthenticatedRequest, res:
   }
 
   await payment.populate('userId', 'username fullName email');
-  await payment.populate('reservationId', 'date timeSlot players status');
+  await payment.populate('reservationId', 'date timeSlot players status totalFee');
   await payment.populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime');
 
   return res.status(200).json({
@@ -1031,7 +1230,7 @@ export const getMyPayments = asyncHandler(async (req: AuthenticatedRequest, res:
   try {
     const payments = await Payment.find(filter)
       .populate('userId', 'username fullName email')
-      .populate('reservationId', 'date timeSlot players status')
+      .populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee')
       .populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -1187,7 +1386,7 @@ export const approvePayment = asyncHandler(async (req: AuthenticatedRequest, res
 
     // Populate related data for response
     await payment.populate('userId', 'username fullName email');
-    await payment.populate('reservationId', 'date timeSlot players status');
+    await payment.populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee');
     await payment.populate('approvedBy', 'username fullName');
 
     console.log('✅ Payment approved successfully:', {
@@ -1263,9 +1462,12 @@ export const recordPayment = asyncHandler(async (req: AuthenticatedRequest, res:
 
     await payment.save();
 
+    // Update CourtUsageReport when payment is recorded
+    await updateCourtUsageReport(payment);
+
     // Populate related data for response
     await payment.populate('userId', 'username fullName email');
-    await payment.populate('reservationId', 'date timeSlot players status');
+    await payment.populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee');
     await payment.populate('approvedBy', 'username fullName');
     await payment.populate('recordedBy', 'username fullName');
 
@@ -1371,9 +1573,12 @@ export const unrecordPayment = asyncHandler(async (req: AuthenticatedRequest, re
 
     await payment.save();
 
+    // Subtract from CourtUsageReport when payment is unrecorded
+    await subtractFromCourtUsageReport(payment);
+
     // Populate related data for response
     await payment.populate('userId', 'username fullName email');
-    await payment.populate('reservationId', 'date timeSlot players status');
+    await payment.populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee');
     await payment.populate('approvedBy', 'username fullName');
 
     console.log('🔄 Payment unrecorded successfully:', {
