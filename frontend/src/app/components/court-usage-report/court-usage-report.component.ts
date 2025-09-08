@@ -9,7 +9,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { interval, Subscription } from 'rxjs';
 import { switchMap, filter, tap } from 'rxjs/operators';
-import { io, Socket } from 'socket.io-client';
 import { AuthService } from '../../services/auth.service';
 import { environment } from '../../../environments/environment';
 
@@ -28,11 +27,9 @@ interface CourtUsageAPIResponse {
 interface CourtUsageData {
   summary: {
     totalMembers: number;
-    totalReservations: number;
+    totalRecordedPayments: number;
     totalRevenue: string;
-    totalPaymentsAdded?: string;
     lastUpdated: string;
-    paymentIntegrationTimestamp?: string;
   };
   rawData: Array<any>;
   headers: string[];
@@ -59,43 +56,21 @@ interface CourtUsageData {
             <mat-icon class="page-icon">analytics</mat-icon>
             <div>
               <h1>Court Usage Report</h1>
-              <p class="subtitle">Monthly member usage statistics (Jan - Aug 2025)</p>
+              <p class="subtitle">Member contributions from recorded payments</p>
             </div>
-          </div>
-          <div class="refresh-section" *ngIf="!loading && reportData">
-            <div class="update-status" *ngIf="lastUpdated">
-              <span class="last-updated">Updated {{ getTimeAgo(lastUpdated) }}</span>
-              <div class="connection-status" *ngIf="socketConnected">
-                <mat-icon class="connected-icon">wifi</mat-icon>
-                <span class="status-text">Real-time</span>
-              </div>
-              <div class="auto-refresh-indicator" *ngIf="autoRefreshEnabled && !socketConnected">
-                <mat-icon class="pulse-icon">sync</mat-icon>
-                <span class="next-update">Next: {{ nextUpdateCountdown }}s</span>
-              </div>
-            </div>
-            <button mat-icon-button (click)="forceRefreshData()" class="force-refresh-btn" [disabled]="loading" title="Force Refresh from Google Sheets">
-              <mat-icon [class.spin]="loading">cloud_download</mat-icon>
-            </button>
-            <button mat-icon-button (click)="toggleAutoRefresh()" [class.active]="autoRefreshEnabled" title="Toggle Auto-refresh">
-              <mat-icon>{{ autoRefreshEnabled ? 'sync' : 'sync_disabled' }}</mat-icon>
-            </button>
-            <button mat-icon-button (click)="refreshData()" class="refresh-btn" [disabled]="loading" title="Refresh Data">
-              <mat-icon [class.spin]="loading">refresh</mat-icon>
-            </button>
           </div>
           <div class="header-stats" *ngIf="!loading && reportData">
             <div class="stat-item">
               <mat-icon>people</mat-icon>
-              <span>{{ reportData.summary.totalMembers }} Active Members</span>
+              <span>Contributing Members</span>
+            </div>
+            <div class="stat-item">
+              <mat-icon>receipt_long</mat-icon>
+              <span>{{ reportData.summary.totalRecordedPayments }} Recorded Payments</span>
             </div>
             <div class="stat-item">
               <mat-icon>monetization_on</mat-icon>
               <span>{{ reportData.summary.totalRevenue }} Total Revenue</span>
-            </div>
-            <div class="stat-item" *ngIf="reportData.summary.totalPaymentsAdded">
-              <mat-icon>add_circle</mat-icon>
-              <span>{{ reportData.summary.totalPaymentsAdded }} Added from Payments</span>
             </div>
           </div>
         </div>
@@ -104,7 +79,7 @@ interface CourtUsageData {
       <!-- Loading State -->
       <div class="loading-container" *ngIf="loading">
         <mat-spinner></mat-spinner>
-        <p>Loading court usage data...</p>
+        <p>Loading recorded payments data...</p>
       </div>
 
       <!-- Main Content -->
@@ -114,25 +89,22 @@ interface CourtUsageData {
           <div class="table-header">
             <div class="table-title">
               <mat-icon>table_chart</mat-icon>
-              <h2>Member Monthly Usage</h2>
+              <h2>Member Contributions</h2>
             </div>
-            <button mat-icon-button (click)="refreshData()" class="refresh-btn" title="Refresh Data">
-              <mat-icon>refresh</mat-icon>
-            </button>
           </div>
           
           <div class="table-wrapper">
             <table mat-table [dataSource]="reportData.rawData" class="modern-data-table">
               <ng-container *ngFor="let column of reportData.headers; trackBy: trackByColumn" [matColumnDef]="column">
                 <th mat-header-cell *matHeaderCellDef 
-                    [ngClass]="['table-header-cell', column === 'PLAYRERS/MEMBERS' ? 'frozen-header-cell' : '']">
+                    [ngClass]="['table-header-cell', column === 'Players/Members' ? 'frozen-header-cell' : '']">
                   {{ column }}
                 </th>
                 <td mat-cell *matCellDef="let element" 
                     [ngClass]="{
-                      'member-name-cell': column === 'PLAYRERS/MEMBERS',
-                      'total-cell': column === 'Total',
-                      'amount-cell': column !== 'PLAYRERS/MEMBERS' && column !== 'Total'
+                      'member-name-cell': column === 'Players/Members',
+                      'amount-cell': column === 'Total' || column.includes('2025'),
+                      'total-cell': column === 'Total'
                     }">
                   {{ element[column] }}
                 </td>
@@ -169,12 +141,10 @@ export class CourtUsageReportComponent implements OnInit, OnDestroy {
   autoRefreshEnabled = true;
   nextUpdateCountdown = 30;
   
-  private apiUrl = environment.apiUrl;
+  private apiUrl = 'http://localhost:3000';
   private autoRefreshSubscription?: Subscription;
   private countdownSubscription?: Subscription;
   private readonly REFRESH_INTERVAL = 30000; // 30 seconds
-  private socket: Socket | null = null;
-  public socketConnected = false;
 
   constructor(
     private http: HttpClient,
@@ -184,13 +154,11 @@ export class CourtUsageReportComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadCourtUsageData();
-    this.initializeWebSocket();
     this.startAutoRefresh();
   }
 
   ngOnDestroy(): void {
     this.stopAutoRefresh();
-    this.disconnectWebSocket();
   }
 
   loadCourtUsageData(): void {
@@ -202,7 +170,7 @@ export class CourtUsageReportComponent implements OnInit, OnDestroy {
     });
 
     this.http.get<CourtUsageAPIResponse>(
-      `${this.apiUrl}/reports/court-usage-sheet`,
+      `${this.apiUrl}/api/reports/static-court-usage`,
       { headers }
     ).subscribe({
       next: (response) => {
@@ -212,7 +180,7 @@ export class CourtUsageReportComponent implements OnInit, OnDestroy {
           this.lastUpdated = response.metadata?.lastModified || response.data.summary.lastUpdated;
           
           if (isDataChanged && this.lastUpdated) {
-            this.snackBar.open('🏸 Court usage data updated!', 'Close', {
+            this.snackBar.open('📊 Recorded payments updated!', 'Close', {
               duration: 4000,
               panelClass: ['success-snack']
             });
@@ -224,9 +192,9 @@ export class CourtUsageReportComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         console.error('Error loading court usage data:', error);
-        this.error = error.error?.message || 'Failed to load court usage data';
+        this.error = error.error?.message || 'Failed to load recorded payments data';
         this.loading = false;
-        this.snackBar.open('Error loading court usage report', 'Close', {
+        this.snackBar.open('Error loading recorded payments report', 'Close', {
           duration: 5000
         });
       }
@@ -260,7 +228,7 @@ export class CourtUsageReportComponent implements OnInit, OnDestroy {
           switchMap(() => {
             if (!this.loading) {
               return this.http.get<CourtUsageAPIResponse>(
-                `${this.apiUrl}/reports/court-usage-sheet`,
+                `${this.apiUrl}/api/reports/static-court-usage`,
                 {
                   headers: new HttpHeaders({
                     'Authorization': `Bearer ${this.authService.token}`
@@ -279,7 +247,7 @@ export class CourtUsageReportComponent implements OnInit, OnDestroy {
               this.lastUpdated = response.metadata?.lastModified || response.data.summary.lastUpdated;
               
               if (isDataChanged) {
-                console.log('🔄 Court usage data auto-updated');
+                console.log('🔄 Recorded payments data auto-updated');
                 this.snackBar.open('📊 Data refreshed automatically', 'Close', {
                   duration: 2000,
                   panelClass: ['info-snack']
@@ -341,133 +309,6 @@ export class CourtUsageReportComponent implements OnInit, OnDestroy {
     return `${Math.floor(diffSeconds / 86400)}d ago`;
   }
 
-  /**
-   * Initialize WebSocket connection for real-time updates
-   */
-  private initializeWebSocket(): void {
-    try {
-      this.socket = io(environment.socketUrl, {
-        transports: ['websocket', 'polling'],
-        auth: {
-          token: this.authService.token
-        }
-      });
 
-      // Connection events
-      this.socket.on('connect', () => {
-        console.log('🔌 Connected to WebSocket server');
-        this.socketConnected = true;
-        this.socket?.emit('subscribe_court_usage_updates');
-      });
-
-      this.socket.on('disconnect', () => {
-        console.log('🔌 Disconnected from WebSocket server');
-        this.socketConnected = false;
-      });
-
-      // Subscription confirmed
-      this.socket.on('subscription_confirmed', (data) => {
-        console.log('🏸 Subscribed to court usage updates:', data);
-        this.snackBar.open('🔄 Real-time updates enabled', 'Close', {
-          duration: 3000,
-          panelClass: ['success-snack']
-        });
-      });
-
-      // Court usage data update events
-      this.socket.on('court_usage_update', (updateEvent) => {
-        console.log('🏸 Received real-time court usage update:', updateEvent);
-        
-        if (updateEvent.data) {
-          const isDataChanged = this.hasDataChanged(updateEvent.data);
-          if (isDataChanged) {
-            this.reportData = updateEvent.data;
-            this.lastUpdated = updateEvent.timestamp;
-            
-            this.snackBar.open('🏸 Court usage data updated in real-time!', 'Close', {
-              duration: 5000,
-              panelClass: ['success-snack']
-            });
-          }
-        }
-      });
-
-      // Fallback for general court usage data change events
-      this.socket.on('court_usage_data_changed', (data) => {
-        console.log('🏸 Court usage data change notification:', data);
-        this.snackBar.open(`🔄 ${data.message}`, 'Refresh', {
-          duration: 6000,
-          panelClass: ['info-snack']
-        }).onAction().subscribe(() => {
-          this.refreshData();
-        });
-      });
-
-      // Handle connection errors
-      this.socket.on('connect_error', (error) => {
-        console.error('🔌 WebSocket connection error:', error);
-        this.socketConnected = false;
-      });
-
-    } catch (error) {
-      console.error('🔌 Failed to initialize WebSocket:', error);
-    }
-  }
-
-  /**
-   * Disconnect WebSocket
-   */
-  private disconnectWebSocket(): void {
-    if (this.socket) {
-      this.socket.emit('unsubscribe_court_usage_updates');
-      this.socket.disconnect();
-      this.socket = null;
-      this.socketConnected = false;
-      console.log('🔌 WebSocket disconnected');
-    }
-  }
-
-  /**
-   * Force refresh court usage data bypassing cache
-   */
-  forceRefreshData(): void {
-    console.log('🔄 Force refresh requested');
-    this.loading = true;
-    this.error = null;
-
-    const headers = new HttpHeaders({
-      'Authorization': `Bearer ${this.authService.token}`
-    });
-
-    this.http.post<CourtUsageAPIResponse>(
-      `${this.apiUrl}/reports/court-usage-sheet/force-refresh`,
-      {},
-      { headers }
-    ).subscribe({
-      next: (response) => {
-        if (response.success) {
-          this.reportData = response.data;
-          this.lastUpdated = response.metadata?.lastModified || response.data.summary.lastUpdated;
-          
-          this.snackBar.open('🔄 Data force refreshed from Google Sheets!', 'Close', {
-            duration: 4000,
-            panelClass: ['success-snack']
-          });
-        } else {
-          this.error = response.message || 'Failed to force refresh court usage report';
-        }
-        this.loading = false;
-      },
-      error: (error) => {
-        console.error('Error force refreshing court usage report:', error);
-        this.error = error.error?.message || 'Failed to force refresh court usage report';
-        this.loading = false;
-        this.snackBar.open('Error force refreshing court usage report', 'Close', {
-          duration: 5000,
-          panelClass: ['error-snack']
-        });
-      }
-    });
-  }
 
 }

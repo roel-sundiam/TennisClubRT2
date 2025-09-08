@@ -13,6 +13,7 @@ import {
   triggerSync,
   getSyncStatus
 } from '../controllers/reportController';
+const { getStaticCourtUsageReport } = require('../controllers/staticReportController');
 import { authenticateToken, requireRole } from '../middleware/auth';
 
 const router = Router();
@@ -98,6 +99,17 @@ router.get(
   '/court-usage-sheet',
   getCourtUsageFromSheet
 );
+
+/**
+ * @route GET /api/reports/static-court-usage
+ * @desc Get static court usage report with screenshot data
+ * @access Private (All authenticated users)
+ */
+router.get(
+  '/static-court-usage',
+  getStaticCourtUsageReport
+);
+
 
 /**
  * @route GET /api/reports/financial-sheet
