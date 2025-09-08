@@ -1325,6 +1325,39 @@
     .time-btn {
       padding: 1.25rem 1rem;
       min-height: 80px;
+      background: white !important;
+      
+      .time {
+        color: #1f2937 !important;
+        font-weight: 600;
+      }
+      
+      .rate-type {
+        color: #6b7280 !important;
+        font-weight: 500;
+      }
+      
+      // Ensure selected state works properly in mobile
+      &.selected {
+        background: linear-gradient(135deg, #667eea, #764ba2) !important;
+        
+        .time, .rate-type {
+          color: white !important;
+        }
+      }
+      
+      // Ensure peak time styling works in mobile
+      &.peak:not(.selected) {
+        background: linear-gradient(135deg, #FF9800 0%, #FF6F00 100%) !important;
+        
+        .time {
+          color: white !important;
+        }
+        
+        .rate-type {
+          color: rgba(255, 255, 255, 0.9) !important;
+        }
+      }
     }
   }
 }

@@ -231,11 +231,11 @@ interface Reservation {
                       <div class="time-slot">{{reservation.timeSlotDisplay}}</div>
                       <div class="user-info" *ngIf="reservation.userId">
                         <mat-icon class="inline-icon">person</mat-icon>
-                        <span class="user-text">{{reservation.userId.fullName}} ({{reservation.userId.username}})</span>
+                        <span class="user-text">{{reservation.userId.fullName}}</span>
                       </div>
                       <div class="players-info">
                         <mat-icon class="inline-icon">people</mat-icon>
-                        <span class="players-text">{{reservation.players.join(', ')}}</span>
+                        <span class="players-text">{{getFilteredPlayers(reservation).join(', ')}}</span>
                       </div>
                     </div>
                   </div>
@@ -895,6 +895,16 @@ click "Try Again" below to reconnect.
       month: 'long',
       day: 'numeric'
     });
+  }
+
+  // Filter out the reservation creator from players list to avoid duplication
+  getFilteredPlayers(reservation: any): string[] {
+    if (!reservation.players || !reservation.userId) {
+      return reservation.players || [];
+    }
+    
+    const creatorName = reservation.userId.fullName;
+    return reservation.players.filter((player: string) => player !== creatorName);
   }
 
   getTimeUntil(date: Date | string): string {

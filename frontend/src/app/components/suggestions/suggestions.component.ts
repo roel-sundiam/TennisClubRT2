@@ -201,7 +201,7 @@ interface Suggestion {
                         <textarea matInput formControlName="description" 
                                   rows="6"
                                   placeholder="Provide detailed information about your feedback..."></textarea>
-                        <mat-hint>{{suggestionForm.get('description')?.value?.length || 0}}/2000 characters</mat-hint>
+                        <mat-hint>{{suggestionForm.get('description')?.value?.length || 0}}/1000 characters</mat-hint>
                         <mat-error *ngIf="suggestionForm.get('description')?.hasError('required')">
                           Description is required
                         </mat-error>
@@ -209,7 +209,7 @@ interface Suggestion {
                           Description must be at least 10 characters long
                         </mat-error>
                         <mat-error *ngIf="suggestionForm.get('description')?.hasError('maxlength')">
-                          Description cannot exceed 2000 characters
+                          Description cannot exceed 1000 characters
                         </mat-error>
                       </mat-form-field>
                     </div>
@@ -389,7 +389,7 @@ export class SuggestionsComponent implements OnInit, OnDestroy {
       category: ['', Validators.required],
       priority: ['medium'],
       title: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(200)]],
-      description: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(2000)]],
+      description: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(1000)]],
       isAnonymous: [false]
     });
   }
@@ -465,7 +465,8 @@ export class SuggestionsComponent implements OnInit, OnDestroy {
   }
 
   resetForm(): void {
-    this.suggestionForm.reset({
+    this.suggestionForm.reset();
+    this.suggestionForm.patchValue({
       type: '',
       category: '',
       priority: 'medium',
@@ -473,6 +474,14 @@ export class SuggestionsComponent implements OnInit, OnDestroy {
       description: '',
       isAnonymous: false
     });
+    
+    // Clear all validation states
+    Object.keys(this.suggestionForm.controls).forEach(key => {
+      this.suggestionForm.get(key)?.setErrors(null);
+    });
+    
+    this.suggestionForm.markAsUntouched();
+    this.suggestionForm.markAsPristine();
   }
 
   deleteSuggestion(suggestion: Suggestion): void {

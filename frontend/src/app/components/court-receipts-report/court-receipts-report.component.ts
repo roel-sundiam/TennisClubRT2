@@ -1390,7 +1390,8 @@ export class CourtReceiptsReportComponent implements OnInit {
                   players = reservation.players || [];
                   reservationDate = reservation.date || new Date().toISOString();
                   timeSlot = reservation.timeSlot || 0;
-                  timeSlotDisplay = `${timeSlot}:00-${timeSlot + 1}:00`;
+                  const endTimeSlot = reservation.endTimeSlot || (timeSlot + 1);
+                  timeSlotDisplay = `${timeSlot}:00-${endTimeSlot}:00`;
                   
                 }
                 
@@ -1752,7 +1753,8 @@ export class CourtReceiptsReportComponent implements OnInit {
                 players = reservation.players || [];
                 reservationDate = reservation.date || new Date().toISOString();
                 timeSlot = reservation.timeSlot || 0;
-                timeSlotDisplay = `${timeSlot}:00-${timeSlot + 1}:00`;
+                const endTimeSlot = reservation.endTimeSlot || (timeSlot + 1);
+                timeSlotDisplay = `${timeSlot}:00-${endTimeSlot}:00`;
               }
               
               return {

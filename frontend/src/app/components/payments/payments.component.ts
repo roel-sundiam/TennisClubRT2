@@ -19,6 +19,7 @@ interface Payment {
     timeSlot: number;
     players: string[];
     timeSlotDisplay: string;
+    totalFee?: number;
   };
   pollId?: {
     _id: string;
@@ -49,6 +50,7 @@ interface Payment {
   daysUntilDue: number;
   createdAt: Date;
   isSynthetic?: boolean; // Flag for synthetic payment objects created from unpaid reservations
+  _groupedPayments?: Payment[]; // For storing original payments when grouped
   metadata?: {
     timeSlot?: number;
     date?: Date;
@@ -80,6 +82,7 @@ interface Reservation {
   paymentStatus: string;
   totalFee: number;
   timeSlotDisplay: string;
+  _groupedReservationIds?: string[]; // For grouped reservations
 }
 
 interface Notification {
@@ -266,17 +269,18 @@ interface Notification {
         <div class="history-container">
           <h2>Your Payment History</h2>
           
+          
           <div class="loading" *ngIf="loadingHistory">
             Loading payment history...
           </div>
           
-          <div class="no-payments" *ngIf="!loadingHistory && paymentHistory.length === 0">
+          <div class="no-payments" *ngIf="!loadingHistory && displayedPayments.length === 0">
             <p>No payment history found.</p>
           </div>
 
-          <div class="payments-list" *ngIf="!loadingHistory && paymentHistory.length > 0">
+          <div class="payments-list" *ngIf="!loadingHistory && displayedPayments.length > 0">
             <div 
-              *ngFor="let payment of paymentHistory"
+              *ngFor="let payment of displayedPayments"
               class="payment-card"
               [class]="'payment-' + payment.status">
               
@@ -315,10 +319,6 @@ interface Notification {
                 
                 <!-- Regular Payment Details -->
                 <div *ngIf="!payment.metadata?.isManualPayment">
-                  <div class="detail-row">
-                    <span>{{payment.reservationId ? 'Reservation:' : 'Event:'}}</span>
-                    <span>{{formatPaymentReservation(payment)}}</span>
-                  </div>
                   <div class="detail-row" *ngIf="payment.pollId && payment.userId">
                     <span>Participant:</span>
                     <span>{{payment.userId.fullName}}</span>
@@ -333,14 +333,6 @@ interface Notification {
                 <div class="detail-row">
                   <span>Payment Method:</span>
                   <span>{{formatPaymentMethod(payment.paymentMethod)}}</span>
-                </div>
-                <div class="detail-row">
-                  <span>Date Created:</span>
-                  <span>{{formatDate(payment.createdAt)}}</span>
-                </div>
-                <div class="detail-row" *ngIf="payment.paymentDate">
-                  <span>Date Paid:</span>
-                  <span>{{formatDate(payment.paymentDate)}}</span>
                 </div>
                 <div class="detail-row" *ngIf="payment.transactionId">
                   <span>Transaction ID:</span>
@@ -358,6 +350,46 @@ interface Notification {
                   <mat-icon>undo</mat-icon>
                   {{processing.includes(payment._id) ? 'Unrecording...' : 'Unrecord'}}
                 </button>
+              </div>
+
+              <!-- Expand/Collapse button for grouped payments -->
+              <div class="expand-actions" *ngIf="payment._groupedPayments && payment._groupedPayments.length > 1">
+                <button 
+                  class="expand-btn"
+                  (click)="togglePaymentExpansion(payment._id)"
+                  title="{{isPaymentExpanded(payment._id) ? 'Hide' : 'Show'}} individual hour breakdown">
+                  <mat-icon>{{isPaymentExpanded(payment._id) ? 'expand_less' : 'expand_more'}}</mat-icon>
+                  {{isPaymentExpanded(payment._id) ? 'Hide' : 'Show'}} breakdown ({{payment._groupedPayments.length}} hours)
+                </button>
+              </div>
+
+              <!-- Detailed breakdown for grouped payments -->
+              <div class="grouped-payment-details" *ngIf="payment._groupedPayments && payment._groupedPayments.length > 1 && isPaymentExpanded(payment._id)">
+                <h4>Individual Hour Breakdown:</h4>
+                <div class="breakdown-summary">
+                  <p><strong>Expected Total:</strong> {{payment._groupedPayments.length}} hours × 3 players × ₱20 = ₱{{(payment._groupedPayments.length * 3 * 20).toFixed(2)}}</p>
+                  <p><strong>Actual Total:</strong> ₱{{payment.amount.toFixed(2)}} 
+                    <span *ngIf="payment.amount !== (payment._groupedPayments.length * 3 * 20)" class="pricing-warning">⚠️ Pricing discrepancy detected</span>
+                  </p>
+                </div>
+                <div class="breakdown-list">
+                  <div 
+                    *ngFor="let individualPayment of payment._groupedPayments" 
+                    class="breakdown-item">
+                    <div class="breakdown-time">
+                      {{formatTime(individualPayment.reservationId.timeSlot)}} - {{formatTime(individualPayment.reservationId.timeSlot + 1)}}
+                    </div>
+                    <div class="breakdown-amount">
+                      ₱{{individualPayment.amount.toFixed(2)}}
+                      <span *ngIf="individualPayment.amount !== 60" class="amount-warning">
+                        (Expected: ₱60)
+                      </span>
+                    </div>
+                    <div class="breakdown-ref">
+                      Ref: {{individualPayment.referenceNumber}}
+                    </div>
+                  </div>
+                </div>
               </div>
 
             </div>
@@ -412,54 +444,11 @@ interface Notification {
               </div>
             </div>
 
-            <!-- Fee Breakdown Section -->
-            <div class="fee-breakdown-section" *ngIf="!isOpenPlayPayment()">
-              <div class="breakdown-header">
-                <mat-icon>receipt</mat-icon>
-                <h4>Fee Breakdown</h4>
-              </div>
-              
-              <div class="breakdown-details">
-                <div class="breakdown-row">
-                  <span class="breakdown-label">Time Slot:</span>
-                  <span class="breakdown-value">{{getTimeSlotInfo()}}</span>
-                </div>
-                
-                <div class="breakdown-row">
-                  <span class="breakdown-label">Rate Type:</span>
-                  <span class="breakdown-value">{{getRateTypeInfo()}}</span>
-                </div>
-                
-                <div class="breakdown-row" *ngIf="getPlayerBreakdownInfo().memberCount > 0">
-                  <span class="breakdown-label">Members ({{getPlayerBreakdownInfo().memberCount}}):</span>
-                  <span class="breakdown-value">{{getPlayerBreakdownInfo().memberCount}} × {{getMemberRate()}} = ₱{{getPlayerBreakdownInfo().memberTotal}}</span>
-                </div>
-                
-                <div class="breakdown-row" *ngIf="getPlayerBreakdownInfo().nonMemberCount > 0">
-                  <span class="breakdown-label">Non-Members ({{getPlayerBreakdownInfo().nonMemberCount}}):</span>
-                  <span class="breakdown-value">{{getPlayerBreakdownInfo().nonMemberCount}} × ₱50 = ₱{{getPlayerBreakdownInfo().nonMemberTotal}}</span>
-                </div>
-                
-                <div class="breakdown-row total-row">
-                  <span class="breakdown-label">Total:</span>
-                  <span class="breakdown-value total-amount">₱{{selectedReservation.totalFee.toFixed(2)}}</span>
-                </div>
-                
-                <div class="calculation-note" *ngIf="isPeakHourReservation()">
-                  <mat-icon>info</mat-icon>
-                  <span>Peak hours have a minimum fee of ₱100. The higher of calculated player fees or ₱100 applies.</span>
-                </div>
-                
-                <div class="calculation-note">
-                  <mat-icon>info</mat-icon>
-                  <span>Player membership status is determined by matching names with the member database.</span>
-                </div>
-              </div>
-            </div>
 
             <div class="form-container">
 
               <form [formGroup]="paymentForm" (ngSubmit)="onSubmit()" class="payment-form">
+                
                 <!-- Payment Method -->
                 <!-- Court Fee -->
                 <div class="field">
@@ -542,15 +531,15 @@ interface Notification {
               Loading pending payments...
             </div>
             
-            <div class="no-payments" *ngIf="!loadingUnpaid && pendingPayments.length === 0">
+            <div class="no-payments" *ngIf="!loadingUnpaid && displayedPendingPayments.length === 0">
               <p>No pending payments! 🎉</p>
             </div>
 
-            <div class="payments-list" *ngIf="!loadingUnpaid && pendingPayments.length > 0">
+            <div class="payments-list" *ngIf="!loadingUnpaid && displayedPendingPayments.length > 0">
               <h3>Your Pending Payments</h3>
               
               <div 
-                *ngFor="let payment of pendingPayments"
+                *ngFor="let payment of displayedPendingPayments"
                 class="payment-card"
                 [class.overdue]="isPaymentOverdue(payment)">
                 
@@ -575,23 +564,14 @@ interface Notification {
                   </div>
                 </div>
 
-                <div class="payment-details">
-                  <div class="detail-row">
-                    <span>Description:</span>
-                    <span>{{payment.description}}</span>
-                  </div>
-                  <div class="detail-row">
-                    <span>Due Date:</span>
-                    <span>{{formatDate(payment.dueDate)}}</span>
-                  </div>
-                </div>
+                <!-- Payment details removed for cleaner display -->
 
                 <div class="payment-actions">
                   <!-- For synthetic payments (unpaid reservations), show Pay Now and Cancel buttons -->
                   <ng-container *ngIf="payment.isSynthetic && payment.reservationId">
                     <button 
                       class="pay-btn"
-                      (click)="payForReservation(payment.reservationId)">
+                      (click)="payForGroupedReservation(payment)">
                       Pay Now
                     </button>
                     <button 
@@ -687,7 +667,10 @@ export class PaymentsComponent implements OnInit {
   activeTab = 'pending';
   unpaidReservations: Reservation[] = [];
   pendingPayments: Payment[] = [];
+  displayedPendingPayments: Payment[] = [];
   paymentHistory: Payment[] = [];
+  displayedPayments: Payment[] = [];
+  expandedPayments: Set<string> = new Set();
   selectedReservation: Reservation | null = null;
   currentUser: any = null;
   processing: string[] = [];
@@ -877,10 +860,19 @@ export class PaymentsComponent implements OnInit {
       // Combine existing payments with synthetic payments
       this.pendingPayments = [...existingPayments, ...syntheticPayments];
       
+      // Group pending payments for multi-hour reservations
+      this.displayedPendingPayments = this.groupPayments([...this.pendingPayments]);
+      
       // Debug: Log payment statuses to ensure proper separation
       console.log('📋 Pending Payments loaded:', this.pendingPayments.length);
+      console.log('📋 Displayed Pending Payments after grouping:', this.displayedPendingPayments.length);
+      
       this.pendingPayments.forEach(payment => {
-        console.log(`  - ${payment.description} (Status: ${payment.status}, ID: ${payment._id}, Synthetic: ${payment.isSynthetic || false})`);
+        console.log(`  - Raw: ${payment.description} (Status: ${payment.status}, TimeSlot: ${payment.reservationId?.timeSlot}, Date: ${payment.reservationId?.date}, ID: ${payment._id}, Synthetic: ${payment.isSynthetic || false})`);
+      });
+      
+      this.displayedPendingPayments.forEach(payment => {
+        console.log(`  - Displayed: ${payment.description} (Amount: ₱${payment.amount}, TimeSlot: ${payment.reservationId?.timeSlot}, Grouped: ${payment._groupedPayments ? payment._groupedPayments.length : 0})`);
       });
       
       this.loadingUnpaid = false;
@@ -910,6 +902,23 @@ export class PaymentsComponent implements OnInit {
           const dateB = new Date(b.paymentDate || b.createdAt);
           return dateB.getTime() - dateA.getTime();
         });
+
+        // Group payments for multi-hour reservations
+        this.displayedPayments = this.groupPayments([...this.paymentHistory]);
+        
+        // Debug: Log displayed payments after grouping
+        console.log('📋 Displayed Payments after grouping:', this.displayedPayments.length, 'payments');
+        this.displayedPayments.forEach((payment, index) => {
+          console.log(`Displayed Payment ${index + 1}:`, {
+            id: payment._id,
+            amount: payment.amount,
+            formattedAmount: payment.formattedAmount,
+            hasGroupedPayments: !!payment._groupedPayments,
+            groupedCount: payment._groupedPayments?.length,
+            timeSlotDisplay: payment.reservationId?.timeSlotDisplay,
+            isSynthetic: payment._id?.startsWith?.('synthetic-')
+          });
+        });
         
         // Debug: Log payment history statuses
         console.log('📋 Payment History loaded:', this.paymentHistory.length, 'payments (excluding pending)');
@@ -917,10 +926,13 @@ export class PaymentsComponent implements OnInit {
           console.log(`Payment ${index + 1}:`, {
             status: payment.status,
             hasReservationId: !!payment.reservationId,
+            timeSlot: payment.reservationId?.timeSlot,
+            timeSlotDisplay: payment.reservationId?.timeSlotDisplay,
+            date: payment.reservationId?.date,
+            amount: payment.amount,
             hasPollId: !!payment.pollId,
             pollTitle: payment.pollId?.title,
-            userFullName: payment.userId?.fullName,
-            amount: payment.amount
+            userFullName: payment.userId?.fullName
           });
         });
         this.paymentHistory.forEach(payment => {
@@ -1012,6 +1024,12 @@ export class PaymentsComponent implements OnInit {
       transactionId: formValue.transactionId || undefined,
       notes: formValue.notes || undefined
     };
+    
+    // Check if this is a grouped payment with multiple reservations
+    if (this.selectedReservation && this.selectedReservation._groupedReservationIds && this.selectedReservation._groupedReservationIds.length > 1) {
+      paymentData.groupedReservationIds = this.selectedReservation._groupedReservationIds;
+      console.log(`💰 Creating grouped payment for ${paymentData.groupedReservationIds.length} reservations:`, paymentData.groupedReservationIds);
+    }
     
     // Add court fee from form input
     paymentData.customAmount = formValue.courtFee;
@@ -1285,9 +1303,10 @@ export class PaymentsComponent implements OnInit {
         day: 'numeric',
         year: 'numeric'
       });
-      const startTime = this.formatTime(payment.reservationId.timeSlot);
-      const endTime = this.formatTime(payment.reservationId.timeSlot + 1);
-      return `${date} ${startTime}-${endTime}`;
+      // Use timeSlotDisplay if available (for grouped payments), otherwise calculate manually
+      const timeRange = payment.reservationId.timeSlotDisplay || 
+        `${this.formatTime(payment.reservationId.timeSlot)}-${this.formatTime(payment.reservationId.timeSlot + 1)}`;
+      return `${date} ${timeRange}`;
     } else if (payment.pollId?.openPlayEvent) {
       const date = new Date(payment.pollId.openPlayEvent.eventDate).toLocaleDateString('en-US', {
         weekday: 'short',
@@ -1318,6 +1337,135 @@ export class PaymentsComponent implements OnInit {
       'coins': 'Coins'
     };
     return methods[method] || method;
+  }
+
+  /**
+   * Group consecutive payments for the same date/user to display multi-hour reservations as single entries
+   */
+  groupPayments(payments: Payment[]): Payment[] {
+    // Separate court payments from other payments
+    const courtPayments = payments.filter(p => 
+      p.reservationId && 
+      p.reservationId.timeSlot !== undefined && 
+      p.reservationId.date
+    );
+    const nonCourtPayments = payments.filter(p => 
+      !p.reservationId || 
+      p.reservationId.timeSlot === undefined || 
+      !p.reservationId.date
+    );
+
+    // Initialize debug info
+
+    if (courtPayments.length === 0) {
+      return payments;
+    }
+
+    // Group payments by date and user first
+    const groupsByDateAndUser = new Map<string, Payment[]>();
+    
+    courtPayments.forEach(payment => {
+      const dateStr = new Date(payment.reservationId!.date).toDateString();
+      const userId = payment.userId._id;
+      const key = `${dateStr}-${userId}`;
+      
+      if (!groupsByDateAndUser.has(key)) {
+        groupsByDateAndUser.set(key, []);
+      }
+      groupsByDateAndUser.get(key)!.push(payment);
+    });
+
+    const grouped: Payment[] = [];
+
+    // Process each date/user group
+    groupsByDateAndUser.forEach(userPayments => {
+      // Sort by timeSlot
+      const sorted = userPayments.sort((a, b) => 
+        a.reservationId!.timeSlot - b.reservationId!.timeSlot
+      );
+
+      let i = 0;
+      while (i < sorted.length) {
+        const consecutiveGroup = [sorted[i]];
+        let j = i + 1;
+
+        // Find consecutive time slots
+        while (j < sorted.length) {
+          const currentLastSlot = consecutiveGroup[consecutiveGroup.length - 1].reservationId!.timeSlot;
+          if (sorted[j].reservationId!.timeSlot === currentLastSlot + 1) {
+            consecutiveGroup.push(sorted[j]);
+            j++;
+          } else {
+            break;
+          }
+        }
+
+        // Create merged payment or single payment
+        if (consecutiveGroup.length > 1) {
+          
+          const firstSlot = consecutiveGroup[0];
+          const lastSlot = consecutiveGroup[consecutiveGroup.length - 1];
+          const totalAmount = consecutiveGroup.reduce((sum, p) => sum + p.amount, 0);
+
+          const mergedPayment: Payment = {
+            ...firstSlot,
+            amount: totalAmount,
+            formattedAmount: `₱${totalAmount.toFixed(2)}`,
+            description: `Court reservation payment for ${new Date(firstSlot.reservationId!.date).toDateString()} ${this.formatTime(firstSlot.reservationId!.timeSlot)}-${this.formatTime(lastSlot.reservationId!.timeSlot + 1)}`,
+            reservationId: {
+              ...firstSlot.reservationId!,
+              timeSlotDisplay: this.formatTimeRange(firstSlot.reservationId!.timeSlot, lastSlot.reservationId!.timeSlot + 1),
+              totalFee: totalAmount
+            },
+            _groupedPayments: consecutiveGroup
+          };
+          
+          grouped.push(mergedPayment);
+        } else {
+          // Single payment - ensure it has timeSlotDisplay
+          const singlePayment = { ...consecutiveGroup[0] };
+          if (singlePayment.reservationId && !singlePayment.reservationId.timeSlotDisplay) {
+            singlePayment.reservationId.timeSlotDisplay = this.formatTimeRange(
+              singlePayment.reservationId.timeSlot, 
+              singlePayment.reservationId.timeSlot + 1
+            );
+          }
+          grouped.push(singlePayment);
+        }
+
+        i = j; // Move to next unprocessed payment
+      }
+    });
+
+    // Combine and sort by creation date (most recent first)
+    return [...grouped, ...nonCourtPayments].sort((a, b) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }
+
+  /**
+   * Format time range (reused from my-reservations component)
+   */
+  formatTimeRange(startHour: number, endHour: number): string {
+    return `${this.formatTime(startHour)}-${this.formatTime(endHour)}`;
+  }
+
+  /**
+   * Toggle expansion of grouped payment to show individual payments
+   */
+  togglePaymentExpansion(paymentId: string): void {
+    if (this.expandedPayments.has(paymentId)) {
+      this.expandedPayments.delete(paymentId);
+    } else {
+      this.expandedPayments.add(paymentId);
+    }
+  }
+
+  /**
+   * Check if payment is expanded
+   */
+  isPaymentExpanded(paymentId: string): boolean {
+    return this.expandedPayments.has(paymentId);
   }
 
   formatDate(date: Date | string): string {
@@ -1432,8 +1580,10 @@ export class PaymentsComponent implements OnInit {
     });
   }
 
-  payForReservation(reservation: Reservation | {_id: string, date: Date, timeSlot: number, players: string[], timeSlotDisplay: string} | undefined): void {
+  payForReservation(reservation: Reservation | {_id: string, date: Date, timeSlot: number, players: string[], timeSlotDisplay: string} | undefined, overrideAmount?: number): void {
     if (!reservation) return;
+    
+    console.log('💰 payForReservation called with override amount:', overrideAmount);
     
     // If admin, check if there's already an existing payment record for this reservation
     if (this.isAdmin()) {
@@ -1460,11 +1610,69 @@ export class PaymentsComponent implements OnInit {
       totalFee: ('totalFee' in reservation) ? reservation.totalFee : 0
     };
     
-    // Always recalculate the fee based on current member data to ensure accuracy
-    this.calculateAndSetReservationFeeWithMemberData(fullReservation);
+    // Use override amount if provided, otherwise recalculate the fee
+    if (overrideAmount) {
+      console.log(`✅ Using override amount: ₱${overrideAmount}`);
+      this.calculateAndSetReservationFee(fullReservation, overrideAmount);
+    } else {
+      // Always recalculate the fee based on current member data to ensure accuracy
+      this.calculateAndSetReservationFeeWithMemberData(fullReservation);
+    }
+  }
+
+  /**
+   * Handle payment for grouped reservations (multi-hour bookings)
+   */
+  payForGroupedReservation(payment: Payment): void {
+    if (!payment) return;
+
+    // Check if this is a grouped payment with multiple reservations
+    if (payment._groupedPayments && payment._groupedPayments.length > 1) {
+      // For grouped payments, we need to handle all reservations at once
+      // Use the total amount from the grouped payment
+      const totalAmount = payment.amount;
+      const firstReservation = payment.reservationId;
+      
+      if (!firstReservation) return;
+
+      // Create a consolidated reservation object for the payment form
+      const consolidatedReservation: Reservation = {
+        _id: firstReservation._id, // Use first reservation's ID as primary
+        date: firstReservation.date,
+        timeSlot: firstReservation.timeSlot,
+        players: firstReservation.players,
+        timeSlotDisplay: firstReservation.timeSlotDisplay || payment.reservationId?.timeSlotDisplay,
+        status: 'confirmed',
+        paymentStatus: 'pending',
+        totalFee: totalAmount, // Use the grouped total amount
+        _groupedReservationIds: payment._groupedPayments.map(p => p.reservationId!._id) // Store all reservation IDs
+      };
+
+      // Set this as the selected reservation and populate the form
+      this.selectedReservation = consolidatedReservation;
+      this.paymentForm.patchValue({
+        reservationId: consolidatedReservation._id,
+        courtFee: totalAmount
+      });
+
+      // Payment form will be shown via calculateAndSetReservationFeeWithMemberData
+      
+      console.log(`💰 Grouped payment setup: ${payment._groupedPayments.length} reservations, total: ₱${totalAmount}`);
+    } else {
+      // Single payment, use the amount from the payment object
+      const paymentAmount = payment.amount;
+      console.log(`💰 Single payment: using payment amount ₱${paymentAmount}`);
+      this.payForReservation(payment.reservationId, paymentAmount);
+    }
   }
 
   calculateAndSetReservationFeeWithMemberData(reservation: Reservation): void {
+    console.log('🔍 DEBUG calculateAndSetReservationFeeWithMemberData input:', {
+      reservationId: reservation._id,
+      initialTotalFee: reservation.totalFee,
+      timeSlot: reservation.timeSlot,
+      players: reservation.players
+    });
     // Calculate fee using current member data instead of backend calculation
     const mockPayment = {
       reservationId: {
@@ -1491,38 +1699,16 @@ export class PaymentsComponent implements OnInit {
     });
   }
 
-  calculateAndSetReservationFee(reservation: Reservation): void {
-    // Use the backend's payment calculation endpoint (fallback method)
-    const reservationDate = new Date(reservation.date);
-    const params = {
-      timeSlot: reservation.timeSlot.toString(),
-      playerCount: reservation.players.length.toString(),
-      date: reservationDate.toISOString()
-    };
-
-    this.http.get<any>(`${this.apiUrl}/payments/calculate`, { params }).subscribe({
-      next: (response) => {
-        if (response.success && response.data) {
-          reservation.totalFee = response.data.amount;
-          this.selectedReservation = reservation;
-          this.paymentForm.patchValue({
-            reservationId: reservation._id,
-            courtFee: response.data.amount
-          });
-        } else {
-          this.showError('Calculation Error', 'Failed to calculate payment amount');
-        }
-      },
-      error: (error) => {
-        console.error('Error calculating payment amount:', error);
-        this.showError('Calculation Error', 'Failed to calculate payment amount');
-        // Still set the reservation but with 0 fee as fallback
-        this.selectedReservation = reservation;
-        this.paymentForm.patchValue({
-          reservationId: reservation._id,
-          courtFee: reservation.totalFee || 0
-        });
-      }
+  calculateAndSetReservationFee(reservation: Reservation, overrideAmount?: number): void {
+    // Use override amount if provided, otherwise use reservation's totalFee
+    const correctFee = overrideAmount || reservation.totalFee || 0;
+    
+    console.log(`✅ Using fee: ₱${correctFee} ${overrideAmount ? '(override provided)' : '(from reservation)'}`);
+    
+    this.selectedReservation = reservation;
+    this.paymentForm.patchValue({
+      reservationId: reservation._id,
+      courtFee: correctFee
     });
   }
 
@@ -1556,6 +1742,14 @@ export class PaymentsComponent implements OnInit {
   payForExistingPayment(payment: Payment): void {
     if (!payment.reservationId) return;
     
+    console.log('🔍 DEBUG payForExistingPayment:', {
+      paymentAmount: payment.amount,
+      reservationTotalFee: payment.reservationId.totalFee,
+      reservationId: payment.reservationId._id,
+      timeSlot: payment.reservationId.timeSlot,
+      players: payment.reservationId.players
+    });
+    
     // For existing payment records that are not cash, show the payment form
     // Convert the payment back to a reservation-like object for the form
     const reservationForForm: Reservation = {
@@ -1566,8 +1760,10 @@ export class PaymentsComponent implements OnInit {
       timeSlotDisplay: payment.reservationId.timeSlotDisplay,
       status: 'confirmed',
       paymentStatus: 'pending',
-      totalFee: payment.amount // This will be recalculated below
+      totalFee: payment.reservationId.totalFee || payment.amount // Use reservation's totalFee first
     };
+    
+    console.log('🔍 DEBUG reservationForForm totalFee:', reservationForForm.totalFee);
     
     // Mark this as an existing payment update
     (reservationForForm as any).existingPaymentId = payment._id;
@@ -1986,6 +2182,16 @@ export class PaymentsComponent implements OnInit {
 
   // Calculate correct payment amount based on stored amount (respects user-edited court fees)
   getCorrectPaymentAmount(payment: any): string {
+    // Debug log for payment history amount issues
+    console.log(`💰 DEBUG Payment Amount for ${payment._id}:`, {
+      amount: payment.amount,
+      formattedAmount: payment.formattedAmount,
+      hasGroupedPayments: !!payment._groupedPayments,
+      groupedPaymentsCount: payment._groupedPayments?.length,
+      isReservationPayment: !!payment.reservationId,
+      timeSlotDisplay: payment.reservationId?.timeSlotDisplay
+    });
+    
     // Always use the stored amount since users can now edit court fees
     // This respects both user-edited amounts and admin overrides
     if (payment.amount !== undefined && payment.amount !== null) {

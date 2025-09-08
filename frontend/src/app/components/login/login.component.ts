@@ -6,25 +6,12 @@ import { trigger, state, style, transition, animate } from '@angular/animations'
 import { AuthService } from '../../services/auth.service';
 import { AnalyticsService } from '../../services/analytics.service';
 
-// PrimeNG Imports
-import { CardModule } from 'primeng/card';
-import { InputTextModule } from 'primeng/inputtext';
-import { ButtonModule } from 'primeng/button';
-import { PasswordModule } from 'primeng/password';
-import { ProgressSpinnerModule } from 'primeng/progressspinner';
-// Removed ToastModule and MessageService - using custom error message
-
 @Component({
   selector: 'app-login',
   standalone: true,
   imports: [
     CommonModule,
-    ReactiveFormsModule,
-    CardModule,
-    InputTextModule,
-    ButtonModule,
-    PasswordModule,
-    ProgressSpinnerModule
+    ReactiveFormsModule
   ],
   animations: [
     trigger('slideIn', [
@@ -123,18 +110,16 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
       
       <!-- Right Panel - Login Form -->
       <div class="login-panel">
-        <p-card class="login-card">
-          <ng-template pTemplate="header">
-            <div class="card-header">
-              <div class="header-icon">
-                <i class="pi pi-sign-in"></i>
-              </div>
-              <div class="header-text">
-                <h2 class="login-title">Welcome Back</h2>
-                <p class="login-subtitle">Please sign in to your account</p>
-              </div>
+        <div class="login-card">
+          <div class="card-header">
+            <div class="header-icon">
+              <i class="pi pi-sign-in"></i>
             </div>
-          </ng-template>
+            <div class="header-text">
+              <h2 class="login-title">Welcome Back</h2>
+              <p class="login-subtitle">Please sign in to your account</p>
+            </div>
+          </div>
           
           <div class="card-content">
             <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="login-form" novalidate>
@@ -142,35 +127,40 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
               <!-- Username Field -->
               <div class="field">
                 <label for="username" class="field-label">Username</label>
-                <div class="p-input-icon-right">
-                  <i class="pi pi-user"></i>
+                <div class="input-icon-wrapper">
                   <input 
-                    pInputText 
+                    type="text"
                     id="username"
                     formControlName="username" 
                     placeholder="Enter your username"
-                    class="full-width"
+                    class="modern-input"
                     autocomplete="username"
-                    aria-required="false"
-                    required="false"
-                    [class.p-invalid]="false">
+                    [class.invalid]="false">
+                  <i class="pi pi-user input-icon"></i>
                 </div>
               </div>
               
               <!-- Password Field -->
               <div class="field">
                 <label for="password" class="field-label">Password</label>
-                <p-password
-                  formControlName="password"
-                  placeholder="Enter your password"
-                  styleClass="full-width"
-                  inputStyleClass="full-width"
-                  [toggleMask]="true"
-                  [feedback]="false"
-                  autocomplete="current-password"
-                  (keydown.enter)="onSubmit()"
-                  [class.p-invalid]="false">
-                </p-password>
+                <div class="input-icon-wrapper">
+                  <input 
+                    [type]="hidePassword ? 'password' : 'text'"
+                    id="password"
+                    formControlName="password"
+                    placeholder="Enter your password"
+                    class="modern-input"
+                    autocomplete="current-password"
+                    (keydown.enter)="onSubmit()"
+                    [class.invalid]="false">
+                  <button 
+                    type="button" 
+                    class="password-toggle"
+                    (click)="hidePassword = !hidePassword"
+                    aria-label="Toggle password visibility">
+                    <i [class]="hidePassword ? 'pi pi-eye' : 'pi pi-eye-slash'"></i>
+                  </button>
+                </div>
               </div>
 
               <!-- Modern Error Message -->
@@ -195,40 +185,32 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
               
               <!-- Login Actions -->
               <div class="login-actions">
-                <p-button 
-                  type="button"
-                  label="Sign In"
-                  icon="pi pi-sign-in"
+                <button 
+                  type="submit"
                   class="login-button"
-                  styleClass="w-full p-button-raised"
-                  (onClick)="onSubmit($event)"
-                  [disabled]="loading"
-                  [loading]="loading"
-                  loadingIcon="pi pi-spinner pi-spin">
-                </p-button>
-                
+                  [disabled]="loading">
+                  <i *ngIf="loading" class="pi pi-spinner pi-spin loading-icon"></i>
+                  <i *ngIf="!loading" class="pi pi-sign-in button-icon"></i>
+                  <span>{{ loading ? 'Signing In...' : 'Sign In' }}</span>
+                </button>
               </div>
             </form>
           </div>
           
-          <ng-template pTemplate="footer">
-            <div class="login-help">
-              <div class="help-text">
-                <i class="pi pi-info-circle"></i>
-                <span>New to Rich Town 2 Tennis Club?</span>
-                <p-button 
-                  label="Create your account here"
-                  link="true"
-                  styleClass="register-link"
-                  (onClick)="goToRegister()">
-                </p-button>
-              </div>
+          <div class="login-help">
+            <div class="help-text">
+              <i class="pi pi-info-circle"></i>
+              <span>New to Rich Town 2 Tennis Club?</span>
+              <button 
+                type="button"
+                class="register-link"
+                (click)="goToRegister()">
+                Create your account here
+              </button>
             </div>
-          </ng-template>
-        </p-card>
+          </div>
+        </div>
       </div>
-      
-      <!-- Custom error messages handled inline -->
     </div>
   `,
   styleUrl: './login.component.scss'
