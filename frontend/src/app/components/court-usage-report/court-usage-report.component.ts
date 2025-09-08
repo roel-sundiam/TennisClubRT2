@@ -141,7 +141,7 @@ export class CourtUsageReportComponent implements OnInit, OnDestroy {
   autoRefreshEnabled = true;
   nextUpdateCountdown = 30;
   
-  private apiUrl = 'http://localhost:3000';
+  private apiUrl = environment.apiBaseUrl;
   private autoRefreshSubscription?: Subscription;
   private countdownSubscription?: Subscription;
   private readonly REFRESH_INTERVAL = 30000; // 30 seconds
@@ -165,16 +165,26 @@ export class CourtUsageReportComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.error = null;
 
+    // Log API URL for debugging
+    const apiEndpoint = `${this.apiUrl}/api/reports/static-court-usage`;
+    console.log('🔗 Court Usage API URL:', apiEndpoint);
+    console.log('🌍 Environment:', environment.production ? 'production' : 'development');
+
     const headers = new HttpHeaders({
-      'Authorization': `Bearer ${this.authService.token}`
+      'Authorization': `Bearer ${this.authService.token}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
     });
 
-    this.http.get<CourtUsageAPIResponse>(
-      `${this.apiUrl}/api/reports/static-court-usage`,
-      { headers }
-    ).subscribe({
-      next: (response) => {
-        if (response.success) {
+    this.http.get<CourtUsageAPIResponse>(apiEndpoint, { 
+      headers,
+      observe: 'response'  // Get full response to see status codes
+    }).subscribe({
+      next: (httpResponse) => {
+        const response = httpResponse.body;
+        console.log('📊 Court Usage API Response:', httpResponse.status, response);
+        
+        if (response && response.success) {
           const isDataChanged = this.hasDataChanged(response.data);
           this.reportData = response.data;
           this.lastUpdated = response.metadata?.lastModified || response.data.summary.lastUpdated;
@@ -186,16 +196,33 @@ export class CourtUsageReportComponent implements OnInit, OnDestroy {
             });
           }
         } else {
-          this.error = response.message || 'Failed to load court usage data';
+          this.error = response?.message || 'Failed to load court usage data';
+          console.error('❌ API returned unsuccessful response:', response);
         }
         this.loading = false;
       },
       error: (error) => {
-        console.error('Error loading court usage data:', error);
-        this.error = error.error?.message || 'Failed to load recorded payments data';
+        console.error('❌ Error loading court usage data:', error);
+        console.error('❌ Error status:', error.status);
+        console.error('❌ Error message:', error.message);
+        console.error('❌ Full error object:', JSON.stringify(error, null, 2));
+        
+        let errorMessage = 'Failed to load recorded payments data';
+        if (error.status === 0) {
+          errorMessage = 'Network error: Unable to connect to server';
+        } else if (error.status === 401) {
+          errorMessage = 'Authentication error: Please log in again';
+        } else if (error.status === 404) {
+          errorMessage = 'API endpoint not found';
+        } else if (error.error?.message) {
+          errorMessage = error.error.message;
+        }
+        
+        this.error = errorMessage;
         this.loading = false;
-        this.snackBar.open('Error loading recorded payments report', 'Close', {
-          duration: 5000
+        this.snackBar.open(`Error: ${errorMessage}`, 'Close', {
+          duration: 8000,
+          panelClass: ['error-snack']
         });
       }
     });
@@ -231,7 +258,9 @@ export class CourtUsageReportComponent implements OnInit, OnDestroy {
                 `${this.apiUrl}/api/reports/static-court-usage`,
                 {
                   headers: new HttpHeaders({
-                    'Authorization': `Bearer ${this.authService.token}`
+                    'Authorization': `Bearer ${this.authService.token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                   })
                 }
               );
