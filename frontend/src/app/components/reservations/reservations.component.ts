@@ -22,6 +22,16 @@ interface TimeSlot {
   display: string;
   available: boolean;
   isPeak: boolean;
+  blockedByOpenPlay?: boolean;
+  openPlayEvent?: {
+    id: string;
+    title: string;
+    status: string;
+    startTime: string;
+    endTime: string;
+    confirmedPlayers: number;
+    maxPlayers: number;
+  };
 }
 
 interface Member {
@@ -109,12 +119,20 @@ interface Reservation {
                   class="time-btn"
                   [class.selected]="selectedStartTime === slot.hour"
                   [class.unavailable]="!slot.available"
+                  [class.blocked-open-play]="slot.blockedByOpenPlay"
                   [class.peak]="slot.isPeak"
                   [disabled]="!slot.available"
                   (click)="selectStartTime(slot.hour)"
+                  [title]="slot.blockedByOpenPlay ? 'Blocked by Open Play: ' + slot.openPlayEvent?.title : ''"
                 >
                   <span class="time">{{ slot.hour }}:00</span>
-                  <span class="rate-type">{{ slot.isPeak ? 'Peak' : 'Regular' }}</span>
+                  <span class="rate-type">{{ 
+                    slot.blockedByOpenPlay ? 'Open Play' : 
+                    (slot.isPeak ? 'Peak' : 'Regular') 
+                  }}</span>
+                  <small *ngIf="slot.blockedByOpenPlay && slot.openPlayEvent" class="open-play-info">
+                    {{ slot.openPlayEvent.status === 'active' ? 'Registration Open' : 'Event Confirmed' }}
+                  </small>
                 </button>
               </div>
               <small
@@ -982,7 +1000,32 @@ export class ReservationsComponent implements OnInit, OnDestroy {
       next: (response) => {
         console.log('🔍 API response for date', dateStr, ':', response);
         this.existingReservations = response.data?.reservations || [];
-        this.updateTimeSlotAvailability();
+        
+        // Use backend time slots data that includes Open Play blocking
+        if (response.data?.timeSlots) {
+          console.log('✅ Backend provided timeSlots data, using it instead of local generation');
+          console.log('📊 Backend timeSlots count:', response.data.timeSlots.length);
+          console.log('🚫 Backend blocked slots:', response.data.timeSlots.filter((s: any) => s.blockedByOpenPlay).length);
+          
+          this.timeSlots = response.data.timeSlots.map((backendSlot: any) => ({
+            hour: backendSlot.hour,
+            display: `${backendSlot.hour}:00 - ${backendSlot.hour + 1}:00`,
+            available: backendSlot.available,
+            isPeak: this.peakHours.includes(backendSlot.hour),
+            blockedByOpenPlay: backendSlot.blockedByOpenPlay || false,
+            openPlayEvent: backendSlot.openPlayEvent || null
+          }));
+          
+          // Log specific slots for debugging
+          const blockedSlots = this.timeSlots.filter(s => s.blockedByOpenPlay);
+          console.log('🚫 Processed blocked slots:', blockedSlots.map(s => s.hour));
+          console.log('🔍 Updated time slots with Open Play blocking:', this.timeSlots);
+        } else {
+          console.log('❌ No timeSlots in backend response, falling back to local generation');
+          console.log('📊 Backend response data keys:', Object.keys(response.data || {}));
+          // Fallback to local generation if backend doesn't provide timeSlots
+          this.updateTimeSlotAvailability();
+        }
       },
       error: (error) => {
         console.error('Error loading reservations:', error);

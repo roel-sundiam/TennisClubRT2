@@ -139,13 +139,29 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
   const reservations = await (Reservation as any).getReservationsForDate(queryDate);
 
   // Check for Open Play blocked slots
-  const openPlayEvents = await Poll.find({
+  // Account for timezone issues by expanding the search range
+  const startOfDay = new Date(queryDate.getTime() - 24 * 60 * 60 * 1000); // Previous day
+  const endOfDay = new Date(queryDate.getTime() + 2 * 24 * 60 * 60 * 1000); // Next day
+  
+  const allPossibleEvents = await Poll.find({
     'metadata.category': 'open_play',
     status: { $in: ['active', 'closed'] },
     'openPlayEvent.eventDate': {
-      $gte: new Date(queryDate.getTime()),
-      $lt: new Date(queryDate.getTime() + 24 * 60 * 60 * 1000)
+      $gte: startOfDay,
+      $lt: endOfDay
     }
+  });
+
+  // Filter events that actually match the requested date in Philippine timezone
+  const openPlayEvents = allPossibleEvents.filter(event => {
+    if (!event.openPlayEvent?.eventDate) return false;
+    
+    // Convert stored UTC date to Philippine date string
+    const eventDate = new Date(event.openPlayEvent.eventDate);
+    const phEventDate = eventDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }); // YYYY-MM-DD format
+    const requestedDate = queryDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    return phEventDate === requestedDate;
   });
 
   const blockedSlots = new Set();
@@ -186,8 +202,11 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
       openPlayEvent: openPlayEvent ? {
         id: openPlayEvent._id,
         title: openPlayEvent.title,
+        status: openPlayEvent.status,
         startTime: openPlayEvent.openPlayEvent?.startTime,
-        endTime: openPlayEvent.openPlayEvent?.endTime
+        endTime: openPlayEvent.openPlayEvent?.endTime,
+        confirmedPlayers: openPlayEvent.openPlayEvent?.confirmedPlayers?.length || 0,
+        maxPlayers: openPlayEvent.openPlayEvent?.maxPlayers || 12
       } : null,
       weather,
       weatherSuitability
@@ -302,28 +321,54 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
     return;
   }
 
-  // Check if slot is blocked by Open Play event
-  const openPlayEvent = await Poll.findOne({
+  // Check if any slot in the reservation range is blocked by Open Play event
+  const slotsToCheck: number[] = [];
+  for (let slot = timeSlot; slot < endTimeSlot; slot++) {
+    slotsToCheck.push(slot);
+  }
+
+  // Check for Open Play conflicts with timezone awareness
+  const startOfDay = new Date(reservationDate.getTime() - 24 * 60 * 60 * 1000);
+  const endOfDay = new Date(reservationDate.getTime() + 2 * 24 * 60 * 60 * 1000);
+  
+  const allPossibleEvents = await Poll.find({
     'metadata.category': 'open_play',
     status: { $in: ['active', 'closed'] },
     'openPlayEvent.eventDate': {
-      $gte: new Date(reservationDate.getTime()),
-      $lt: new Date(reservationDate.getTime() + 24 * 60 * 60 * 1000)
+      $gte: startOfDay,
+      $lt: endOfDay
     },
-    'openPlayEvent.blockedTimeSlots': timeSlot
+    'openPlayEvent.blockedTimeSlots': { $in: slotsToCheck }
+  });
+
+  // Filter for events that match the requested date in Philippine timezone
+  const requestedDate = reservationDate.toISOString().split('T')[0];
+  const openPlayEvent = allPossibleEvents.find(event => {
+    if (!event.openPlayEvent?.eventDate) return false;
+    
+    const eventDate = new Date(event.openPlayEvent.eventDate);
+    const phEventDate = eventDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+    
+    return phEventDate === requestedDate;
   });
 
   if (openPlayEvent) {
+    const blockedSlots = openPlayEvent.openPlayEvent?.blockedTimeSlots?.filter((slot: number) => slotsToCheck.includes(slot)) || [];
+    const blockedSlotsDisplay = blockedSlots.map((slot: number) => `${slot}:00-${slot + 1}:00`).join(', ');
+    
     res.status(400).json({
       success: false,
-      error: `Time slot is blocked by Open Play event: ${openPlayEvent.title}`,
+      error: `Reservation conflicts with Open Play event "${openPlayEvent.title}". Blocked time slots: ${blockedSlotsDisplay}`,
       details: {
         openPlayEvent: {
           id: openPlayEvent._id,
           title: openPlayEvent.title,
           startTime: openPlayEvent.openPlayEvent?.startTime,
-          endTime: openPlayEvent.openPlayEvent?.endTime
-        }
+          endTime: openPlayEvent.openPlayEvent?.endTime,
+          blockedSlots: blockedSlots
+        },
+        requestedRange: `${timeSlot}:00-${endTimeSlot}:00`,
+        conflictingSlots: blockedSlotsDisplay
       }
     });
     return;

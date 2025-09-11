@@ -346,6 +346,47 @@
           }
         }
         
+        // Open Play blocked state
+        &.blocked-open-play {
+          background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+          border-color: #8b5cf6;
+          color: white;
+          cursor: not-allowed;
+          box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+          
+          .time {
+            color: white;
+          }
+          
+          .rate-type {
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 700;
+          }
+          
+          .open-play-info {
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 500;
+            margin-top: 0.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          
+          &::after {
+            content: '🏆';
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            font-size: 0.9rem;
+          }
+          
+          &:hover {
+            background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
+          }
+        }
+        
         // Unavailable state
         &.unavailable, &:disabled {
           background: #f9fafb;
