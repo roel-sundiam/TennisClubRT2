@@ -107,6 +107,7 @@ router.get(
  */
 router.get(
   '/static-court-usage',
+  authenticateToken,
   getStaticCourtUsageReport
 );
 

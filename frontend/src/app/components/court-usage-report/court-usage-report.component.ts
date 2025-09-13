@@ -209,19 +209,29 @@ export class CourtUsageReportComponent implements OnInit, OnDestroy {
         
         let errorMessage = 'Failed to load recorded payments data';
         if (error.status === 0) {
-          errorMessage = 'Network error: Unable to connect to server';
+          errorMessage = 'Network error: Unable to connect to server. Please check your internet connection and try again.';
         } else if (error.status === 401) {
           errorMessage = 'Authentication error: Please log in again';
+          // Redirect to login if authentication fails
+          this.authService.logout();
+        } else if (error.status === 403) {
+          errorMessage = 'Access denied: You do not have permission to view this report';
         } else if (error.status === 404) {
-          errorMessage = 'API endpoint not found';
+          errorMessage = 'API endpoint not found. Please contact support if this persists.';
+        } else if (error.status === 500) {
+          errorMessage = 'Server error: There was a problem processing your request. Please try again later.';
+        } else if (error.status >= 500) {
+          errorMessage = 'Server unavailable: The service is temporarily unavailable. Please try again later.';
         } else if (error.error?.message) {
           errorMessage = error.error.message;
+        } else if (error.name === 'TimeoutError') {
+          errorMessage = 'Request timeout: The server is taking too long to respond. Please try again.';
         }
         
         this.error = errorMessage;
         this.loading = false;
         this.snackBar.open(`Error: ${errorMessage}`, 'Close', {
-          duration: 8000,
+          duration: 10000,
           panelClass: ['error-snack']
         });
       }

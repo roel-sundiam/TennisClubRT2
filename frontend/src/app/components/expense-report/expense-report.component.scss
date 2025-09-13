@@ -397,10 +397,66 @@
     }
   }
   
-  .displayedColumns {
-    // Hide some columns on mobile
+  // Add horizontal scroll for expense table on mobile
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #ccc transparent;
+
+    &::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #ccc;
+      border-radius: 3px;
+
+      &:hover {
+        background: #999;
+      }
+    }
+  }
+  
+  .expense-table {
+    min-width: 800px; // Ensure table doesn't collapse on mobile
+    
+    // Adjust column widths for mobile scroll
+    .mat-column-date {
+      width: 100px;
+    }
+    
+    .mat-column-details {
+      min-width: 250px;
+    }
+    
+    .mat-column-category {
+      width: 150px;
+    }
+    
+    .amount-column {
+      width: 120px;
+    }
+    
+    .actions-column {
+      width: 80px;
+    }
+    
+    // Remove the display: none so all columns remain visible with scroll
     .details-column, .category-column {
-      display: none;
+      display: table-cell !important;
+    }
+  }
+  
+  .displayedColumns {
+    // Keep all columns visible on mobile with horizontal scroll
+    .details-column, .category-column {
+      display: block;
     }
   }
 }

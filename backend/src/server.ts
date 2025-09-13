@@ -65,7 +65,8 @@ const allowedOrigins: string[] = [
   'http://localhost:4200',
   'http://localhost:4201', 
   'http://localhost:3000',
-  'https://tennisclubrt2.netlify.app'
+  'https://tennisclubrt2.netlify.app',
+  'https://main--tennisclubrt2.netlify.app'
 ];
 
 // Add production frontend URL if available
