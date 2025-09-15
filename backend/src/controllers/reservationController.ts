@@ -136,7 +136,9 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
   }
 
   const queryDate = new Date(date);
+  console.log(`🔍 QUERY DEBUG: Requested date: ${date}, Parsed queryDate: ${queryDate.toISOString()}`);
   const reservations = await (Reservation as any).getReservationsForDate(queryDate);
+  console.log(`🔍 QUERY DEBUG: Found ${reservations.length} reservations for date ${date}`);
 
   // Check for Open Play blocked slots
   // Account for timezone issues by expanding the search range
@@ -194,10 +196,11 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
       (r.status === 'pending' || r.status === 'confirmed')
     );
 
-    // For END TIME availability: hour can be used as end time if no reservation STARTS exactly at this hour
-    // This allows 16:00-17:00 booking even if there's a 17:00-19:00 reservation
+    // For END TIME availability: hour can be used as end time if no reservation OCCUPIES that hour
+    // This allows 16:00-17:00 booking even if there's a 17:00-19:00 reservation (back-to-back is OK)
     const canBeEndTime = !reservations.find((r: any) =>
-      r.timeSlot === hour &&
+      hour > r.timeSlot &&
+      hour <= (r.endTimeSlot || r.timeSlot + (r.duration || 1)) &&
       (r.status === 'pending' || r.status === 'confirmed')
     );
 
