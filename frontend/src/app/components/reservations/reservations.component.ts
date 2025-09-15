@@ -93,7 +93,6 @@ interface Reservation {
               [min]="minDateString"
               (change)="onDateChange($event)"
               title="Select reservation date in Philippine time"
-              placeholder="Select Date"
             />
             <small
               class="error"
