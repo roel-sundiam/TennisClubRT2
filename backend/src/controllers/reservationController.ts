@@ -172,14 +172,48 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
   });
 
   // Generate time slots availability with weather data and Open Play blocking
+  console.log(`🔍 BACKEND DEBUG for date ${date} (UPDATED LOGIC):`);
+  console.log(`📊 Total reservations found: ${reservations.length}`);
+  console.log(`🚫 Blocked Open Play slots: [${Array.from(blockedSlots).join(', ')}]`);
+  console.log(`📅 All reservations:`, reservations.map((r: any) => ({
+    id: r._id,
+    timeSlot: r.timeSlot,
+    endTimeSlot: r.endTimeSlot,
+    duration: r.duration,
+    status: r.status,
+    range: `${r.timeSlot}:00 - ${(r.endTimeSlot || r.timeSlot + (r.duration || 1))}:00`
+  })));
+
   const timeSlots = [];
   for (let hour = 5; hour <= 22; hour++) {
-    const existingReservation = reservations.find((r: any) => 
-      hour >= r.timeSlot && hour < (r.endTimeSlot || r.timeSlot + (r.duration || 1))
+    // FIXED LOGIC: Check if this hour is actually occupied by a reservation
+    // For START TIME availability: hour must not be occupied by any active reservation
+    const occupyingReservation = reservations.find((r: any) =>
+      hour >= r.timeSlot &&
+      hour < (r.endTimeSlot || r.timeSlot + (r.duration || 1)) &&
+      (r.status === 'pending' || r.status === 'confirmed')
     );
+
+    // For END TIME availability: hour can be used as end time if no reservation STARTS exactly at this hour
+    // This allows 16:00-17:00 booking even if there's a 17:00-19:00 reservation
+    const canBeEndTime = !reservations.find((r: any) =>
+      r.timeSlot === hour &&
+      (r.status === 'pending' || r.status === 'confirmed')
+    );
+
     const isBlockedByOpenPlay = blockedSlots.has(hour);
-    const openPlayEvent = isBlockedByOpenPlay ? 
+    const openPlayEvent = isBlockedByOpenPlay ?
       openPlayEvents.find(event => event.openPlayEvent?.blockedTimeSlots && Array.isArray(event.openPlayEvent.blockedTimeSlots) && event.openPlayEvent.blockedTimeSlots.includes(hour)) : null;
+
+    // Enhanced debugging for specific hours that might be problematic
+    if (hour === 17) {
+      console.log(`🔍 DETAILED DEBUG for hour ${hour} (NEW LOGIC):`);
+      console.log(`  - Occupying reservation: ${occupyingReservation ? `${occupyingReservation.timeSlot}:00-${(occupyingReservation.endTimeSlot || occupyingReservation.timeSlot + (occupyingReservation.duration || 1))}:00 (status: ${occupyingReservation.status})` : 'NONE'}`);
+      console.log(`  - Can be end time: ${canBeEndTime}`);
+      console.log(`  - Blocked by Open Play: ${isBlockedByOpenPlay}`);
+      console.log(`  - Available for START: ${!occupyingReservation && !isBlockedByOpenPlay}`);
+      console.log(`  - Available for END: ${canBeEndTime && !isBlockedByOpenPlay}`);
+    }
     
     // Get weather forecast for this time slot
     let weather = null;
@@ -193,11 +227,14 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
       console.warn(`Failed to fetch weather for ${date} ${hour}:00:`, error);
     }
     
-    timeSlots.push({
+    const slotData = {
       hour,
       timeDisplay: `${hour}:00 - ${hour + 1}:00`,
-      available: (!existingReservation || existingReservation.status === 'cancelled') && !isBlockedByOpenPlay,
-      reservation: existingReservation || null,
+      // FIXED: Use correct availability logic for START times
+      available: !occupyingReservation && !isBlockedByOpenPlay,
+      // NEW: Add separate field for END time availability
+      availableAsEndTime: canBeEndTime && !isBlockedByOpenPlay,
+      reservation: occupyingReservation || null,
       blockedByOpenPlay: isBlockedByOpenPlay,
       openPlayEvent: openPlayEvent ? {
         id: openPlayEvent._id,
@@ -210,7 +247,19 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
       } : null,
       weather,
       weatherSuitability
-    });
+    };
+
+    // Special logging for hour 17 to debug frontend issue
+    if (hour === 17) {
+      console.log(`🔍 BACKEND RESPONSE DATA for Hour 17:`);
+      console.log(`  - hour:`, slotData.hour);
+      console.log(`  - available:`, slotData.available);
+      console.log(`  - availableAsEndTime:`, slotData.availableAsEndTime);
+      console.log(`  - canBeEndTime value was:`, canBeEndTime);
+      console.log(`  - isBlockedByOpenPlay:`, isBlockedByOpenPlay);
+    }
+
+    timeSlots.push(slotData);
   }
 
   res.status(200).json({

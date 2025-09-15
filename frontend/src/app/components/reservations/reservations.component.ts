@@ -21,6 +21,7 @@ interface TimeSlot {
   hour: number;
   display: string;
   available: boolean;
+  availableAsEndTime?: boolean;  // NEW: Separate availability for end times
   isPeak: boolean;
   blockedByOpenPlay?: boolean;
   openPlayEvent?: {
@@ -149,7 +150,7 @@ interface Reservation {
             <!-- End Time Buttons -->
             <div class="time-selection" *ngIf="selectedStartTime">
               <h4>End Time</h4>
-              <div class="time-buttons">
+              <div class="time-buttons" *ngIf="availableEndTimes.length > 0">
                 <button
                   *ngFor="let slot of availableEndTimes"
                   type="button"
@@ -162,6 +163,66 @@ interface Reservation {
                   <span class="rate-type">{{ slot.isPeak ? 'Peak' : 'Regular' }}</span>
                 </button>
               </div>
+
+              <!-- Message when no end times available -->
+              <div class="no-end-times-message" *ngIf="availableEndTimes.length === 0 && selectedStartTime">
+                <p><strong>No consecutive time slots available</strong> after {{ selectedStartTime }}:00</p>
+                <p>Court reservations require consecutive time blocks. The next hour ({{ selectedStartTime + 1 }}:00) is unavailable.</p>
+
+                <!-- Debug Information Panel -->
+                <div class="debug-panel" style="background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 8px; font-family: monospace; font-size: 12px;">
+                  <h4 style="margin: 0 0 10px 0; color: #333;">🔍 Debug Information:</h4>
+
+                  <div><strong>Selected Date:</strong> {{ selectedDate | date:'yyyy-MM-dd' }}</div>
+                  <div><strong>Selected Start Time:</strong> {{ selectedStartTime }}:00</div>
+                  <div><strong>Blocked Hour:</strong> {{ selectedStartTime + 1 }}:00</div>
+
+                  <div style="margin-top: 10px;">
+                    <strong>Time Slots Data (from backend):</strong>
+                    <div *ngFor="let slot of timeSlots" style="margin: 2px 0;">
+                      <span [style.color]="slot.available ? 'green' : 'red'">
+                        {{ slot.hour }}:00 - START: {{ slot.available ? 'AVAILABLE' : 'BLOCKED' }}
+                      </span>
+                      <span *ngIf="slot.availableAsEndTime !== undefined"
+                            [style.color]="slot.availableAsEndTime ? 'green' : 'red'">
+                        | END: {{ slot.availableAsEndTime ? 'AVAILABLE' : 'BLOCKED' }}
+                      </span>
+                      <span *ngIf="slot.blockedByOpenPlay" style="color: orange;"> (Open Play)</span>
+                      <span *ngIf="!slot.available && !slot.blockedByOpenPlay" style="color: red;"> (Existing Reservation)</span>
+                    </div>
+                  </div>
+
+                  <div style="margin-top: 10px;" *ngIf="existingReservations.length > 0">
+                    <strong>Existing Reservations for this Date:</strong>
+                    <div *ngFor="let res of existingReservations" style="margin: 2px 0; padding: 5px; background: #fff; border-radius: 4px;">
+                      <span>{{ res.timeSlotDisplay || (res.timeSlot + ':00 - ' + ((res.endTimeSlot || res.timeSlot + 1) + ':00')) }}</span>
+                      <span style="color: #666;"> | Status: {{ res.status }}</span>
+                      <span style="color: #666;"> | Players: {{ res.players.join(', ') }}</span>
+                    </div>
+                  </div>
+
+                  <div style="margin-top: 10px; padding: 10px; background: #fff; border-radius: 4px;">
+                    <strong>Why {{ selectedStartTime + 1 }}:00 is unavailable:</strong>
+                    <div [ngSwitch]="getUnavailabilityReason(selectedStartTime + 1)">
+                      <div *ngSwitchCase="'open_play'" style="color: orange;">
+                        🎾 Open Play event is scheduled for this time
+                      </div>
+                      <div *ngSwitchCase="'reservation'" style="color: red;">
+                        📅 Existing reservation blocks this time slot
+                      </div>
+                      <div *ngSwitchCase="'unknown'" style="color: gray;">
+                        ❓ Slot marked as unavailable (unknown reason)
+                      </div>
+                      <div *ngSwitchDefault style="color: green;">
+                        ✅ Should be available - this might be a bug!
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <p><em>If you believe this is an error, please contact support with the debug information above.</em></p>
+              </div>
+
               <small
                 class="error"
                 *ngIf="
@@ -827,6 +888,7 @@ export class ReservationsComponent implements OnInit, OnDestroy {
   }
 
   selectStartTime(hour: number): void {
+    console.log('🔍 selectStartTime() called with hour:', hour);
     this.selectedStartTime = hour;
     this.selectedEndTime = null; // Reset end time when start time changes
 
@@ -834,6 +896,7 @@ export class ReservationsComponent implements OnInit, OnDestroy {
     this.reservationForm.get('startTime')?.setValue(hour);
     this.reservationForm.get('endTime')?.setValue('');
 
+    console.log('🔍 About to call updateAvailableEndTimes()');
     // Update available end times
     this.updateAvailableEndTimes();
 
@@ -894,39 +957,108 @@ export class ReservationsComponent implements OnInit, OnDestroy {
   }
 
   updateAvailableEndTimes(): void {
+    console.log('🔍 updateAvailableEndTimes() called');
+    console.log('🔍 selectedStartTime:', this.selectedStartTime);
+    console.log('🔍 selectedDate:', this.selectedDate);
+    console.log('🔍 timeSlots array length:', this.timeSlots.length);
+
+    // Enhanced logging for debugging specific time slots
+    console.log('🔍 Detailed timeSlots data for debugging:');
+    this.timeSlots.forEach(slot => {
+      console.log(`  Hour ${slot.hour}: available=${slot.available}, availableAsEndTime=${slot.availableAsEndTime}, blocked=${slot.blockedByOpenPlay}, isPeak=${slot.isPeak}`);
+    });
+
     if (!this.selectedStartTime) {
       this.availableEndTimes = [];
+      console.log('❌ No selectedStartTime, returning empty availableEndTimes');
       return;
     }
 
     this.availableEndTimes = [];
 
-    // Find consecutive available slots starting from selectedStartTime + 1
-    // Court closes at 10:00 PM, so latest end time is 22:00 (10:00 PM)
+    // CRITICAL FIX: Restore proper consecutive booking logic
+    // Court reservations must be consecutive - no gaps allowed
+    console.log('🔍 Checking consecutive hours starting from', this.selectedStartTime + 1);
+
     for (let hour = this.selectedStartTime + 1; hour <= 22; hour++) {
-      // For hours within the start time slots (5-21), check availability
+      console.log(`🔍 Checking hour ${hour} for consecutive availability`);
+
       if (hour <= 21) {
+        // For regular operating hours (5-21), check END TIME availability
         const slot = this.timeSlots.find((s) => s.hour === hour);
-        if (slot && slot.available) {
+        console.log(`🔍 Hour ${hour} slot:`, slot);
+
+        // FIXED: Use availableAsEndTime for end time calculations
+        const canUseAsEndTime = slot && (slot.availableAsEndTime !== undefined ? slot.availableAsEndTime : slot.available);
+
+        // Special logging for hour 17
+        if (hour === 17) {
+          console.log(`🔍 SPECIAL DEBUG for Hour 17:`);
+          console.log(`  - slot:`, slot);
+          console.log(`  - slot.available:`, slot?.available);
+          console.log(`  - slot.availableAsEndTime:`, slot?.availableAsEndTime);
+          console.log(`  - canUseAsEndTime:`, canUseAsEndTime);
+        }
+
+        if (canUseAsEndTime) {
+          console.log(`✅ Hour ${hour} is available as END TIME - adding to end times`);
           this.availableEndTimes.push({
             hour: hour,
             display: `${hour}:00`,
             available: true,
             isPeak: slot.isPeak,
           });
+
+          // Log why this slot is available as end time
+          if (slot.available !== slot.availableAsEndTime) {
+            console.log(`📋 Hour ${hour}: available=${slot.available}, availableAsEndTime=${slot.availableAsEndTime}`);
+          }
         } else {
-          // Stop at first unavailable slot to ensure consecutive booking
+          console.log(`❌ Hour ${hour} is NOT available as END TIME - STOPPING consecutive check`);
+          if (slot) {
+            console.log(`   Slot details: available=${slot.available}, availableAsEndTime=${slot.availableAsEndTime}, blocked=${slot.blockedByOpenPlay}`);
+            if (slot.openPlayEvent) {
+              console.log(`   Open Play event: ${slot.openPlayEvent.title} (${slot.openPlayEvent.status})`);
+            }
+          } else {
+            console.log(`   No slot found for hour ${hour}`);
+          }
+
+          // CRITICAL: Stop at first unavailable slot for consecutive booking
+          console.log('🛑 Breaking consecutive check - no more end times will be available');
           break;
         }
       } else if (hour === 22) {
-        // Always allow 22:00 (10:00 PM) as end time since it's court closing
-        this.availableEndTimes.push({
-          hour: hour,
-          display: `${hour}:00`,
-          available: true,
-          isPeak: false, // 22:00 is not in peak hours
-        });
+        // Special case: 22:00 (court closing time) - only add if previous hour (21:00) was available
+        console.log('🔍 Checking 22:00 as potential court closing end time');
+        if (this.availableEndTimes.length > 0) {
+          console.log('✅ Adding 22:00 as court closing end time');
+          this.availableEndTimes.push({
+            hour: hour,
+            display: `${hour}:00`,
+            available: true,
+            isPeak: false, // 22:00 is not in peak hours
+          });
+        } else {
+          console.log('❌ Cannot add 22:00 - no consecutive slots available before it');
+        }
       }
+    }
+
+    // Enhanced debugging for the final result
+    console.log('🔍 FINAL RESULT:');
+    console.log(`   Selected start time: ${this.selectedStartTime}:00`);
+    console.log(`   Available end times: [${this.availableEndTimes.map(t => t.hour + ':00').join(', ')}]`);
+    console.log(`   Total end time options: ${this.availableEndTimes.length}`);
+
+    if (this.availableEndTimes.length === 0) {
+      console.log('⚠️ WARNING: No end times available!');
+      console.log('   This means the first hour after start time is unavailable');
+      console.log('   Possible causes:');
+      console.log('   - Existing reservation blocking the next hour');
+      console.log('   - Open Play event scheduled for the next hour');
+      console.log('   - Court closing time reached');
+      console.log('   - Backend data inconsistency');
     }
   }
 
@@ -999,26 +1131,32 @@ export class ReservationsComponent implements OnInit, OnDestroy {
     this.http.get<any>(`${this.apiUrl}/reservations/date/${dateStr}`).subscribe({
       next: (response) => {
         console.log('🔍 API response for date', dateStr, ':', response);
+        console.log('🔍 Full API response structure:', JSON.stringify(response, null, 2));
         this.existingReservations = response.data?.reservations || [];
-        
+        console.log('🔍 Existing reservations loaded:', this.existingReservations.length);
+
         // Use backend time slots data that includes Open Play blocking
         if (response.data?.timeSlots) {
           console.log('✅ Backend provided timeSlots data, using it instead of local generation');
           console.log('📊 Backend timeSlots count:', response.data.timeSlots.length);
+          console.log('🔍 Backend timeSlots raw data:', response.data.timeSlots);
           console.log('🚫 Backend blocked slots:', response.data.timeSlots.filter((s: any) => s.blockedByOpenPlay).length);
-          
+
           this.timeSlots = response.data.timeSlots.map((backendSlot: any) => ({
             hour: backendSlot.hour,
             display: `${backendSlot.hour}:00 - ${backendSlot.hour + 1}:00`,
             available: backendSlot.available,
+            availableAsEndTime: backendSlot.availableAsEndTime, // CRITICAL: Include the availableAsEndTime field from backend
             isPeak: this.peakHours.includes(backendSlot.hour),
             blockedByOpenPlay: backendSlot.blockedByOpenPlay || false,
             openPlayEvent: backendSlot.openPlayEvent || null
           }));
-          
+
           // Log specific slots for debugging
           const blockedSlots = this.timeSlots.filter(s => s.blockedByOpenPlay);
           console.log('🚫 Processed blocked slots:', blockedSlots.map(s => s.hour));
+          const unavailableSlots = this.timeSlots.filter(s => !s.available);
+          console.log('❌ All unavailable slots:', unavailableSlots.map(s => ({ hour: s.hour, blocked: s.blockedByOpenPlay, available: s.available })));
           console.log('🔍 Updated time slots with Open Play blocking:', this.timeSlots);
         } else {
           console.log('❌ No timeSlots in backend response, falling back to local generation');
@@ -1584,5 +1722,34 @@ export class ReservationsComponent implements OnInit, OnDestroy {
     }
 
     return offPeakHours * this.getNonMemberCount() * 50; // ₱50 per non-member per off-peak hour
+  }
+
+  // Debug method to determine why a specific hour is unavailable
+  getUnavailabilityReason(hour: number): string {
+    const slot = this.timeSlots.find(s => s.hour === hour);
+
+    if (!slot) {
+      return 'unknown';
+    }
+
+    if (slot.available) {
+      return 'available';
+    }
+
+    if (slot.blockedByOpenPlay) {
+      return 'open_play';
+    }
+
+    // Check if there's an existing reservation for this hour
+    const conflictingReservation = this.existingReservations.find(res => {
+      const endTimeSlot = res.endTimeSlot || (res.timeSlot + (res.duration || 1));
+      return hour >= res.timeSlot && hour < endTimeSlot && res.status !== 'cancelled';
+    });
+
+    if (conflictingReservation) {
+      return 'reservation';
+    }
+
+    return 'unknown';
   }
 }
