@@ -1036,9 +1036,9 @@ export const getFinancialReport = asyncHandler(async (req: AuthenticatedRequest,
     try {
       const serviceFeePercentage = 0.10; // 10% service fee
       
-      // Get all completed and recorded payments (excluding coins)
-      const serviceablePayments = await Payment.find({ 
-        status: { $in: ['completed', 'record'] },
+      // Get only recorded payments (excluding coins) - App Service Fee only applies to recorded payments
+      const serviceablePayments = await Payment.find({
+        status: 'record',
         paymentMethod: { $ne: 'coins' }
       });
       
@@ -1133,10 +1133,10 @@ export const forceRefreshFinancialReport = asyncHandler(async (req: Authenticate
     const totalRecordedAmount = recordedPayments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
     console.log(`💰 Found ${recordedPayments.length} recorded payments totaling ₱${totalRecordedAmount}`);
     
-    // Calculate App Service Fee from all completed and recorded payments
+    // Calculate App Service Fee from only recorded payments - service fee only applies to recorded payments
     const serviceFeePercentage = 0.10; // 10% service fee
-    const serviceablePayments = await Payment.find({ 
-      status: { $in: ['completed', 'record'] },
+    const serviceablePayments = await Payment.find({
+      status: 'record',
       paymentMethod: { $ne: 'coins' }
     });
     

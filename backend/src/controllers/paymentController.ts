@@ -95,6 +95,14 @@ async function updateFinancialReportCourtReceipts(): Promise<void> {
     
     const fileContent = fs.readFileSync(dataPath, 'utf8');
     const financialData = JSON.parse(fileContent);
+
+    // Ensure manual values are preserved
+    const advancesIndex = financialData.receiptsCollections.findIndex((item: any) =>
+      item.description === 'Advances'
+    );
+    if (advancesIndex !== -1) {
+      financialData.receiptsCollections[advancesIndex].amount = 0; // Keep manual value
+    }
     
     // Find and update Tennis Court Usage Receipts
     const courtReceiptsIndex = financialData.receiptsCollections.findIndex((item: any) => 
@@ -104,8 +112,8 @@ async function updateFinancialReportCourtReceipts(): Promise<void> {
     if (courtReceiptsIndex !== -1) {
       const oldAmount = financialData.receiptsCollections[courtReceiptsIndex].amount;
       
-      // Get baseline amount from Google Sheets dynamically
-      const baselineAmount = await getGoogleSheetsBaselineAmount();
+      // Use manual baseline amount (no Google Sheets integration)
+      const baselineAmount = 69705; // Manual baseline amount
       const newAmount = baselineAmount + totalCourtReceipts;
       
       financialData.receiptsCollections[courtReceiptsIndex].amount = newAmount;
@@ -113,23 +121,23 @@ async function updateFinancialReportCourtReceipts(): Promise<void> {
       // Recalculate total receipts
       financialData.totalReceipts = financialData.receiptsCollections.reduce((sum: number, item: any) => sum + item.amount, 0);
       
-      // Ensure App Service Fee is preserved in disbursements
-      let appServiceFee = 103.20; // Use the known correct amount
+      // Calculate App Service Fee based on recorded payments only (10% of recorded payments)
+      const appServiceFee = totalCourtReceipts * 0.10;
       const appServiceFeeIndex = financialData.disbursementsExpenses.findIndex(
         (item: any) => item.description === 'App Service Fee'
       );
-      
+
       if (appServiceFeeIndex === -1) {
         // Add App Service Fee if it doesn't exist
         financialData.disbursementsExpenses.push({
           description: 'App Service Fee',
           amount: appServiceFee
         });
-        console.log('💰 Added missing App Service Fee to financial report');
+        console.log(`💰 Added App Service Fee to financial report: ₱${appServiceFee.toFixed(2)}`);
       } else {
-        // Preserve existing App Service Fee amount
-        appServiceFee = financialData.disbursementsExpenses[appServiceFeeIndex].amount;
-        console.log(`💰 Preserved existing App Service Fee: ₱${appServiceFee}`);
+        // Update App Service Fee amount
+        financialData.disbursementsExpenses[appServiceFeeIndex].amount = appServiceFee;
+        console.log(`💰 Updated App Service Fee: ₱${appServiceFee.toFixed(2)}`);
       }
       
       // Recalculate total disbursements to include App Service Fee

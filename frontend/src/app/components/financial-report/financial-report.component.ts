@@ -88,15 +88,6 @@ interface FinancialStatementData {
               <span class="next-update">Next: {{ nextUpdateCountdown }}s</span>
             </div>
           </div>
-          <button mat-icon-button (click)="forceRefreshData()" class="force-refresh-btn" [disabled]="loading" title="Force Refresh from Google Sheets">
-            <mat-icon [class.spin]="loading">cloud_download</mat-icon>
-          </button>
-          <button mat-icon-button (click)="toggleAutoRefresh()" [class.active]="autoRefreshEnabled" title="Toggle Auto-refresh">
-            <mat-icon>{{ autoRefreshEnabled ? 'sync' : 'sync_disabled' }}</mat-icon>
-          </button>
-          <button mat-icon-button (click)="refreshData()" class="refresh-btn" [disabled]="loading" title="Refresh Data">
-            <mat-icon [class.spin]="loading">refresh</mat-icon>
-          </button>
         </div>
       </div>
 
@@ -348,23 +339,6 @@ export class FinancialReportComponent implements OnInit, OnDestroy {
     this.countdownSubscription?.unsubscribe();
   }
 
-  toggleAutoRefresh(): void {
-    this.autoRefreshEnabled = !this.autoRefreshEnabled;
-    
-    if (this.autoRefreshEnabled) {
-      this.startAutoRefresh();
-      this.snackBar.open('🔄 Auto-refresh enabled', 'Close', {
-        duration: 2000,
-        panelClass: ['success-snack']
-      });
-    } else {
-      this.stopAutoRefresh();
-      this.snackBar.open('⏸️ Auto-refresh disabled', 'Close', {
-        duration: 2000,
-        panelClass: ['info-snack']
-      });
-    }
-  }
 
   getTimeAgo(dateString: string): string {
     const now = new Date().getTime();
@@ -474,46 +448,4 @@ export class FinancialReportComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Force refresh financial data bypassing cache
-   */
-  forceRefreshData(): void {
-    console.log('🔄 Force refresh requested');
-    this.loading = true;
-    this.error = null;
-
-    const headers = new HttpHeaders({
-      'Authorization': `Bearer ${this.authService.token}`
-    });
-
-    this.http.post<FinancialAPIResponse>(
-      `${this.apiUrl}/reports/financial-sheet/force-refresh`,
-      {},
-      { headers }
-    ).subscribe({
-      next: (response) => {
-        if (response.success) {
-          this.financialData = response.data;
-          this.lastUpdated = response.metadata?.lastModified || response.data.lastUpdated;
-          
-          this.snackBar.open('🔄 Data force refreshed from Google Sheets!', 'Close', {
-            duration: 4000,
-            panelClass: ['success-snack']
-          });
-        } else {
-          this.error = response.message || 'Failed to force refresh financial statement';
-        }
-        this.loading = false;
-      },
-      error: (error) => {
-        console.error('Error force refreshing financial statement:', error);
-        this.error = error.error?.message || 'Failed to force refresh financial statement';
-        this.loading = false;
-        this.snackBar.open('Error force refreshing financial statement', 'Close', {
-          duration: 5000,
-          panelClass: ['error-snack']
-        });
-      }
-    });
-  }
 }
