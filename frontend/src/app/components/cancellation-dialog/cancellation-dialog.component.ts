@@ -44,7 +44,7 @@ export interface CancellationResult {
           <mat-icon>cancel</mat-icon>
         </div>
         <div class="header-text">
-          <h2>{{data.isReservationCancellation ? 'Cancel Reservation' : 'Cancel Payment'}}</h2>
+          <h2>Cancel Reservation</h2>
           <p class="payment-details">
             {{data.paymentAmount}} for {{data.reservationDate}} at {{data.reservationTime}}
           </p>
@@ -56,7 +56,7 @@ export interface CancellationResult {
         <form [formGroup]="cancellationForm" class="cancellation-form">
           
           <div class="question-section">
-            <h3>Why are you cancelling this payment?</h3>
+            <h3>Why are you cancelling this reservation?</h3>
             <p class="help-text">Please select the reason for cancellation to help us improve our service.</p>
           </div>
 
@@ -121,7 +121,7 @@ export interface CancellationResult {
           class="confirm-cancel-btn">
           <mat-icon>cancel</mat-icon>
           <span class="button-text">
-            <span class="button-title">Cancel Payment</span>
+            <span class="button-title">Cancel Reservation</span>
             <span class="button-subtitle">Process refund</span>
           </span>
         </button>
@@ -300,6 +300,8 @@ export interface CancellationResult {
       align-items: center;
       gap: 16px;
       margin: 0 !important;
+      box-sizing: border-box;
+      width: 100%;
       
       .cancel-action-btn {
         background: #4caf50;
@@ -409,54 +411,278 @@ export interface CancellationResult {
         min-width: auto;
         width: 100%;
         max-width: 100%;
+        margin: 0;
+        max-height: 85vh;
+        overflow-y: auto;
       }
-      
+
       .dialog-header {
-        flex-direction: column;
-        text-align: center;
-        gap: 12px;
-      }
-      
-      .reason-content {
         flex-direction: row;
         text-align: left;
         gap: 12px;
-        align-items: flex-start;
+        padding: 12px 16px !important;
+
+        .header-icon {
+          width: 36px;
+          height: 36px;
+
+          mat-icon {
+            font-size: 20px;
+            width: 20px;
+            height: 20px;
+          }
+        }
+
+        .header-text {
+          h2 {
+            font-size: 18px;
+            margin: 0 0 2px 0;
+          }
+
+          .payment-details {
+            font-size: 13px;
+          }
+        }
       }
-      
-      .dialog-actions {
-        flex-direction: row !important;
-        justify-content: space-between;
-        gap: 12px;
-        
-        .cancel-action-btn {
-          min-width: 140px;
-          min-height: 50px;
-          flex: 1;
-          
-          .button-text {
-            .button-title {
-              font-size: 13px;
+
+      .dialog-content {
+        padding: 12px 16px !important;
+
+        .question-section {
+          margin-bottom: 16px;
+
+          h3 {
+            font-size: 15px;
+            margin: 0 0 6px 0;
+          }
+
+          .help-text {
+            font-size: 13px;
+          }
+        }
+      }
+
+      .reason-selection {
+        margin: 16px 0;
+
+        .reason-radio-group {
+          gap: 8px;
+        }
+
+        .reason-option {
+          .reason-content {
+            padding: 12px 12px 12px 0;
+            gap: 10px;
+
+            .reason-icon {
+              width: 20px;
+              height: 20px;
+
+              mat-icon {
+                font-size: 18px;
+                width: 18px;
+                height: 18px;
+              }
             }
-            
-            .button-subtitle {
-              font-size: 10px;
+
+            .reason-text {
+              .reason-title {
+                font-size: 13px;
+              }
+
+              .reason-description {
+                font-size: 11px;
+              }
             }
           }
         }
-        
-        .confirm-cancel-btn {
-          min-width: 140px;
-          min-height: 50px;
-          flex: 1;
-          
+      }
+
+      .custom-reason-section {
+        margin-top: 16px;
+
+        mat-divider {
+          margin-bottom: 16px;
+        }
+      }
+
+      .dialog-actions {
+        flex-direction: row !important;
+        justify-content: space-between;
+        gap: 4px;
+        padding: 12px 16px !important;
+        flex-wrap: nowrap;
+        position: sticky;
+        bottom: 0;
+        background: white;
+        border-top: 1px solid #e0e0e0;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+
+        .cancel-action-btn {
+          min-width: 100px;
+          min-height: 48px;
+          flex: 0 0 auto;
+          max-width: 45%;
+          font-size: 12px;
+          padding: 8px 10px;
+          box-sizing: border-box;
+
+          mat-icon {
+            font-size: 18px;
+            width: 18px;
+            height: 18px;
+          }
+
           .button-text {
             .button-title {
-              font-size: 13px;
-            }
-            
-            .button-subtitle {
               font-size: 10px;
+              font-weight: 600;
+            }
+
+            .button-subtitle {
+              font-size: 8px;
+              display: none;
+            }
+          }
+        }
+
+        .confirm-cancel-btn {
+          min-width: 100px;
+          min-height: 48px;
+          flex: 0 0 auto;
+          max-width: 45%;
+          font-size: 12px;
+          padding: 8px 10px;
+          box-sizing: border-box;
+
+          mat-icon {
+            font-size: 18px;
+            width: 18px;
+            height: 18px;
+          }
+
+          .button-text {
+            .button-title {
+              font-size: 10px;
+              font-weight: 600;
+            }
+
+            .button-subtitle {
+              font-size: 8px;
+              display: none;
+            }
+          }
+        }
+      }
+    }
+
+    @media (max-width: 480px) {
+      .cancellation-dialog {
+        width: calc(100vw - 16px);
+        max-width: calc(100vw - 16px);
+        max-height: 90vh;
+      }
+
+      .dialog-header {
+        padding: 10px 12px !important;
+
+        .header-icon {
+          width: 32px;
+          height: 32px;
+
+          mat-icon {
+            font-size: 18px;
+            width: 18px;
+            height: 18px;
+          }
+        }
+
+        .header-text {
+          h2 {
+            font-size: 16px;
+          }
+
+          .payment-details {
+            font-size: 12px;
+          }
+        }
+      }
+
+      .dialog-content {
+        padding: 10px 12px !important;
+
+        .question-section {
+          margin-bottom: 12px;
+
+          h3 {
+            font-size: 14px;
+            margin: 0 0 4px 0;
+          }
+
+          .help-text {
+            font-size: 12px;
+          }
+        }
+      }
+
+      .reason-selection {
+        margin: 12px 0;
+
+        .reason-radio-group {
+          gap: 6px;
+        }
+
+        .reason-option {
+          .reason-content {
+            padding: 10px 10px 10px 0;
+            gap: 8px;
+
+            .reason-text {
+              .reason-title {
+                font-size: 12px;
+              }
+
+              .reason-description {
+                font-size: 10px;
+              }
+            }
+          }
+        }
+      }
+
+      .dialog-actions {
+        flex-direction: row !important;
+        gap: 3px;
+        padding: 10px 12px !important;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+
+        .cancel-action-btn,
+        .confirm-cancel-btn {
+          min-width: 90px;
+          max-width: 45%;
+          flex: 0 0 auto;
+          min-height: 44px;
+          padding: 6px 8px;
+          box-sizing: border-box;
+
+          mat-icon {
+            font-size: 16px;
+            width: 16px;
+            height: 16px;
+          }
+
+          .button-text {
+            .button-title {
+              font-size: 11px;
+              font-weight: 600;
+            }
+
+            .button-subtitle {
+              display: none;
             }
           }
         }

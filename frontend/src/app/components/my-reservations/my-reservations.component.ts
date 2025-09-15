@@ -103,6 +103,22 @@ interface Reservation {
               
               <div *ngIf="!loading" class="reservations-list">
                 <div *ngFor="let reservation of upcomingReservations" class="reservation-card-compact">
+                  <!-- Mobile Action Buttons (Upper Right Corner) -->
+                  <div class="card-actions-mobile" *ngIf="isMobileView">
+                    <button mat-icon-button class="action-btn edit-btn"
+                            (click)="editReservation(reservation)"
+                            [disabled]="!canEdit(reservation)"
+                            matTooltip="Edit">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button mat-icon-button class="action-btn cancel-btn"
+                            (click)="cancelReservation(reservation)"
+                            [disabled]="!canCancel(reservation)"
+                            matTooltip="Cancel">
+                      <mat-icon>cancel</mat-icon>
+                    </button>
+                  </div>
+
                   <div class="card-left">
                     <div class="date-badge">
                       <span class="date-day">{{getDay(reservation.date)}}</span>
@@ -135,14 +151,15 @@ interface Reservation {
                         </span>
                       </span>
                     </div>
-                    <div class="card-actions">
-                      <button mat-icon-button class="action-btn edit-btn" 
+                    <!-- Desktop Action Buttons (Bottom Right) -->
+                    <div class="card-actions" *ngIf="!isMobileView">
+                      <button mat-icon-button class="action-btn edit-btn"
                               (click)="editReservation(reservation)"
                               [disabled]="!canEdit(reservation)"
                               matTooltip="Edit">
                         <mat-icon>edit</mat-icon>
                       </button>
-                      <button mat-icon-button class="action-btn cancel-btn" 
+                      <button mat-icon-button class="action-btn cancel-btn"
                               (click)="cancelReservation(reservation)"
                               [disabled]="!canCancel(reservation)"
                               matTooltip="Cancel">
