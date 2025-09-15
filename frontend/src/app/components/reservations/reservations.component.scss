@@ -191,18 +191,24 @@
         }
       }
 
-      // Mobile: Show custom background calendar icon
+      // Mobile: Remove custom background - let browser handle it natively
       @media (max-width: 768px) {
-        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667eea' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3crect x='3' y='4' width='18' height='18' rx='2' ry='2'%3e%3c/rect%3e%3cline x1='16' y1='2' x2='16' y2='6'%3e%3c/line%3e%3cline x1='8' y1='2' x2='8' y2='6'%3e%3c/line%3e%3cline x1='3' y1='10' x2='21' y2='10'%3e%3c/line%3e%3c/svg%3e");
-        background-repeat: no-repeat;
-        background-position: right 1rem center;
-        background-size: 24px 24px;
-        padding-right: 3.5rem;
         min-height: 56px; /* Larger touch target for mobile */
         font-size: 16px; /* Prevent zoom on iOS */
 
-        &:focus {
-          background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3crect x='3' y='4' width='18' height='18' rx='2' ry='2'%3e%3c/rect%3e%3cline x1='16' y1='2' x2='16' y2='6'%3e%3c/line%3e%3cline x1='8' y1='2' x2='8' y2='6'%3e%3c/line%3e%3cline x1='3' y1='10' x2='21' y2='10'%3e%3c/line%3e%3c/svg%3e");
+        // Remove any background images that might be causing the multiple icons
+        background-image: none !important;
+        background-repeat: no-repeat;
+
+        // Let webkit handle the calendar icon natively
+        &::-webkit-calendar-picker-indicator {
+          opacity: 1;
+          cursor: pointer;
+          // Reset any conflicting styles
+          position: static;
+          width: auto;
+          height: auto;
+          z-index: auto;
         }
       }
 
