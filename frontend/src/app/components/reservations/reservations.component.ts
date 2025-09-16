@@ -106,8 +106,17 @@ interface Reservation {
             </small>
           </div>
 
-          <!-- Time Range Selection -->
-          <div class="time-range-section">
+          <!-- Date Selection Prompt (when no date selected) -->
+          <div class="date-selection-prompt" *ngIf="!selectedDate">
+            <div class="prompt-content">
+              <div class="prompt-icon">📅</div>
+              <h3>Select a Date First</h3>
+              <p>Please choose a date above to see available time slots for court reservation.</p>
+            </div>
+          </div>
+
+          <!-- Time Range Selection (only shown when date is selected) -->
+          <div class="time-range-section" *ngIf="selectedDate">
             <h3>Select Time Range *</h3>
 
             <!-- Start Time Buttons -->
@@ -882,6 +891,24 @@ export class ReservationsComponent implements OnInit, OnDestroy {
       this.selectedDate = this.minDate;
     } else {
       this.selectedDate = selectedDate;
+    }
+
+    // Reset time selections when date changes (except in edit mode)
+    if (!this.isEditMode) {
+      this.selectedStartTime = null;
+      this.selectedEndTime = null;
+      this.availableEndTimes = [];
+      this.calculatedFee = 0;
+
+      // Clear form controls for time selection
+      this.reservationForm.patchValue({
+        startTime: '',
+        endTime: ''
+      });
+
+      // Reset credit calculations
+      this.willUseCredits = false;
+      this.creditAmountToUse = 0;
     }
 
     this.loadReservationsForDate();
