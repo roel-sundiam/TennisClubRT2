@@ -49,9 +49,11 @@ export class AuthService {
   private apiUrl = environment.apiUrl;
   private currentUserSubject = new BehaviorSubject<User | null>(null);
   private tokenSubject = new BehaviorSubject<string | null>(null);
+  private isLoadingSubject = new BehaviorSubject<boolean>(true);
 
   public currentUser$ = this.currentUserSubject.asObservable();
   public token$ = this.tokenSubject.asObservable();
+  public isLoading$ = this.isLoadingSubject.asObservable();
 
   constructor(
     private http: HttpClient,
@@ -60,12 +62,13 @@ export class AuthService {
     // Check for existing token on service initialization
     const token = localStorage.getItem('token');
     const userString = localStorage.getItem('user');
-    
+
     if (token && userString && userString !== 'undefined' && userString !== 'null') {
       try {
         const user = JSON.parse(userString);
         this.tokenSubject.next(token);
         this.currentUserSubject.next(user);
+        console.log('🔐 Restored auth state from localStorage:', user.username);
       } catch (error) {
         console.error('Error parsing user from localStorage:', error);
         // Clear invalid data
@@ -73,9 +76,16 @@ export class AuthService {
         localStorage.removeItem('user');
       }
     }
+
+    // Set loading to false after initialization
+    setTimeout(() => {
+      this.isLoadingSubject.next(false);
+      console.log('✅ Auth service initialization complete');
+    }, 0);
   }
 
   login(credentials: LoginRequest): Observable<AuthResponse> {
+    this.isLoadingSubject.next(true);
     return this.http.post<AuthResponse>(`${this.apiUrl}/auth/login`, credentials)
       .pipe(
         tap((response: any) => {
@@ -83,7 +93,7 @@ export class AuthService {
           // Backend returns: { success: true, data: { token, user }, message }
           const token = response.data?.token || response.token;
           const user = response.data?.user || response.user;
-          
+
           if (token && user) {
             localStorage.setItem('token', token);
             localStorage.setItem('user', JSON.stringify(user));
@@ -93,6 +103,7 @@ export class AuthService {
           } else {
             console.error('Invalid login response - missing token or user');
           }
+          this.isLoadingSubject.next(false);
         })
       );
   }
@@ -102,6 +113,7 @@ export class AuthService {
     localStorage.removeItem('user');
     this.tokenSubject.next(null);
     this.currentUserSubject.next(null);
+    this.isLoadingSubject.next(false);
     this.router.navigate(['/login']);
   }
 
@@ -115,6 +127,10 @@ export class AuthService {
 
   isAuthenticated(): boolean {
     return !!this.token;
+  }
+
+  isLoading(): boolean {
+    return this.isLoadingSubject.value;
   }
 
   isAdmin(): boolean {

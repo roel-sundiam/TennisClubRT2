@@ -71,16 +71,31 @@ export class PageVisitTrackerService {
     ).subscribe((event: NavigationEnd) => {
       this.handleRouteChange(event.url);
     });
+
+    // Also listen to auth loading state changes to re-check current route when loading completes
+    this.authService.isLoading$.subscribe(isLoading => {
+      if (!isLoading && this.authService.isAuthenticated()) {
+        // Auth loading completed and user is authenticated, check current route
+        setTimeout(() => {
+          const currentUrl = this.router.url;
+          if (currentUrl && currentUrl !== this.currentRoute) {
+            console.log(`🔄 Auth loading completed, checking current route: ${currentUrl}`);
+            this.handleRouteChange(currentUrl);
+          }
+        }, 100); // Small delay to ensure everything is settled
+      }
+    });
   }
 
   private handleRouteChange(url: string): void {
-    // Skip tracking if user is not authenticated
-    if (!this.authService.isAuthenticated()) {
+    // Skip tracking if user is not authenticated or auth is still loading
+    if (!this.authService.isAuthenticated() || this.authService.isLoading()) {
+      console.log(`⏸️ Skipping page visit tracking: authenticated=${this.authService.isAuthenticated()}, loading=${this.authService.isLoading()}`);
       return;
     }
 
     const now = Date.now();
-    
+
     // Avoid charging for rapid navigation or same page refreshes
     if (this.currentRoute === url && (now - this.lastVisitTime) < this.visitDebounceTime) {
       return;
@@ -90,7 +105,7 @@ export class PageVisitTrackerService {
     this.lastVisitTime = now;
 
     const pageConfig = this.getPageConfig(url);
-    
+
     // Only process if page requires coins and costs > 0
     if (pageConfig && pageConfig.requiresCoins && pageConfig.coinCost > 0) {
       console.log(`💰 Page visit: ${url} requires ${pageConfig.coinCost} coins`);

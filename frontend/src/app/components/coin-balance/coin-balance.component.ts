@@ -4,6 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatBadgeModule } from '@angular/material/badge';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
@@ -17,28 +18,41 @@ import { CoinService } from '../../services/coin.service';
     MatIconModule,
     MatButtonModule,
     MatTooltipModule,
-    MatBadgeModule
+    MatBadgeModule,
+    MatProgressSpinnerModule
   ],
   template: `
-    <div class="coin-balance-container" [class.clickable]="clickable" (click)="onClick()">
-      <mat-icon 
-        class="coin-icon" 
+    <div class="coin-balance-container" [class.clickable]="clickable" [class.loading]="isLoading" (click)="onClick()">
+      <!-- Loading spinner -->
+      <mat-spinner
+        *ngIf="isLoading"
+        class="loading-spinner"
+        diameter="20"
+        strokeWidth="3"
+        [matTooltip]="'Loading coin balance...'"
+        matTooltipPosition="below">
+      </mat-spinner>
+
+      <!-- Coin icon (hidden when loading) -->
+      <mat-icon
+        *ngIf="!isLoading"
+        class="coin-icon"
         [class.low-balance]="isLowBalance"
         [matTooltip]="tooltipText"
         matTooltipPosition="below">
         monetization_on
       </mat-icon>
-      
+
       <div class="balance-info">
-        <span class="balance-amount" [class.low-balance]="isLowBalance">
-          {{coinBalance}}
+        <span class="balance-amount" [class.low-balance]="isLowBalance" [class.loading]="isLoading">
+          {{isLoading ? '...' : coinBalance}}
         </span>
-        <span class="balance-label">Coins</span>
+        <span class="balance-label">{{isLoading ? 'Loading' : 'Coins'}}</span>
       </div>
-      
-      <!-- Low balance warning badge -->
-      <mat-icon 
-        *ngIf="isLowBalance && showLowBalanceWarning" 
+
+      <!-- Low balance warning badge (hidden when loading) -->
+      <mat-icon
+        *ngIf="!isLoading && isLowBalance && showLowBalanceWarning"
         class="warning-icon"
         matTooltip="Low coin balance! Click to purchase more coins."
         matTooltipPosition="below">
@@ -143,6 +157,25 @@ import { CoinService } from '../../services/coin.service';
     .coin-balance-container.compact .balance-label {
       font-size: 11px;
     }
+
+    /* Loading states */
+    .coin-balance-container.loading {
+      opacity: 0.8;
+    }
+
+    .loading-spinner {
+      color: #ffd700;
+    }
+
+    .balance-amount.loading {
+      color: rgba(255, 255, 255, 0.7);
+      font-style: italic;
+    }
+
+    /* Smooth transitions */
+    .balance-amount, .balance-label {
+      transition: all 0.3s ease;
+    }
   `]
 })
 export class CoinBalanceComponent implements OnInit, OnDestroy {
@@ -153,6 +186,7 @@ export class CoinBalanceComponent implements OnInit, OnDestroy {
 
   coinBalance = 0;
   isLowBalance = false;
+  isLoading = true;
   tooltipText = '';
 
   private subscriptions = new Subscription();
@@ -164,14 +198,22 @@ export class CoinBalanceComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // Initialize with current user's balance
-    this.coinBalance = this.authService.getCoinBalance();
-    this.updateBalanceStatus();
+    // Subscribe to auth loading state
+    this.subscriptions.add(
+      this.authService.isLoading$.subscribe(isLoading => {
+        this.isLoading = isLoading;
+        if (!isLoading) {
+          // Loading completed, initialize balance
+          this.coinBalance = this.authService.getCoinBalance();
+          this.updateBalanceStatus();
+        }
+      })
+    );
 
     // Subscribe to coin balance changes
     this.subscriptions.add(
       this.coinService.coinBalance$.subscribe(balance => {
-        if (this.coinBalance !== balance) { // Only update if balance actually changed
+        if (!this.isLoading && this.coinBalance !== balance) { // Only update if not loading and balance actually changed
           this.coinBalance = balance;
           this.updateBalanceStatus();
           // Update auth service with new balance (without triggering circular update)
@@ -183,24 +225,28 @@ export class CoinBalanceComponent implements OnInit, OnDestroy {
     // Subscribe to user changes (login/logout)
     this.subscriptions.add(
       this.authService.currentUser$.subscribe(user => {
-        if (user) {
-          const newBalance = user.coinBalance || 0;
-          if (this.coinBalance !== newBalance) { // Only update if balance actually changed
-            this.coinBalance = newBalance;
-            this.updateBalanceStatus();
-            // Sync with coin service (without triggering circular update)
-            this.coinService.updateBalance(this.coinBalance);
+        if (!this.isLoading) {
+          if (user) {
+            const newBalance = user.coinBalance || 0;
+            if (this.coinBalance !== newBalance) { // Only update if balance actually changed
+              this.coinBalance = newBalance;
+              this.updateBalanceStatus();
+              // Sync with coin service (without triggering circular update)
+              this.coinService.updateBalance(this.coinBalance);
+            }
+          } else {
+            this.coinBalance = 0;
+            this.isLowBalance = false;
+            this.tooltipText = 'Please log in to view coin balance';
           }
-        } else {
-          this.coinBalance = 0;
-          this.isLowBalance = false;
-          this.tooltipText = 'Please log in to view coin balance';
         }
       })
     );
 
-    // Refresh balance from server
-    this.refreshBalance();
+    // Refresh balance from server (only when not loading)
+    if (!this.isLoading) {
+      this.refreshBalance();
+    }
   }
 
   ngOnDestroy(): void {

@@ -246,38 +246,50 @@ export class CoinBalanceAlertsComponent implements OnInit, OnDestroy {
       const dismissedData = JSON.parse(dismissed);
       this.dismissedAlerts = new Map(dismissedData);
       console.log('🔍 Loaded dismissed coin alerts:', dismissedData);
-      
+
       // Clean up expired dismissals
       this.cleanupExpiredDismissals();
     }
 
-    // Initialize with current balance
-    this.currentBalance = this.authService.getCoinBalance();
-    console.log('🪙 Initial coin balance:', this.currentBalance);
-    this.updateAlerts();
+    // Wait for auth loading to complete before showing alerts
+    this.subscriptions.add(
+      this.authService.isLoading$.subscribe(isLoading => {
+        if (!isLoading) {
+          // Initialize with current balance only after loading completes
+          this.currentBalance = this.authService.getCoinBalance();
+          console.log('🪙 Initial coin balance (after loading):', this.currentBalance);
+          this.updateAlerts();
+        } else {
+          // Clear alerts while loading
+          this.activeAlerts = [];
+        }
+      })
+    );
 
-    // Subscribe to coin balance changes
+    // Subscribe to coin balance changes (only when not loading)
     this.subscriptions.add(
       this.coinService.coinBalance$.subscribe(balance => {
-        if (this.currentBalance !== balance) {
+        if (!this.authService.isLoading() && this.currentBalance !== balance) {
           this.currentBalance = balance;
           this.updateAlerts();
         }
       })
     );
 
-    // Subscribe to auth changes
+    // Subscribe to auth changes (only when not loading)
     this.subscriptions.add(
       this.authService.currentUser$.subscribe(user => {
-        if (user) {
-          const newBalance = user.coinBalance || 0;
-          if (this.currentBalance !== newBalance) {
-            this.currentBalance = newBalance;
-            this.updateAlerts();
+        if (!this.authService.isLoading()) {
+          if (user) {
+            const newBalance = user.coinBalance || 0;
+            if (this.currentBalance !== newBalance) {
+              this.currentBalance = newBalance;
+              this.updateAlerts();
+            }
+          } else {
+            this.currentBalance = 0;
+            this.activeAlerts = [];
           }
-        } else {
-          this.currentBalance = 0;
-          this.activeAlerts = [];
         }
       })
     );
