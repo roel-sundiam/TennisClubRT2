@@ -1075,9 +1075,50 @@ export const getFinancialReport = asyncHandler(async (req: AuthenticatedRequest,
     } catch (error) {
       console.warn('⚠️ Could not calculate App Service Fee for financial report:', error);
     }
-    
+
+    // Calculate recorded payments and add to Tennis Court Usage Receipts
+    try {
+      // Get recorded payments from database
+      const recordedPayments = await Payment.find({
+        status: 'record',
+        paymentMethod: { $ne: 'coins' }
+      });
+
+      const totalRecordedAmount = recordedPayments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
+
+      console.log(`💰 Found ${recordedPayments.length} recorded payments totaling ₱${totalRecordedAmount}`);
+
+      // Find Tennis Court Usage Receipts and add recorded payments
+      const courtReceiptsIndex = financialData.receiptsCollections.findIndex((item: any) =>
+        item.description === 'Tennis Court Usage Receipts'
+      );
+
+      if (courtReceiptsIndex !== -1 && totalRecordedAmount > 0) {
+        const courtReceiptsItem = financialData.receiptsCollections[courtReceiptsIndex];
+        if (courtReceiptsItem) {
+          const baselineAmount = courtReceiptsItem.amount;
+          courtReceiptsItem.amount += totalRecordedAmount;
+
+          console.log(`🧮 Updated Tennis Court Usage Receipts: baseline ₱${baselineAmount} + recorded ₱${totalRecordedAmount} = ₱${courtReceiptsItem.amount}`);
+
+          // Recalculate totals with updated receipts
+          financialData.totalReceipts = financialData.receiptsCollections.reduce(
+            (sum: number, item: any) => sum + item.amount, 0
+          );
+          financialData.netIncome = financialData.totalReceipts - financialData.totalDisbursements;
+          financialData.fundBalance = financialData.beginningBalance.amount + financialData.netIncome;
+
+          console.log(`📊 Updated totals: receipts ₱${financialData.totalReceipts}, net income ₱${financialData.netIncome}, fund balance ₱${financialData.fundBalance}`);
+        }
+      }
+
+    } catch (error) {
+      console.warn('⚠️ Could not calculate recorded payments for Tennis Court Usage Receipts:', error);
+    }
+
     // Financial data is updated directly in recordPayment/unrecordPayment functions
     // App Service Fee is now calculated and included in the disbursements
+    // Tennis Court Usage Receipts now includes recorded payments from database
     
     // Debug: Log financial statement loaded
     console.log('📊 Financial statement loaded for:', financialData.clubName);
