@@ -271,6 +271,7 @@ interface ActivityHistoryItem {
                           <mat-option value="view_schedule">View Schedule</mat-option>
                           <mat-option value="submit_suggestion">Submit Suggestion</mat-option>
                           <mat-option value="vote_poll">Vote Poll</mat-option>
+                          <mat-option value="partner_click">Partner Click</mat-option>
                         </mat-select>
                       </mat-form-field>
 
@@ -398,6 +399,166 @@ interface ActivityHistoryItem {
                   </mat-card-content>
                 </mat-card>
               </div>
+            </div>
+          </mat-tab>
+
+          <!-- Partner Engagement Tab -->
+          <mat-tab label="Partner Engagement">
+            <div class="tab-content">
+              <!-- Header Section with Summary Stats -->
+              <div class="partner-engagement-header">
+                <mat-card class="engagement-summary-card">
+                  <mat-card-content>
+                    <div class="summary-header">
+                      <div class="summary-title">
+                        <mat-icon class="summary-icon">handshake</mat-icon>
+                        <div class="title-text">
+                          <h2>Partner Engagement Overview</h2>
+                          <p>Track user interaction with club partners and measure partnership effectiveness</p>
+                        </div>
+                      </div>
+                      <div class="summary-stats" *ngIf="getTotalPartnerStats() as stats">
+                        <div class="stat-item">
+                          <span class="stat-value">{{ stats.totalClicks }}</span>
+                          <span class="stat-label">Total Clicks</span>
+                        </div>
+                        <div class="stat-divider"></div>
+                        <div class="stat-item">
+                          <span class="stat-value">{{ stats.totalUsers }}</span>
+                          <span class="stat-label">Engaged Users</span>
+                        </div>
+                        <div class="stat-divider"></div>
+                        <div class="stat-item">
+                          <span class="stat-value">{{ stats.activePartners }}</span>
+                          <span class="stat-label">Active Partners</span>
+                        </div>
+                      </div>
+                    </div>
+                  </mat-card-content>
+                </mat-card>
+              </div>
+
+              <!-- Partner Analytics Cards -->
+              <div class="partner-analytics-section" *ngIf="getPartnerClickStats().length > 0; else noPartnerData">
+                <div class="partner-cards-grid">
+                  <mat-card *ngFor="let partner of getPartnerClickStats(); let i = index"
+                           class="partner-engagement-card"
+                           [class.top-performer]="i === 0">
+
+                    <!-- Card Header with Partner Info -->
+                    <mat-card-header class="partner-card-header">
+                      <div class="partner-avatar" [class]="'partner-' + partner.type">
+                        <mat-icon>{{ getPartnerTypeIcon(partner.type) }}</mat-icon>
+                      </div>
+                      <mat-card-title-group>
+                        <mat-card-title class="partner-name">
+                          {{ partner.name }}
+                          <mat-icon *ngIf="i === 0" class="top-badge" matTooltip="Top Performing Partner">star</mat-icon>
+                        </mat-card-title>
+                        <mat-card-subtitle class="partner-category">
+                          <mat-chip class="category-chip" [class]="'chip-' + partner.type">
+                            {{ getPartnerCategoryLabel(partner.type) }}
+                          </mat-chip>
+                        </mat-card-subtitle>
+                      </mat-card-title-group>
+                    </mat-card-header>
+
+                    <!-- Metrics Section -->
+                    <mat-card-content class="partner-metrics-content">
+                      <div class="metrics-row">
+                        <div class="metric-card clicks-metric">
+                          <div class="metric-icon">
+                            <mat-icon>mouse</mat-icon>
+                          </div>
+                          <div class="metric-data">
+                            <span class="metric-value">{{ partner.clicks | number }}</span>
+                            <span class="metric-label">Total Clicks</span>
+                          </div>
+                        </div>
+
+                        <div class="metric-card users-metric">
+                          <div class="metric-icon">
+                            <mat-icon>people</mat-icon>
+                          </div>
+                          <div class="metric-data">
+                            <span class="metric-value">{{ partner.uniqueUsers | number }}</span>
+                            <span class="metric-label">Unique Users</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Engagement Rate Bar -->
+                      <div class="engagement-progress">
+                        <div class="progress-header">
+                          <span class="progress-label">Engagement Rate</span>
+                          <span class="progress-percentage">{{ getEngagementRate(partner) }}%</span>
+                        </div>
+                        <div class="progress-bar-container">
+                          <div class="progress-bar"
+                               [style.width.%]="getPartnerClickPercentage(partner.clicks)"
+                               [class]="'progress-' + partner.type">
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Additional Insights -->
+                      <div class="partner-insights">
+                        <div class="insight-item">
+                          <mat-icon class="insight-icon">trending_up</mat-icon>
+                          <span class="insight-text">{{ getClicksPerUser(partner) }} avg clicks per user</span>
+                        </div>
+                      </div>
+                    </mat-card-content>
+
+                    <!-- Action Buttons -->
+                    <mat-card-actions class="partner-actions">
+                      <button mat-stroked-button color="primary" class="action-button">
+                        <mat-icon>analytics</mat-icon>
+                        View Details
+                      </button>
+                      <button mat-stroked-button color="accent" class="action-button">
+                        <mat-icon>open_in_new</mat-icon>
+                        Visit Partner
+                      </button>
+                    </mat-card-actions>
+                  </mat-card>
+                </div>
+              </div>
+
+              <!-- Empty State -->
+              <ng-template #noPartnerData>
+                <div class="no-partner-data">
+                  <mat-card class="empty-state-card">
+                    <mat-card-content>
+                      <div class="empty-state-content">
+                        <div class="empty-state-icon">
+                          <mat-icon>handshake</mat-icon>
+                        </div>
+                        <h3>No Partner Engagement Data Yet</h3>
+                        <p>Start tracking partner engagement by having users click on partner links in the dashboard.</p>
+                        <div class="empty-state-features">
+                          <div class="feature-item">
+                            <mat-icon>analytics</mat-icon>
+                            <span>Real-time click tracking</span>
+                          </div>
+                          <div class="feature-item">
+                            <mat-icon>people</mat-icon>
+                            <span>User engagement metrics</span>
+                          </div>
+                          <div class="feature-item">
+                            <mat-icon>trending_up</mat-icon>
+                            <span>Performance insights</span>
+                          </div>
+                        </div>
+                        <button mat-raised-button color="primary" class="cta-button">
+                          <mat-icon>dashboard</mat-icon>
+                          Go to Dashboard
+                        </button>
+                      </div>
+                    </mat-card-content>
+                  </mat-card>
+                </div>
+              </ng-template>
             </div>
           </mat-tab>
         </mat-tab-group>
@@ -629,7 +790,8 @@ export class AdminAnalyticsComponent implements OnInit, OnDestroy {
       export: 'file_download',
       click_button: 'mouse',
       form_submit: 'send',
-      navigation: 'navigation'
+      navigation: 'navigation',
+      partner_click: 'handshake'
     };
     return iconMap[action] || 'help';
   }
@@ -652,23 +814,29 @@ export class AdminAnalyticsComponent implements OnInit, OnDestroy {
       export: 'Export',
       click_button: 'Button Click',
       form_submit: 'Form Submit',
-      navigation: 'Navigate'
+      navigation: 'Navigate',
+      partner_click: 'Partner Click'
     };
     return labelMap[action] || action;
   }
 
   getDetailsDisplay(details: any): string {
     if (!details) return '';
-    
+
     if (typeof details === 'string') return details;
-    
+
+    // Handle partner click details
+    if (details.partnerName && details.partnerType) {
+      return `${details.partnerName} (${details.partnerType})`;
+    }
+
     if (details.query) return `"${details.query}"`;
     if (details.button) return details.button;
     if (details.username) return details.username;
     if (details.fileName) return details.fileName;
     if (details.filterType) return `${details.filterType}: ${details.filterValue}`;
     if (details.from && details.to) return `${details.from} → ${details.to}`;
-    
+
     return JSON.stringify(details).substring(0, 50) + (JSON.stringify(details).length > 50 ? '...' : '');
   }
 
@@ -717,20 +885,82 @@ export class AdminAnalyticsComponent implements OnInit, OnDestroy {
     link.href = '/showcase/video-output/tennis-club-rt2-demo.html';
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    
+
     // Temporarily add to DOM, click, and remove
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     // Track the video demo view
-    this.analyticsService.trackButtonClick('Video Demo', 'admin-analytics', { 
+    this.analyticsService.trackButtonClick('Video Demo', 'admin-analytics', {
       action: 'view_demo_video',
       component: 'admin_analytics',
       timestamp: new Date().toISOString()
     });
-    
+
     this.showMessage('Opening video demo in new tab', 'success');
+  }
+
+  // Partner engagement analytics methods
+  getPartnerClickStats(): Array<{name: string; type: string; clicks: number; uniqueUsers: number}> {
+    if (!this.analyticsData?.partnerClickStats) return [];
+
+    // Convert backend partner click stats to the format expected by the template
+    return this.analyticsData.partnerClickStats.map(stat => ({
+      name: stat.partnerName,
+      type: stat.partnerType,
+      clicks: stat.clicks,
+      uniqueUsers: stat.uniqueUsers
+    })).sort((a, b) => b.clicks - a.clicks);
+  }
+
+  getPartnerTypeIcon(type: string): string {
+    const iconMap: Record<string, string> = {
+      food: 'restaurant',
+      equipment: 'sports_tennis',
+      general: 'handshake'
+    };
+    return iconMap[type] || 'handshake';
+  }
+
+  getPartnerClickPercentage(clicks: number): number {
+    const partnerStats = this.getPartnerClickStats();
+    if (!partnerStats.length) return 0;
+
+    const maxClicks = Math.max(...partnerStats.map(p => p.clicks));
+    return maxClicks > 0 ? (clicks / maxClicks) * 100 : 0;
+  }
+
+  // New methods for enhanced partner engagement UI
+  getTotalPartnerStats(): {totalClicks: number; totalUsers: number; activePartners: number} {
+    const partnerStats = this.getPartnerClickStats();
+    return {
+      totalClicks: partnerStats.reduce((sum, partner) => sum + partner.clicks, 0),
+      totalUsers: partnerStats.reduce((sum, partner) => sum + partner.uniqueUsers, 0),
+      activePartners: partnerStats.length
+    };
+  }
+
+  getPartnerCategoryLabel(type: string): string {
+    const categoryMap: Record<string, string> = {
+      food: 'Food & Dining',
+      equipment: 'Sports Equipment',
+      general: 'General Partner'
+    };
+    return categoryMap[type] || 'Partner';
+  }
+
+  getEngagementRate(partner: {clicks: number; uniqueUsers: number}): number {
+    // Calculate engagement rate as clicks per unique user, capped at 100%
+    if (partner.uniqueUsers === 0) return 0;
+    const rate = (partner.clicks / partner.uniqueUsers) * 20; // Scale factor for display
+    return Math.min(Math.round(rate), 100);
+  }
+
+  getClicksPerUser(partner: {clicks: number; uniqueUsers: number}): string {
+    if (partner.uniqueUsers === 0) return '0';
+    const ratio = partner.clicks / partner.uniqueUsers;
+    return ratio.toFixed(1);
   }
 
   private showMessage(message: string, type: 'success' | 'error' | 'warning'): void {

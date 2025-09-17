@@ -8,6 +8,7 @@ import { MatGridListModule } from '@angular/material/grid-list';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { AuthService, User } from '../../services/auth.service';
+import { AnalyticsService } from '../../services/analytics.service';
 import { WebSocketService, OpenPlayNotificationEvent } from '../../services/websocket.service';
 import { NotificationService } from '../../services/notification.service';
 import { PWANotificationService } from '../../services/pwa-notification.service';
@@ -617,6 +618,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   constructor(
     private authService: AuthService,
+    private analyticsService: AnalyticsService,
     private router: Router,
     private dialog: MatDialog,
     private http: HttpClient,
@@ -653,10 +655,26 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   openHelensKitchen(): void {
+    // Track partner click analytics
+    this.analyticsService.trackUserActivity('partner_click', 'dashboard', {
+      partnerName: "Helen's Kitchen",
+      partnerUrl: 'https://helens-kitchen.netlify.app/',
+      partnerType: 'food',
+      clickSource: 'partner_card'
+    });
+
     window.open('https://helens-kitchen.netlify.app/', '_blank');
   }
 
   openBaselineGearhub(): void {
+    // Track partner click analytics
+    this.analyticsService.trackUserActivity('partner_click', 'dashboard', {
+      partnerName: 'Baseline Gearhub',
+      partnerUrl: 'https://tennis-marketplace.netlify.app/',
+      partnerType: 'equipment',
+      clickSource: 'partner_card'
+    });
+
     window.open('https://tennis-marketplace.netlify.app/', '_blank');
   }
 
