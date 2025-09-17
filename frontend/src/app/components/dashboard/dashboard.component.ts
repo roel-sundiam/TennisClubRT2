@@ -527,45 +527,82 @@ import { environment } from '../../../environments/environment';
           </div>
         </div>
 
-        <!-- Sponsor Section -->
-        <div class="sponsor-section">
-          <h2 class="section-title sponsor-title">
-            <mat-icon>restaurant</mat-icon>
-            Our Club Partner
+        <!-- Partner Section -->
+        <div class="partner-section">
+          <h2 class="section-title partner-title">
+            <mat-icon>handshake</mat-icon>
+            Our Club Partners
           </h2>
-          
-          <mat-card class="sponsor-card" (click)="openHelensKitchen()">
-            <mat-card-header>
-              <img src="helens-kitchen-logo.jpg" alt="Helen's Kitchen Logo" mat-card-avatar class="sponsor-logo-header">
-              <mat-card-title>Helen's Kitchen</mat-card-title>
-              <mat-card-subtitle>Delicious Meals & Tennis Club Catering</mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="sponsor-content">
-                <p>Looking for great food after your tennis match? Check out Helen's Kitchen for authentic, delicious meals!</p>
-                <div class="sponsor-features">
-                  <div class="feature-item">
-                    <mat-icon>local_dining</mat-icon>
-                    <span>Fresh Daily Menu</span>
-                  </div>
-                  <div class="feature-item">
-                    <mat-icon>delivery_dining</mat-icon>
-                    <span>Court-side Delivery</span>
-                  </div>
-                  <div class="feature-item">
-                    <mat-icon>group</mat-icon>
-                    <span>Group Catering</span>
+
+          <div class="partner-grid">
+            <!-- Helen's Kitchen Partner -->
+            <mat-card class="partner-card food-partner" (click)="openHelensKitchen()">
+              <mat-card-header>
+                <img src="helens-kitchen-logo.jpg" alt="Helen's Kitchen Logo" mat-card-avatar class="partner-logo-header">
+                <mat-card-title>Helen's Kitchen</mat-card-title>
+                <mat-card-subtitle>Delicious Meals & Tennis Club Catering</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <div class="partner-content">
+                  <p>Looking for great food after your tennis match? Check out Helen's Kitchen for authentic, delicious meals!</p>
+                  <div class="partner-features">
+                    <div class="feature-item">
+                      <mat-icon>local_dining</mat-icon>
+                      <span>Fresh Daily Menu</span>
+                    </div>
+                    <div class="feature-item">
+                      <mat-icon>delivery_dining</mat-icon>
+                      <span>Court-side Delivery</span>
+                    </div>
+                    <div class="feature-item">
+                      <mat-icon>group</mat-icon>
+                      <span>Group Catering</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </mat-card-content>
-            <mat-card-actions>
-              <button mat-raised-button class="sponsor-btn" (click)="openHelensKitchen()">
-                <mat-icon>open_in_new</mat-icon>
-                View Menu
-              </button>
-            </mat-card-actions>
-          </mat-card>
+              </mat-card-content>
+              <mat-card-actions>
+                <button mat-raised-button class="partner-btn food-btn" (click)="openHelensKitchen()">
+                  <mat-icon>open_in_new</mat-icon>
+                  View Menu
+                </button>
+              </mat-card-actions>
+            </mat-card>
+
+            <!-- Baseline Gearhub Partner -->
+            <mat-card class="partner-card equipment-partner" (click)="openBaselineGearhub()">
+              <mat-card-header>
+                <img src="baseline-gearhub-logo.png" alt="Baseline Gearhub Logo" mat-card-avatar class="partner-logo-header baseline-logo" loading="lazy">
+                <mat-card-title>Baseline Gearhub</mat-card-title>
+                <mat-card-subtitle>Your hub for tennis & pickleball gear</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <div class="partner-content">
+                  <p>Elevate your game with premium equipment for both tennis and pickleball! Discover quality rackets, paddles, and accessories for every skill level.</p>
+                  <div class="partner-features">
+                    <div class="feature-item">
+                      <mat-icon>sports_tennis</mat-icon>
+                      <span>Tennis & Pickleball</span>
+                    </div>
+                    <div class="feature-item">
+                      <mat-icon>shopping_cart</mat-icon>
+                      <span>Gear & Accessories</span>
+                    </div>
+                    <div class="feature-item">
+                      <mat-icon>local_shipping</mat-icon>
+                      <span>Fast Delivery</span>
+                    </div>
+                  </div>
+                </div>
+              </mat-card-content>
+              <mat-card-actions>
+                <button mat-raised-button class="partner-btn equipment-btn" (click)="openBaselineGearhub()">
+                  <mat-icon>open_in_new</mat-icon>
+                  Shop Now
+                </button>
+              </mat-card-actions>
+            </mat-card>
+          </div>
         </div>
       </div>
     </div>
@@ -617,6 +654,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   openHelensKitchen(): void {
     window.open('https://helens-kitchen.netlify.app/', '_blank');
+  }
+
+  openBaselineGearhub(): void {
+    window.open('https://tennis-marketplace.netlify.app/', '_blank');
   }
 
   /**
