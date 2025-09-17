@@ -388,6 +388,49 @@ router.get('/dashboard', (req, res, next) => {
       }
     ]);
 
+    // Get partner click statistics
+    const partnerClickStats = await UserActivity.aggregate([
+      {
+        $match: {
+          timestamp: { $gte: fromDate, $lte: toDate },
+          action: 'partner_click'
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $match: {
+          'user.role': { $ne: 'superadmin' }
+        }
+      },
+      {
+        $group: {
+          _id: '$details.partnerName',
+          partnerType: { $first: '$details.partnerType' },
+          partnerUrl: { $first: '$details.partnerUrl' },
+          clicks: { $sum: 1 },
+          uniqueUsers: { $addToSet: '$userId' }
+        }
+      },
+      {
+        $project: {
+          partnerName: '$_id',
+          partnerType: 1,
+          partnerUrl: 1,
+          clicks: 1,
+          uniqueUsers: { $size: '$uniqueUsers' },
+          _id: 0
+        }
+      },
+      { $sort: { clicks: -1 } }
+    ]);
+
     // Device and browser breakdown - exclude superadmin users
     const deviceStats = await PageView.aggregate([
       { $match: { timestamp: { $gte: fromDate, $lte: toDate } } },
@@ -479,6 +522,7 @@ router.get('/dashboard', (req, res, next) => {
       },
       popularPages: popularPages || [],
       userActivity: userActivity || [],
+      partnerClickStats: partnerClickStats || [],
       engagement: {
         totalSessions: totalSessions,
         avgDuration: avgSessionDuration[0]?.avgDuration || 45000,

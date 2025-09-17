@@ -139,7 +139,8 @@ const userActivitySchema = new Schema<IUserActivity>({
       'export',
       'click_button',
       'form_submit',
-      'navigation'
+      'navigation',
+      'partner_click'
     ]
   },
   component: {

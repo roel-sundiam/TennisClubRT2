@@ -37,6 +37,13 @@ export interface AnalyticsStats {
     count: number;
     uniqueUsers: number;
   }>;
+  partnerClickStats: Array<{
+    partnerName: string;
+    partnerType: string;
+    partnerUrl: string;
+    clicks: number;
+    uniqueUsers: number;
+  }>;
   engagement: {
     totalSessions: number;
     avgDuration: number;
