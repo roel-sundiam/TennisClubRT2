@@ -208,6 +208,11 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
     const openPlayEvent = isBlockedByOpenPlay ?
       openPlayEvents.find(event => event.openPlayEvent?.blockedTimeSlots && Array.isArray(event.openPlayEvent.blockedTimeSlots) && event.openPlayEvent.blockedTimeSlots.includes(hour)) : null;
 
+    // Block Wednesday 6:00-8:00 PM (hours 18 and 19)
+    const isWednesday = queryDate.getDay() === 3;
+    const isBlockedWednesdayTime = isWednesday && (hour === 18 || hour === 19);
+    
+
     // Enhanced debugging for specific hours that might be problematic
     if (hour === 17) {
       console.log(`🔍 DETAILED DEBUG for hour ${hour} (NEW LOGIC):`);
@@ -234,9 +239,9 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
       hour,
       timeDisplay: `${hour}:00 - ${hour + 1}:00`,
       // FIXED: Use correct availability logic for START times
-      available: !occupyingReservation && !isBlockedByOpenPlay,
+      available: !occupyingReservation && !isBlockedByOpenPlay && !isBlockedWednesdayTime,
       // NEW: Add separate field for END time availability
-      availableAsEndTime: canBeEndTime && !isBlockedByOpenPlay,
+      availableAsEndTime: canBeEndTime && !isBlockedByOpenPlay && !isBlockedWednesdayTime,
       reservation: occupyingReservation || null,
       blockedByOpenPlay: isBlockedByOpenPlay,
       openPlayEvent: openPlayEvent ? {

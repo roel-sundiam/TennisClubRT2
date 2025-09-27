@@ -178,58 +178,6 @@ interface Reservation {
                 <p><strong>No consecutive time slots available</strong> after {{ selectedStartTime }}:00</p>
                 <p>Court reservations require consecutive time blocks. The next hour ({{ selectedStartTime + 1 }}:00) is unavailable.</p>
 
-                <!-- Debug Information Panel -->
-                <div class="debug-panel" style="background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 8px; font-family: monospace; font-size: 12px;">
-                  <h4 style="margin: 0 0 10px 0; color: #333;">🔍 Debug Information:</h4>
-
-                  <div><strong>Selected Date:</strong> {{ selectedDate | date:'yyyy-MM-dd' }}</div>
-                  <div><strong>Selected Start Time:</strong> {{ selectedStartTime }}:00</div>
-                  <div><strong>Blocked Hour:</strong> {{ selectedStartTime + 1 }}:00</div>
-
-                  <div style="margin-top: 10px;">
-                    <strong>Time Slots Data (from backend):</strong>
-                    <div *ngFor="let slot of timeSlots" style="margin: 2px 0;">
-                      <span [style.color]="slot.available ? 'green' : 'red'">
-                        {{ slot.hour }}:00 - START: {{ slot.available ? 'AVAILABLE' : 'BLOCKED' }}
-                      </span>
-                      <span *ngIf="slot.availableAsEndTime !== undefined"
-                            [style.color]="slot.availableAsEndTime ? 'green' : 'red'">
-                        | END: {{ slot.availableAsEndTime ? 'AVAILABLE' : 'BLOCKED' }}
-                      </span>
-                      <span *ngIf="slot.blockedByOpenPlay" style="color: orange;"> (Open Play)</span>
-                      <span *ngIf="!slot.available && !slot.blockedByOpenPlay" style="color: red;"> (Existing Reservation)</span>
-                    </div>
-                  </div>
-
-                  <div style="margin-top: 10px;" *ngIf="existingReservations.length > 0">
-                    <strong>Existing Reservations for this Date:</strong>
-                    <div *ngFor="let res of existingReservations" style="margin: 2px 0; padding: 5px; background: #fff; border-radius: 4px;">
-                      <span>{{ res.timeSlotDisplay || (res.timeSlot + ':00 - ' + ((res.endTimeSlot || res.timeSlot + 1) + ':00')) }}</span>
-                      <span style="color: #666;"> | Status: {{ res.status }}</span>
-                      <span style="color: #666;"> | Players: {{ res.players.join(', ') }}</span>
-                    </div>
-                  </div>
-
-                  <div style="margin-top: 10px; padding: 10px; background: #fff; border-radius: 4px;">
-                    <strong>Why {{ selectedStartTime + 1 }}:00 is unavailable:</strong>
-                    <div [ngSwitch]="getUnavailabilityReason(selectedStartTime + 1)">
-                      <div *ngSwitchCase="'open_play'" style="color: orange;">
-                        🎾 Open Play event is scheduled for this time
-                      </div>
-                      <div *ngSwitchCase="'reservation'" style="color: red;">
-                        📅 Existing reservation blocks this time slot
-                      </div>
-                      <div *ngSwitchCase="'unknown'" style="color: gray;">
-                        ❓ Slot marked as unavailable (unknown reason)
-                      </div>
-                      <div *ngSwitchDefault style="color: green;">
-                        ✅ Should be available - this might be a bug!
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <p><em>If you believe this is an error, please contact support with the debug information above.</em></p>
               </div>
 
               <small
