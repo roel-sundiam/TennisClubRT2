@@ -84,6 +84,69 @@ interface Reservation {
 
         <div class="content-wrapper">
         <mat-tab-group class="reservations-tabs modern-compact-tabs" (selectedTabChange)="onTabChange($event)">
+          <!-- All Reservations -->
+          <mat-tab [label]="getTabLabel('all')" [disabled]="loading">
+            <div class="tab-content">
+              <div *ngIf="loading" class="loading-container">
+                <mat-spinner diameter="50"></mat-spinner>
+                <p>Loading all reservations...</p>
+              </div>
+              
+              <div *ngIf="!loading && allReservations.length === 0" class="no-reservations">
+                <mat-icon class="large-icon">event_note</mat-icon>
+                <h2>No Reservations Found</h2>
+                <p>No court reservations have been made by any members yet.</p>
+                <button mat-raised-button color="primary" (click)="createNewReservation()">
+                  <mat-icon>add</mat-icon>
+                  Book a Court
+                </button>
+              </div>
+              
+              <div *ngIf="!loading && allReservations.length > 0" class="reservations-list">
+                <!-- NEW COMPACT DESIGN LOADED --> 
+                <div *ngFor="let reservation of allReservations" 
+                     class="reservation-card-compact all-reservations"
+                     [class.homeowner-day]="reservation.isHomeownerDay"
+                     [style.border-left-color]="getWeatherBorderColor(reservation)">
+                  <div class="card-left">
+                    <div class="date-badge" [ngClass]="isPastReservation(reservation.date) ? 'past' : ''">
+                      <span class="date-day">{{getDay(reservation.date)}}</span>
+                      <span class="date-info">{{getShortDate(reservation.date)}}</span>
+                    </div>
+                    <div class="reservation-main show-user-info">
+                      <div class="time-slot">{{reservation.timeSlotDisplay}}</div>
+                      <div class="user-info" *ngIf="reservation.userId">
+                        <mat-icon class="inline-icon">person</mat-icon>
+                        <span class="user-text">{{reservation.userId.fullName}}</span>
+                      </div>
+                      <div class="players-info">
+                        <mat-icon class="inline-icon">people</mat-icon>
+                        <span class="players-text">{{getFilteredPlayers(reservation).join(', ')}}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="card-right">
+                    <div class="status-chips">
+                      <mat-chip *ngIf="reservation.status !== 'pending'" class="status-chip" [ngClass]="'status-' + reservation.status">
+                        {{reservation.status | titlecase}}
+                      </mat-chip>
+                    </div>
+                    <div class="fee-weather">
+                      <span class="fee">₱{{reservation.totalFee}}</span>
+                      <span class="weather" *ngIf="reservation.weatherForecast">
+                        <mat-icon class="weather-icon">{{getWeatherIcon(reservation.weatherForecast.icon)}}</mat-icon>
+                        {{reservation.weatherForecast.temperature}}°C
+                        <span class="rain-chance" *ngIf="reservation.weatherForecast.rainChance !== undefined">
+                          {{reservation.weatherForecast.rainChance}}%
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </mat-tab>
+          
           <!-- Upcoming Reservations -->
           <mat-tab [label]="getTabLabel('upcoming')" [disabled]="loading">
             <div class="tab-content">
@@ -210,69 +273,6 @@ interface Reservation {
                     </div>
                     <div class="fee-weather">
                       <span class="fee">₱{{reservation.totalFee}}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </mat-tab>
-          
-          <!-- All Reservations -->
-          <mat-tab [label]="getTabLabel('all')" [disabled]="loading">
-            <div class="tab-content">
-              <div *ngIf="loading" class="loading-container">
-                <mat-spinner diameter="50"></mat-spinner>
-                <p>Loading all reservations...</p>
-              </div>
-              
-              <div *ngIf="!loading && allReservations.length === 0" class="no-reservations">
-                <mat-icon class="large-icon">event_note</mat-icon>
-                <h2>No Reservations Found</h2>
-                <p>No court reservations have been made by any members yet.</p>
-                <button mat-raised-button color="primary" (click)="createNewReservation()">
-                  <mat-icon>add</mat-icon>
-                  Book a Court
-                </button>
-              </div>
-              
-              <div *ngIf="!loading && allReservations.length > 0" class="reservations-list">
-                <!-- NEW COMPACT DESIGN LOADED --> 
-                <div *ngFor="let reservation of allReservations" 
-                     class="reservation-card-compact all-reservations"
-                     [class.homeowner-day]="reservation.isHomeownerDay"
-                     [style.border-left-color]="getWeatherBorderColor(reservation)">
-                  <div class="card-left">
-                    <div class="date-badge" [ngClass]="isPastReservation(reservation.date) ? 'past' : ''">
-                      <span class="date-day">{{getDay(reservation.date)}}</span>
-                      <span class="date-info">{{getShortDate(reservation.date)}}</span>
-                    </div>
-                    <div class="reservation-main show-user-info">
-                      <div class="time-slot">{{reservation.timeSlotDisplay}}</div>
-                      <div class="user-info" *ngIf="reservation.userId">
-                        <mat-icon class="inline-icon">person</mat-icon>
-                        <span class="user-text">{{reservation.userId.fullName}}</span>
-                      </div>
-                      <div class="players-info">
-                        <mat-icon class="inline-icon">people</mat-icon>
-                        <span class="players-text">{{getFilteredPlayers(reservation).join(', ')}}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="card-right">
-                    <div class="status-chips">
-                      <mat-chip *ngIf="reservation.status !== 'pending'" class="status-chip" [ngClass]="'status-' + reservation.status">
-                        {{reservation.status | titlecase}}
-                      </mat-chip>
-                    </div>
-                    <div class="fee-weather">
-                      <span class="fee">₱{{reservation.totalFee}}</span>
-                      <span class="weather" *ngIf="reservation.weatherForecast">
-                        <mat-icon class="weather-icon">{{getWeatherIcon(reservation.weatherForecast.icon)}}</mat-icon>
-                        {{reservation.weatherForecast.temperature}}°C
-                        <span class="rain-chance" *ngIf="reservation.weatherForecast.rainChance !== undefined">
-                          {{reservation.weatherForecast.rainChance}}%
-                        </span>
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -579,6 +579,9 @@ click "Try Again" below to reconnect.
         console.log('- Past:', this.pastReservations.length);
         
         this.loading = false;
+        
+        // Load all reservations since it's now the first tab (without showing loading again)
+        this.loadAllReservations(false);
       },
       error: (error) => {
         console.error('❌ HTTP request failed:', error);
@@ -608,16 +611,18 @@ click "Try Again" below to reconnect.
   onTabChange(event: any): void {
     this.currentTab = event.index;
     console.log('🔄 Tab changed to index:', event.index);
-    // Load all reservations when switching to "All Reservations" tab (index 2)
-    if (event.index === 2) {
+    // Load all reservations when switching to "All Reservations" tab (index 0)
+    if (event.index === 0) {
       console.log('📋 Loading All Reservations tab, current length:', this.allReservations.length);
       this.loadAllReservations();
     }
   }
 
-  loadAllReservations(): void {
+  loadAllReservations(showLoading: boolean = true): void {
     console.log('Loading all reservations from all users...');
-    this.loading = true;
+    if (showLoading) {
+      this.loading = true;
+    }
     
     // Use the general reservations endpoint with showAll=true to get all reservations
     const timestamp = new Date().getTime();
@@ -670,11 +675,15 @@ click "Try Again" below to reconnect.
         console.log('- Total from all users (excluding cancelled):', this.allReservations.length);
         console.log('- Cancelled reservations filtered out:', reservations.length - activeReservations.length);
         
-        this.loading = false;
+        if (showLoading) {
+          this.loading = false;
+        }
       },
       error: (error) => {
         console.error('Error loading all reservations:', error);
-        this.loading = false;
+        if (showLoading) {
+          this.loading = false;
+        }
         this.snackBar.open('Failed to load all reservations', 'Close', {
           duration: 3000,
           panelClass: ['error-snackbar']
