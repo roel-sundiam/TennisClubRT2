@@ -36,9 +36,61 @@ export interface OpenPlayNotificationEvent {
   message: string;
 }
 
+export interface ChatMessageEvent {
+  type: 'new_message' | 'message_edited' | 'message_deleted';
+  data: {
+    _id: string;
+    roomId: string;
+    userId: string;
+    user: {
+      _id: string;
+      username: string;
+      fullName: string;
+      profilePicture?: string;
+      role: string;
+    };
+    content: string;
+    type: 'text' | 'system' | 'announcement';
+    isEdited: boolean;
+    editedAt?: string;
+    isDeleted: boolean;
+    deletedAt?: string;
+    deletedBy?: string;
+    replyTo?: string;
+    metadata?: {
+      systemType?: string;
+      mentions?: string[];
+    };
+    createdAt: string;
+    updatedAt: string;
+  };
+  timestamp: string;
+  message: string;
+}
+
+export interface ChatTypingEvent {
+  roomId: string;
+  userId: string;
+  username: string;
+  isTyping: boolean;
+}
+
+export interface ChatUserStatusEvent {
+  type: 'user_joined' | 'user_left' | 'user_online' | 'user_offline';
+  data: {
+    roomId?: string;
+    userId: string;
+    username: string;
+    fullName: string;
+  };
+  timestamp: string;
+}
+
 export class WebSocketService {
   private io: SocketIOServer | null = null;
   private connectedClients: Set<Socket> = new Set();
+  private userSockets: Map<string, Set<string>> = new Map(); // userId -> Set of socket IDs
+  private typingUsers: Map<string, Set<string>> = new Map(); // roomId -> Set of userIds who are typing
 
   constructor() {
     console.log('🔌 WebSocket Service initialized');
@@ -100,10 +152,137 @@ export class WebSocketService {
         socket.leave('open_play_notifications');
       });
 
+      // Chat-related socket handlers
+      
+      // Handle user authentication for chat
+      socket.on('chat_authenticate', (userData: { userId: string; username: string; fullName: string }) => {
+        console.log('💬 Chat authentication for user:', userData.username);
+        
+        // Store user-socket mapping
+        if (!this.userSockets.has(userData.userId)) {
+          this.userSockets.set(userData.userId, new Set());
+        }
+        this.userSockets.get(userData.userId)!.add(socket.id);
+        
+        // Store user data on socket for later use
+        (socket as any).userData = userData;
+        
+        socket.emit('chat_authenticated', { success: true });
+      });
+
+      // Handle joining chat rooms
+      socket.on('join_chat_room', (roomId: string) => {
+        console.log('💬 User joining chat room:', roomId, 'Socket:', socket.id);
+        socket.join(`chat_room_${roomId}`);
+        
+        // Notify other participants that user is online
+        if ((socket as any).userData) {
+          const userData = (socket as any).userData;
+          socket.to(`chat_room_${roomId}`).emit('user_status_changed', {
+            type: 'user_online',
+            data: {
+              roomId,
+              userId: userData.userId,
+              username: userData.username,
+              fullName: userData.fullName
+            },
+            timestamp: new Date().toISOString()
+          } as ChatUserStatusEvent);
+        }
+      });
+
+      // Handle leaving chat rooms
+      socket.on('leave_chat_room', (roomId: string) => {
+        console.log('💬 User leaving chat room:', roomId, 'Socket:', socket.id);
+        socket.leave(`chat_room_${roomId}`);
+        
+        // Notify other participants that user left
+        if ((socket as any).userData) {
+          const userData = (socket as any).userData;
+          socket.to(`chat_room_${roomId}`).emit('user_status_changed', {
+            type: 'user_offline',
+            data: {
+              roomId,
+              userId: userData.userId,
+              username: userData.username,
+              fullName: userData.fullName
+            },
+            timestamp: new Date().toISOString()
+          } as ChatUserStatusEvent);
+        }
+      });
+
+      // Handle typing indicators
+      socket.on('chat_typing_start', (data: { roomId: string }) => {
+        if (!(socket as any).userData) return;
+        
+        const userData = (socket as any).userData;
+        const { roomId } = data;
+        
+        // Add user to typing users for this room
+        if (!this.typingUsers.has(roomId)) {
+          this.typingUsers.set(roomId, new Set());
+        }
+        this.typingUsers.get(roomId)!.add(userData.userId);
+        
+        // Notify other participants
+        socket.to(`chat_room_${roomId}`).emit('user_typing', {
+          roomId,
+          userId: userData.userId,
+          username: userData.username,
+          isTyping: true
+        } as ChatTypingEvent);
+      });
+
+      socket.on('chat_typing_stop', (data: { roomId: string }) => {
+        if (!(socket as any).userData) return;
+        
+        const userData = (socket as any).userData;
+        const { roomId } = data;
+        
+        // Remove user from typing users for this room
+        if (this.typingUsers.has(roomId)) {
+          this.typingUsers.get(roomId)!.delete(userData.userId);
+        }
+        
+        // Notify other participants
+        socket.to(`chat_room_${roomId}`).emit('user_typing', {
+          roomId,
+          userId: userData.userId,
+          username: userData.username,
+          isTyping: false
+        } as ChatTypingEvent);
+      });
+
       // Handle disconnect
       socket.on('disconnect', () => {
         console.log('🔌 Client disconnected:', socket.id);
         this.connectedClients.delete(socket);
+        
+        // Clean up user-socket mapping
+        if ((socket as any).userData) {
+          const userId = (socket as any).userData.userId;
+          if (this.userSockets.has(userId)) {
+            this.userSockets.get(userId)!.delete(socket.id);
+            if (this.userSockets.get(userId)!.size === 0) {
+              this.userSockets.delete(userId);
+            }
+          }
+          
+          // Clean up typing indicators
+          this.typingUsers.forEach((typingSet, roomId) => {
+            if (typingSet.has(userId)) {
+              typingSet.delete(userId);
+              // Notify others that user stopped typing
+              socket.to(`chat_room_${roomId}`).emit('user_typing', {
+                roomId,
+                userId,
+                username: (socket as any).userData.username,
+                isTyping: false
+              } as ChatTypingEvent);
+            }
+          });
+        }
       });
 
       // Send welcome message
@@ -224,6 +403,119 @@ export class WebSocketService {
    */
   isInitialized(): boolean {
     return this.io !== null;
+  }
+
+  /**
+   * Emit chat message to all participants in a room
+   */
+  emitChatMessage(messageEvent: ChatMessageEvent): void {
+    if (!this.io) {
+      console.warn('⚠️  WebSocket not initialized - cannot emit chat message');
+      return;
+    }
+
+    const roomChannel = `chat_room_${messageEvent.data.roomId}`;
+    console.log(`💬 Broadcasting ${messageEvent.type} to room ${messageEvent.data.roomId}`);
+    
+    // Emit to all clients in the chat room
+    this.io.to(roomChannel).emit('chat_message', messageEvent);
+
+    // For announcement messages, also emit to general notification channel
+    if (messageEvent.data.type === 'announcement') {
+      this.io.emit('chat_announcement', {
+        roomId: messageEvent.data.roomId,
+        message: messageEvent.data.content,
+        author: messageEvent.data.user.fullName,
+        timestamp: messageEvent.timestamp
+      });
+    }
+  }
+
+  /**
+   * Emit typing indicator to room participants
+   */
+  emitTypingIndicator(typingEvent: ChatTypingEvent): void {
+    if (!this.io) {
+      console.warn('⚠️  WebSocket not initialized - cannot emit typing indicator');
+      return;
+    }
+
+    const roomChannel = `chat_room_${typingEvent.roomId}`;
+    this.io.to(roomChannel).emit('user_typing', typingEvent);
+  }
+
+  /**
+   * Emit user status change to room participants
+   */
+  emitUserStatusChange(statusEvent: ChatUserStatusEvent): void {
+    if (!this.io) {
+      console.warn('⚠️  WebSocket not initialized - cannot emit user status change');
+      return;
+    }
+
+    if (statusEvent.data.roomId) {
+      const roomChannel = `chat_room_${statusEvent.data.roomId}`;
+      this.io.to(roomChannel).emit('user_status_changed', statusEvent);
+    } else {
+      // Global user status change
+      this.io.emit('user_status_changed', statusEvent);
+    }
+  }
+
+  /**
+   * Send notification to specific user (all their connected sockets)
+   */
+  sendNotificationToUser(userId: string, event: string, data: any): void {
+    if (!this.io) {
+      console.warn('⚠️  WebSocket not initialized - cannot send notification to user');
+      return;
+    }
+
+    const userSocketIds = this.userSockets.get(userId);
+    if (userSocketIds && userSocketIds.size > 0) {
+      console.log(`📱 Sending ${event} notification to user ${userId} (${userSocketIds.size} sockets)`);
+      
+      userSocketIds.forEach(socketId => {
+        const socket = this.io!.sockets.sockets.get(socketId);
+        if (socket) {
+          socket.emit(event, data);
+        }
+      });
+    }
+  }
+
+  /**
+   * Get online users in a chat room
+   */
+  getOnlineUsersInRoom(roomId: string): string[] {
+    if (!this.io) {
+      return [];
+    }
+
+    const roomChannel = `chat_room_${roomId}`;
+    const room = this.io.sockets.adapter.rooms.get(roomChannel);
+    
+    if (!room) {
+      return [];
+    }
+
+    const onlineUsers: string[] = [];
+    room.forEach(socketId => {
+      const socket = this.io!.sockets.sockets.get(socketId);
+      if (socket && (socket as any).userData) {
+        onlineUsers.push((socket as any).userData.userId);
+      }
+    });
+
+    return [...new Set(onlineUsers)]; // Remove duplicates
+  }
+
+  /**
+   * Check if user is online
+   */
+  isUserOnline(userId: string): boolean {
+    const userSocketIds = this.userSockets.get(userId);
+    return userSocketIds !== undefined && userSocketIds.size > 0;
   }
 }
 

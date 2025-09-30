@@ -414,3 +414,92 @@ export interface RefundRequest {
   amount: number;
   reason: string;
 }
+
+// Chat System Types
+export interface ChatRoom {
+  _id: string;
+  name: string;
+  description?: string;
+  type: 'general' | 'admin' | 'announcement';
+  isActive: boolean;
+  participantRoles?: ('member' | 'admin' | 'superadmin')[];
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ChatMessage {
+  _id: string;
+  roomId: string;
+  userId: string;
+  user?: User;
+  content: string;
+  type: 'text' | 'system' | 'announcement';
+  isEdited: boolean;
+  editedAt?: Date;
+  isDeleted: boolean;
+  deletedAt?: Date;
+  deletedBy?: string;
+  replyTo?: string;
+  attachments?: Array<{
+    filename: string;
+    path: string;
+    mimetype: string;
+    size: number;
+  }>;
+  metadata?: {
+    systemType?: 'user_joined' | 'user_left' | 'room_created';
+    mentions?: string[];
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ChatParticipant {
+  _id: string;
+  roomId: string;
+  userId: string;
+  user?: User;
+  joinedAt: Date;
+  lastReadAt?: Date;
+  isActive: boolean;
+  notifications: boolean;
+  role?: 'member' | 'moderator' | 'admin';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateChatRoomRequest {
+  name: string;
+  description?: string;
+  type: 'general' | 'admin' | 'announcement';
+  participantRoles?: ('member' | 'admin' | 'superadmin')[];
+}
+
+export interface SendMessageRequest {
+  content: string;
+  type?: 'text' | 'announcement';
+  replyTo?: string;
+}
+
+export interface UpdateChatParticipantRequest {
+  lastReadAt?: Date;
+  notifications?: boolean;
+}
+
+export interface ChatRoomWithUnreadCount extends ChatRoom {
+  unreadCount: number;
+  lastMessage?: ChatMessage;
+  participantCount: number;
+}
+
+export interface ChatStats {
+  totalMessages: number;
+  activeParticipants: number;
+  todayMessages: number;
+  topUsers: Array<{
+    userId: string;
+    username: string;
+    messageCount: number;
+  }>;
+}
