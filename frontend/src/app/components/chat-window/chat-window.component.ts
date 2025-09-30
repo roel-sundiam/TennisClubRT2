@@ -41,6 +41,8 @@ import { AuthService } from '../../services/auth.service';
         class="chat-toggle-button" 
         *ngIf="isMinimized || isClosed"
         (click)="isClosed ? toggleChat() : restore()"
+        (touchstart)="onToggleButtonTouchStart($event)"
+        (touchend)="onToggleButtonTouchEnd($event)"
         [matBadge]="totalUnreadCount"
         [matBadgeHidden]="totalUnreadCount === 0"
         matBadgeColor="warn"
@@ -179,12 +181,21 @@ import { AuthService } from '../../services/auth.service';
       box-shadow: 0 4px 16px rgba(0, 132, 255, 0.4);
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       border: none;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(0, 132, 255, 0.3);
+      user-select: none;
+      -webkit-user-select: none;
     }
 
     .chat-toggle-button:hover {
       background: linear-gradient(135deg, #0066cc, #0099e6);
       transform: translateY(-2px);
       box-shadow: 0 6px 20px rgba(0, 132, 255, 0.5);
+    }
+
+    .chat-toggle-button:active {
+      transform: translateY(0px) scale(0.95);
+      box-shadow: 0 2px 10px rgba(0, 132, 255, 0.4);
     }
 
     .chat-window {
@@ -597,12 +608,24 @@ import { AuthService } from '../../services/auth.service';
 
     /* Mobile Responsive */
     @media (max-width: 768px) {
-      .chat-container {
+      .chat-container:not(.minimized):not(.closed) {
         position: fixed;
         top: 0;
         bottom: 0;
         left: 0;
         right: 0;
+        z-index: 1000;
+      }
+
+      .chat-container.minimized,
+      .chat-container.closed {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        top: auto;
+        left: auto;
+        width: auto;
+        height: auto;
         z-index: 1000;
       }
 
@@ -618,9 +641,10 @@ import { AuthService } from '../../services/auth.service';
       .chat-toggle-button {
         width: 56px;
         height: 56px;
-        position: fixed;
-        bottom: 80px;
-        right: 20px;
+        position: relative;
+        bottom: auto;
+        right: auto;
+        z-index: 1001;
       }
 
       .chat-header {
@@ -705,6 +729,27 @@ import { AuthService } from '../../services/auth.service';
     }
 
     @media (max-width: 480px) {
+      .chat-container:not(.minimized):not(.closed) {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+      }
+
+      .chat-container.minimized,
+      .chat-container.closed {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        top: auto;
+        left: auto;
+        width: auto;
+        height: auto;
+        z-index: 1000;
+      }
+
       .chat-window {
         height: 400px;
       }
@@ -789,7 +834,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
   private destroy$ = new Subject<void>();
 
   // Component state
-  isMinimized = false;
+  isMinimized = true;  // Default to minimized on page load
   isClosed = false;
   selectedTabIndex = 0;
   
@@ -810,6 +855,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
   
   // Sound notification
   private messageSound: HTMLAudioElement | null = null;
+  
+  // Touch event handling
+  private touchStartTime = 0;
 
   constructor(
     private chatService: ChatService,
@@ -963,6 +1011,33 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
     this.isClosed = true;
     this.isMinimized = false;
     this.saveChatState();
+  }
+
+  /**
+   * Handle touch start for toggle button
+   */
+  onToggleButtonTouchStart(event: TouchEvent): void {
+    this.touchStartTime = Date.now();
+    event.stopPropagation();
+  }
+
+  /**
+   * Handle touch end for toggle button
+   */
+  onToggleButtonTouchEnd(event: TouchEvent): void {
+    const touchDuration = Date.now() - this.touchStartTime;
+    
+    // Only trigger if it's a quick tap (less than 500ms)
+    if (touchDuration < 500) {
+      event.preventDefault();
+      event.stopPropagation();
+      
+      if (this.isClosed) {
+        this.toggleChat();
+      } else {
+        this.restore();
+      }
+    }
   }
 
   /**

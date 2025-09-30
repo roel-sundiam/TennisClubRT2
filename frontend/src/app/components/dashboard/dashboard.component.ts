@@ -35,7 +35,10 @@ import { environment } from '../../../environments/environment';
         
         <div class="action-grid">
           <!-- Reserve Court -->
-          <mat-card class="action-card primary-action" data-icon="calendar_today" data-title="Reserve Court" (click)="testNavigation()">
+          <mat-card class="action-card primary-action" data-icon="calendar_today" data-title="Reserve Court" 
+                   (click)="testNavigation()" 
+                   (touchstart)="handleTouchStart($event)"
+                   (touchend)="handleTouchEnd($event, 'testNavigation')">
             <!-- Mobile Icon -->
             <div class="mobile-card-icon">
               <mat-icon>calendar_today</mat-icon>
@@ -60,7 +63,10 @@ import { environment } from '../../../environments/environment';
           </mat-card>
 
           <!-- My Reservations -->
-          <mat-card class="action-card" data-icon="event" data-title="My Reservations" (click)="navigateTo('/my-reservations')">
+          <mat-card class="action-card" data-icon="event" data-title="My Reservations" 
+                   (click)="navigateTo('/my-reservations')" 
+                   (touchstart)="handleTouchStart($event)"
+                   (touchend)="handleTouchEnd($event, '/my-reservations')">
             <!-- Mobile Icon -->
             <div class="mobile-card-icon">
               <mat-icon>event</mat-icon>
@@ -85,7 +91,10 @@ import { environment } from '../../../environments/environment';
           </mat-card>
 
           <!-- Payments -->
-          <mat-card class="action-card" data-icon="payment" data-title="Payments" (click)="navigateTo('/payments')">
+          <mat-card class="action-card" data-icon="payment" data-title="Payments" 
+                   (click)="navigateTo('/payments')" 
+                   (touchstart)="handleTouchStart($event)"
+                   (touchend)="handleTouchEnd($event, '/payments')">
             <!-- Mobile Icon -->
             <div class="mobile-card-icon">
               <mat-icon>payment</mat-icon>
@@ -114,7 +123,10 @@ import { environment } from '../../../environments/environment';
           </mat-card>
 
           <!-- Open Play -->
-          <mat-card class="action-card" data-icon="sports_tennis" data-title="Open Play" (click)="navigateTo('/polls')">
+          <mat-card class="action-card" data-icon="sports_tennis" data-title="Open Play" 
+                   (click)="navigateTo('/polls')" 
+                   (touchstart)="handleTouchStart($event)"
+                   (touchend)="handleTouchEnd($event, '/polls')">
             <!-- Mobile Icon -->
             <div class="mobile-card-icon">
               <mat-icon>sports_tennis</mat-icon>
@@ -139,7 +151,10 @@ import { environment } from '../../../environments/environment';
           </mat-card>
 
           <!-- Rankings -->
-          <mat-card class="action-card" data-icon="leaderboard" data-title="Player Rankings" (click)="navigateTo('/rankings')">
+          <mat-card class="action-card" data-icon="leaderboard" data-title="Player Rankings" 
+                   (click)="navigateTo('/rankings')" 
+                   (touchstart)="handleTouchStart($event)"
+                   (touchend)="handleTouchEnd($event, '/rankings')">
             <!-- Mobile Icon -->
             <div class="mobile-card-icon">
               <mat-icon>leaderboard</mat-icon>
@@ -164,7 +179,10 @@ import { environment } from '../../../environments/environment';
           </mat-card>
 
           <!-- Weather Info -->
-          <mat-card class="action-card" data-icon="wb_sunny" data-title="Weather Forecast" (click)="navigateTo('/weather')">
+          <mat-card class="action-card" data-icon="wb_sunny" data-title="Weather Forecast" 
+                   (click)="navigateTo('/weather')" 
+                   (touchstart)="handleTouchStart($event)"
+                   (touchend)="handleTouchEnd($event, '/weather')">
             <!-- Mobile Icon -->
             <div class="mobile-card-icon">
               <mat-icon>wb_sunny</mat-icon>
@@ -189,7 +207,10 @@ import { environment } from '../../../environments/environment';
           </mat-card>
 
           <!-- Member Directory -->
-          <mat-card class="action-card" data-icon="people" data-title="Member Directory" (click)="navigateTo('/members')">
+          <mat-card class="action-card" data-icon="people" data-title="Member Directory" 
+                   (click)="navigateTo('/members')" 
+                   (touchstart)="handleTouchStart($event)"
+                   (touchend)="handleTouchEnd($event, '/members')">
             <!-- Mobile Icon -->
             <div class="mobile-card-icon">
               <mat-icon>people</mat-icon>
@@ -214,7 +235,10 @@ import { environment } from '../../../environments/environment';
           </mat-card>
 
           <!-- Suggestions & Complaints -->
-          <mat-card class="action-card" data-icon="feedback" data-title="Feedback" (click)="navigateTo('/suggestions')">
+          <mat-card class="action-card" data-icon="feedback" data-title="Feedback" 
+                   (click)="navigateTo('/suggestions')" 
+                   (touchstart)="handleTouchStart($event)"
+                   (touchend)="handleTouchEnd($event, '/suggestions')">
             <!-- Mobile Icon -->
             <div class="mobile-card-icon">
               <mat-icon>feedback</mat-icon>
@@ -239,7 +263,10 @@ import { environment } from '../../../environments/environment';
           </mat-card>
 
           <!-- Rules & Regulations -->
-          <mat-card class="action-card" data-icon="gavel" data-title="Rules & Regulations" (click)="navigateTo('/rules')">
+          <mat-card class="action-card" data-icon="gavel" data-title="Rules & Regulations" 
+                   (click)="navigateTo('/rules')" 
+                   (touchstart)="handleTouchStart($event)"
+                   (touchend)="handleTouchEnd($event, '/rules')">
             <!-- Mobile Icon -->
             <div class="mobile-card-icon">
               <mat-icon>gavel</mat-icon>
@@ -264,7 +291,10 @@ import { environment } from '../../../environments/environment';
           </mat-card>
 
           <!-- Credit Management (Admin only for now) -->
-          <mat-card class="action-card" data-icon="account_balance" data-title="Credit Management" (click)="navigateTo('/credits')" *ngIf="isAdmin">
+          <mat-card class="action-card" data-icon="account_balance" data-title="Credit Management" 
+                   (click)="navigateTo('/credits')" 
+                   (touchstart)="handleTouchStart($event)"
+                   (touchend)="handleTouchEnd($event, '/credits')" *ngIf="isAdmin">
             <!-- Mobile Icon -->
             <div class="mobile-card-icon">
               <mat-icon>account_balance</mat-icon>
@@ -293,7 +323,10 @@ import { environment } from '../../../environments/environment';
           </mat-card>
 
           <!-- Court Usage Report -->
-          <mat-card class="action-card" data-icon="analytics" data-title="Court Usage Report" (click)="navigateTo('/court-usage-report')">
+          <mat-card class="action-card" data-icon="analytics" data-title="Court Usage Report" 
+                   (click)="navigateTo('/court-usage-report')" 
+                   (touchstart)="handleTouchStart($event)"
+                   (touchend)="handleTouchEnd($event, '/court-usage-report')">
             <!-- Mobile Icon -->
             <div class="mobile-card-icon">
               <mat-icon>analytics</mat-icon>
@@ -318,7 +351,10 @@ import { environment } from '../../../environments/environment';
           </mat-card>
 
           <!-- Official Tennis App Store -->
-          <mat-card class="action-card" data-icon="store" data-title="Official Tennis App Store" (click)="openTennisAppStore()">
+          <mat-card class="action-card" data-icon="store" data-title="Official Tennis App Store" 
+                   (click)="openTennisAppStore()" 
+                   (touchstart)="handleTouchStart($event)"
+                   (touchend)="handleTouchEnd($event, 'openTennisAppStore')">
             <!-- Mobile Icon -->
             <div class="mobile-card-icon">
               <mat-icon>store</mat-icon>
@@ -706,11 +742,41 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   testNavigation(): void {
+    console.log('📱 Dashboard: Test navigation triggered');
     this.navigateTo('/reservations');
   }
 
   navigateTo(route: string): void {
+    console.log('📱 Dashboard: Navigating to:', route);
     this.router.navigate([route]);
+  }
+
+  // Touch event handlers for mobile devices
+  private touchStartTime = 0;
+  
+  handleTouchStart(event: TouchEvent): void {
+    console.log('📱 Touch start detected');
+    this.touchStartTime = Date.now();
+    event.preventDefault();
+  }
+  
+  handleTouchEnd(event: TouchEvent, action: string): void {
+    console.log('📱 Touch end detected, action:', action);
+    const touchDuration = Date.now() - this.touchStartTime;
+    
+    // Only trigger if it's a quick tap (less than 500ms)
+    if (touchDuration < 500) {
+      event.preventDefault();
+      event.stopPropagation();
+      
+      if (action === 'testNavigation') {
+        this.testNavigation();
+      } else if (action === 'openTennisAppStore') {
+        this.openTennisAppStore();
+      } else {
+        this.navigateTo(action);
+      }
+    }
   }
 
   openHelensKitchen(): void {
