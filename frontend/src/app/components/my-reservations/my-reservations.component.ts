@@ -17,6 +17,7 @@ import { timeout, catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { environment } from '../../../environments/environment';
+import { canCancelReservation } from '../../utils/date-validation.util';
 
 interface Reservation {
   _id: string;
@@ -858,10 +859,7 @@ click "Try Again" below to reconnect.
   }
 
   canCancel(reservation: Reservation): boolean {
-    const reservationDate = new Date(reservation.date);
-    const now = new Date();
-    // Can cancel if reservation is in the future and not already cancelled
-    return reservationDate > now && reservation.status !== 'cancelled';
+    return canCancelReservation(reservation);
   }
 
   editReservation(reservation: Reservation): void {

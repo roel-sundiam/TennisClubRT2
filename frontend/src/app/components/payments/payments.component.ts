@@ -9,6 +9,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { CancellationDialogComponent, CancellationDialogData } from '../cancellation-dialog/cancellation-dialog.component';
 import { environment } from '../../../environments/environment';
+import { canCancelReservation } from '../../utils/date-validation.util';
 
 // Interfaces
 interface Payment {
@@ -611,7 +612,7 @@ interface Notification {
                     <button 
                       class="cancel-reservation-btn"
                       (click)="cancelReservationDirectly(convertPaymentToReservation(payment))"
-                      [disabled]="processing.includes(payment.reservationId._id)">
+                      [disabled]="processing.includes(payment.reservationId._id) || !canCancel(payment)">
                       Cancel Reservation
                     </button>
                   </ng-container>
@@ -652,7 +653,7 @@ interface Notification {
                       <button 
                         class="cancel-reservation-btn"
                         (click)="cancelReservationFromPayment(payment)"
-                        *ngIf="payment.reservationId"
+                        *ngIf="payment.reservationId && canCancel(payment)"
                         [disabled]="processing.includes(payment.reservationId._id)">
                         Cancel Reservation
                       </button>
@@ -661,7 +662,7 @@ interface Notification {
                       <button 
                         class="cancel-reservation-btn"
                         (click)="cancelPayment(payment._id)"
-                        *ngIf="payment.pollId"
+                        *ngIf="payment.pollId && canCancel(payment)"
                         [disabled]="processing.includes(payment._id)">
                         Cancel Open Play
                       </button>
@@ -878,7 +879,7 @@ export class PaymentsComponent implements OnInit {
           _id: `synthetic-${reservation._id}`,
           reservationId: {
             _id: reservation._id,
-            date: reservation.date,
+            date: new Date(reservation.date),
             timeSlot: reservation.timeSlot,
             players: reservation.players,
             timeSlotDisplay: reservation.timeSlotDisplay
@@ -1135,6 +1136,19 @@ export class PaymentsComponent implements OnInit {
         this.showError('Process Failed', message);
       }
     });
+  }
+
+  canCancel(payment: Payment): boolean {
+    // If payment is for a reservation, check the date
+    if (payment.reservationId) {
+      return canCancelReservation({
+        date: payment.reservationId.date,
+        status: payment.status
+      }) && payment.status !== 'refunded';
+    }
+    
+    // For non-reservation payments (like polls), allow cancellation if not refunded
+    return payment.status !== 'refunded';
   }
 
   cancelPayment(paymentId: string): void {
