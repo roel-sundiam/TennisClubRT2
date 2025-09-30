@@ -7,6 +7,7 @@ import { PaymentAlertsComponent } from '../../components/payment-alerts/payment-
 import { CoinBalanceAlertsComponent } from '../../components/coin-balance-alerts/coin-balance-alerts.component';
 import { PWAInstallPromptComponent } from '../../components/pwa-install-prompt/pwa-install-prompt.component';
 import { UpdateBannerComponent } from '../../components/update-banner/update-banner.component';
+import { ChatWindowComponent } from '../../components/chat-window/chat-window.component';
 
 @Component({
   selector: 'app-layout',
@@ -18,7 +19,8 @@ import { UpdateBannerComponent } from '../../components/update-banner/update-ban
     PaymentAlertsComponent,
     CoinBalanceAlertsComponent,
     PWAInstallPromptComponent,
-    UpdateBannerComponent
+    UpdateBannerComponent,
+    ChatWindowComponent
   ],
   template: `
     <div class="app-layout" [class.authenticated]="isAuthenticated" [class.loading]="isAuthLoading">
@@ -39,6 +41,9 @@ import { UpdateBannerComponent } from '../../components/update-banner/update-ban
 
       <!-- PWA Install Prompt (always available) -->
       <app-pwa-install-prompt></app-pwa-install-prompt>
+
+      <!-- Chat Window (only on authenticated pages) -->
+      <app-chat-window *ngIf="isAuthenticated && !isAuthLoading"></app-chat-window>
     </div>
   `,
   styleUrl: './layout.component.scss'

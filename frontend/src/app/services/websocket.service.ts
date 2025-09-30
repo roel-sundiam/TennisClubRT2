@@ -29,7 +29,7 @@ export interface OpenPlayNotificationEvent {
   providedIn: 'root'
 })
 export class WebSocketService implements OnDestroy {
-  private socket: Socket | null = null;
+  public socket: Socket | null = null;
   private serverUrl = environment.socketUrl;
   private connectionSubject = new BehaviorSubject<boolean>(false);
   private openPlayNotificationSubject = new Subject<OpenPlayNotificationEvent>();
