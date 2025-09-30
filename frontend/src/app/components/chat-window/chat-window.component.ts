@@ -68,6 +68,9 @@ import { AuthService } from '../../services/auth.service';
             ></span>
           </div>
           <div class="header-actions">
+            <button class="test-sound-btn" (click)="testSound()" title="Test Sound" *ngIf="!isAudioInitialized">
+              <mat-icon>volume_up</mat-icon>
+            </button>
             <button class="minimize-btn" (click)="minimize()" title="Minimize">
               <mat-icon>remove</mat-icon>
             </button>
@@ -248,7 +251,8 @@ import { AuthService } from '../../services/auth.service';
       gap: 2px;
     }
 
-    .minimize-btn {
+    .minimize-btn,
+    .test-sound-btn {
       background: transparent;
       border: none;
       color: white;
@@ -262,11 +266,21 @@ import { AuthService } from '../../services/auth.service';
       transition: all 0.2s ease;
     }
 
-    .minimize-btn:hover {
+    .minimize-btn:hover,
+    .test-sound-btn:hover {
       background-color: rgba(255, 255, 255, 0.15);
     }
 
-    .minimize-btn mat-icon {
+    .test-sound-btn {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .test-sound-btn:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .minimize-btn mat-icon,
+    .test-sound-btn mat-icon {
       font-size: 18px;
       width: 18px;
       height: 18px;
@@ -855,6 +869,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
   
   // Sound notification
   private messageSound: HTMLAudioElement | null = null;
+  private audioContext: AudioContext | null = null;
+  isAudioInitialized = false; // Public for template access
+  private pendingSoundPlay = false;
   
   // Touch event handling
   private touchStartTime = 0;
@@ -958,6 +975,16 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
     this.destroy$.next();
     this.destroy$.complete();
     this.saveChatState();
+    
+    // Clean up audio resources
+    if (this.messageSound) {
+      this.messageSound.pause();
+      this.messageSound = null;
+    }
+    
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      this.audioContext.close();
+    }
   }
 
   /**
@@ -1011,6 +1038,14 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
     this.isClosed = true;
     this.isMinimized = false;
     this.saveChatState();
+  }
+
+  /**
+   * Test sound functionality (useful for iOS)
+   */
+  testSound(): void {
+    console.log('🔊 Testing notification sound...');
+    this.playMessageSound();
   }
 
   /**
@@ -1242,42 +1277,149 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
   }
   
   /**
-   * Initialize message sound
+   * Initialize message sound with iOS compatibility
    */
   private initializeMessageSound(): void {
     try {
-      // Create a simple notification sound using Web Audio API
+      // Create Audio element with better iOS support
       this.messageSound = new Audio();
-      // Use a data URL for a simple notification beep
+      
+      // Use a proper notification sound - iOS-compatible
       this.messageSound.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBzSJ0fPOeSsFLWpF';
-      this.messageSound.volume = 0.3; // Set volume to 30%
+      this.messageSound.volume = 0.4;
       this.messageSound.preload = 'auto';
+      
+      // iOS-specific attributes
+      this.messageSound.setAttribute('playsinline', 'true');
+      this.messageSound.setAttribute('webkit-playsinline', 'true');
+      
+      // Initialize Web Audio Context for iOS
+      if (typeof AudioContext !== 'undefined') {
+        this.audioContext = new AudioContext();
+      } else if (typeof (window as any).webkitAudioContext !== 'undefined') {
+        this.audioContext = new (window as any).webkitAudioContext();
+      }
+      
+      // Set up user interaction listeners to unlock audio on iOS
+      this.setupAudioUnlockListeners();
+      
     } catch (error) {
       console.warn('Could not initialize message sound:', error);
       this.messageSound = null;
     }
   }
+
+  /**
+   * Setup audio unlock listeners for iOS
+   */
+  private setupAudioUnlockListeners(): void {
+    const unlockAudio = () => {
+      if (!this.isAudioInitialized && this.messageSound) {
+        // Play a silent sound to unlock audio on iOS
+        const originalVolume = this.messageSound.volume;
+        this.messageSound.volume = 0;
+        this.messageSound.play().then(() => {
+          this.messageSound!.volume = originalVolume;
+          this.isAudioInitialized = true;
+          console.log('📱 Audio unlocked for iOS');
+          
+          // Play pending sound if any
+          if (this.pendingSoundPlay) {
+            this.pendingSoundPlay = false;
+            this.playMessageSound();
+          }
+        }).catch(error => {
+          console.warn('Could not unlock audio:', error);
+        });
+        
+        // Resume AudioContext if suspended (iOS requirement)
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+          this.audioContext.resume();
+        }
+      }
+      
+      // Remove listeners after first interaction
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('keydown', unlockAudio);
+    };
+    
+    // Add listeners for user interactions
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('click', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
+  }
   
   /**
-   * Play message notification sound
+   * Play message notification sound with iOS support
    */
   private playMessageSound(): void {
     try {
-      if (this.messageSound) {
-        // Reset the audio to the beginning
-        this.messageSound.currentTime = 0;
-        // Play the sound
-        const playPromise = this.messageSound.play();
-        
-        // Handle potential autoplay restrictions
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.warn('Could not play message sound (autoplay restriction):', error);
-          });
-        }
+      if (!this.messageSound) return;
+      
+      // If audio is not initialized on iOS, queue the sound for later
+      if (!this.isAudioInitialized) {
+        this.pendingSoundPlay = true;
+        console.log('📱 Audio not unlocked yet, queueing sound for iOS');
+        return;
       }
+      
+      // Reset the audio to the beginning
+      this.messageSound.currentTime = 0;
+      
+      // Ensure volume is set correctly
+      this.messageSound.volume = 0.4;
+      
+      // Play the sound with promise handling
+      const playPromise = this.messageSound.play();
+      
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          console.log('📱 Message sound played successfully');
+        }).catch(error => {
+          console.warn('Could not play message sound:', error);
+          
+          // Fallback: try to create a beep using Web Audio API
+          this.playFallbackBeep();
+        });
+      }
+      
     } catch (error) {
       console.warn('Error playing message sound:', error);
+      this.playFallbackBeep();
+    }
+  }
+
+  /**
+   * Fallback beep using Web Audio API for iOS
+   */
+  private playFallbackBeep(): void {
+    try {
+      if (this.audioContext && this.audioContext.state === 'running') {
+        // Create a simple beep tone
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+        
+        // Configure the beep
+        oscillator.frequency.setValueAtTime(800, this.audioContext.currentTime); // 800Hz
+        oscillator.type = 'sine';
+        
+        // Configure volume envelope
+        gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.1, this.audioContext.currentTime + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.2);
+        
+        // Play the beep
+        oscillator.start(this.audioContext.currentTime);
+        oscillator.stop(this.audioContext.currentTime + 0.2);
+        
+        console.log('📱 Fallback beep played using Web Audio API');
+      }
+    } catch (error) {
+      console.warn('Could not play fallback beep:', error);
     }
   }
 }
