@@ -1023,12 +1023,33 @@ export const updatePayment = asyncHandler(async (req: AuthenticatedRequest, res:
     });
   }
 
-  // Only allow updating pending payments
+  // Payment status update restrictions based on user role
+  const isAdmin = req.user?.role === 'admin' || req.user?.role === 'superadmin';
+  
   if (payment.status !== 'pending') {
-    return res.status(400).json({
-      success: false,
-      error: 'Only pending payments can be updated'
-    });
+    // Non-admins can only update pending payments
+    if (!isAdmin) {
+      return res.status(400).json({
+        success: false,
+        error: 'Only pending payments can be updated'
+      });
+    }
+    
+    // Admins cannot edit payments that have been recorded in financial reports
+    if (payment.status === 'record') {
+      return res.status(400).json({
+        success: false,
+        error: 'Recorded payments cannot be edited. Use unrecord feature first.'
+      });
+    }
+    
+    // Allow admins to edit completed and failed payments
+    if (!['completed', 'failed'].includes(payment.status)) {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot edit ${payment.status} payments`
+      });
+    }
   }
 
   // Update payment details
@@ -1154,6 +1175,8 @@ export const cancelPayment = asyncHandler(async (req: AuthenticatedRequest, res:
       error: 'Access denied'
     });
   }
+
+  // Allow cancellation of any reservation regardless of date
 
   const previousStatus = payment.status;
   payment.status = payment.status === 'completed' ? 'refunded' : 'failed';

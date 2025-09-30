@@ -91,7 +91,7 @@ export const autoFixMultiHourPayments = async (userId: string): Promise<void> =>
           
           // Update reservation payment status
           reservation.paymentStatus = 'paid';
-          await reservation.save();
+          await reservation.save({ validateBeforeSave: false });
           
           console.log(`✅ Auto-fixed: Created payment ${newPayment.referenceNumber} for ₱${allocationAmount}`);
         }

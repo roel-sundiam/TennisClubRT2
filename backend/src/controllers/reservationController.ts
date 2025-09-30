@@ -599,7 +599,7 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
   // Update the reservation with credit transaction reference if credit was used
   if (creditUsed && creditTransactionId) {
     reservation.set('metadata.creditTransactionId', creditTransactionId);
-    await reservation.save();
+    await reservation.save({ validateBeforeSave: false });
   }
 
   const message = creditUsed 
@@ -720,7 +720,7 @@ export const updateReservation = asyncHandler(async (req: AuthenticatedRequest, 
     reservation.players = players.map(p => p.trim());
   }
 
-  await reservation.save();
+  await reservation.save({ validateBeforeSave: false });
   await reservation.populate('userId', 'username fullName email');
 
   res.status(200).json({
@@ -786,15 +786,7 @@ export const cancelReservation = asyncHandler(async (req: AuthenticatedRequest, 
     isPastDate: reservationDateTime < todayStart
   });
   
-  // If reservation is in the past (before today), don't allow cancellation
-  if (reservationDateTime < new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
-    console.log(`❌ Cannot cancel past reservation (before today)`);
-    res.status(400).json({
-      success: false,
-      error: 'Cannot cancel past reservations'
-    });
-    return;
-  }
+  // Allow cancellation of any reservation regardless of date
   
   // If reservation is for today but the time slot has already started, allow cancellation anyway
   // (Business rule: Allow cancellation for weather/emergency even if time has passed)
@@ -872,7 +864,7 @@ export const cancelReservation = asyncHandler(async (req: AuthenticatedRequest, 
   }
 
   reservation.status = 'cancelled';
-  await reservation.save();
+  await reservation.save({ validateBeforeSave: false });
   await reservation.populate('userId', 'username fullName email');
 
   const message = creditRefundAmount > 0 
@@ -913,7 +905,7 @@ export const updateReservationStatus = asyncHandler(async (req: AuthenticatedReq
   }
 
   reservation.status = status;
-  await reservation.save();
+  await reservation.save({ validateBeforeSave: false });
   await reservation.populate('userId', 'username fullName email');
 
   res.status(200).json({
@@ -972,7 +964,7 @@ export const completeReservation = asyncHandler(async (req: AuthenticatedRequest
     }
   } else {
     // Just mark as completed without processing points
-    await reservation.save();
+    await reservation.save({ validateBeforeSave: false });
   }
 
   await reservation.populate('userId', 'username fullName email');

@@ -37,7 +37,7 @@ export class SeedingService {
       // Mark reservation as points processed
       reservation.matchResults = matchResults;
       reservation.pointsProcessed = true;
-      await reservation.save();
+      await reservation.save({ validateBeforeSave: false });
 
     } catch (error) {
       console.error('Error processing match results:', error);
