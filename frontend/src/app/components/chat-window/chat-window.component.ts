@@ -11,6 +11,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSelectModule } from '@angular/material/select';
 import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
 import { ChatService, ChatRoom, ChatMessage, ChatTypingEvent } from '../../services/chat.service';
@@ -32,6 +33,7 @@ import { AuthService } from '../../services/auth.service';
     MatTabsModule,
     MatChipsModule,
     MatTooltipModule,
+    MatSelectModule,
     FormsModule
   ],
   template: `
@@ -68,13 +70,56 @@ import { AuthService } from '../../services/auth.service';
             ></span>
           </div>
           <div class="header-actions">
-            <button class="test-sound-btn" (click)="testSound()" title="Test Sound" *ngIf="!isAudioInitialized">
+            <button class="settings-btn" [matMenuTriggerFor]="soundMenu" title="Sound Settings">
+              <mat-icon>settings</mat-icon>
+            </button>
+            <button class="test-sound-btn" (click)="testSound()" title="Test Sound">
               <mat-icon>volume_up</mat-icon>
             </button>
             <button class="minimize-btn" (click)="minimize()" title="Minimize">
               <mat-icon>remove</mat-icon>
             </button>
           </div>
+
+          <!-- Sound Settings Menu -->
+          <mat-menu #soundMenu="matMenu" class="sound-menu">
+            <div class="sound-settings-panel" (click)="$event.stopPropagation()">
+              <h4>🔊 Notification Sounds</h4>
+              
+              <div class="sound-option-group">
+                <label>Select Sound:</label>
+                <mat-select [(value)]="selectedSoundType" (selectionChange)="onSoundTypeChange()">
+                  <mat-option value="beep">🔔 Classic Beep</mat-option>
+                  <mat-option value="chime">🎵 Soft Chime</mat-option>
+                  <mat-option value="ping">📧 Message Ping</mat-option>
+                  <mat-option value="ding">✨ Notification Ding</mat-option>
+                  <mat-option value="pop">💬 Chat Pop</mat-option>
+                  <mat-option value="none">🔇 Silent</mat-option>
+                </mat-select>
+              </div>
+
+              <div class="sound-volume-group">
+                <label>Volume:</label>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.1" 
+                  [(ngModel)]="soundVolume"
+                  (input)="onVolumeChange()"
+                  class="volume-slider"
+                >
+                <span class="volume-label">{{ (soundVolume * 100).toFixed(0) }}%</span>
+              </div>
+
+              <div class="sound-actions">
+                <button mat-button (click)="testSound()" class="test-btn">
+                  <mat-icon>play_arrow</mat-icon>
+                  Test Sound
+                </button>
+              </div>
+            </div>
+          </mat-menu>
         </div>
 
         <!-- Simplified Chat Content (no tabs for now, just General Chat) -->
@@ -252,7 +297,8 @@ import { AuthService } from '../../services/auth.service';
     }
 
     .minimize-btn,
-    .test-sound-btn {
+    .test-sound-btn,
+    .settings-btn {
       background: transparent;
       border: none;
       color: white;
@@ -267,24 +313,129 @@ import { AuthService } from '../../services/auth.service';
     }
 
     .minimize-btn:hover,
-    .test-sound-btn:hover {
+    .test-sound-btn:hover,
+    .settings-btn:hover {
       background-color: rgba(255, 255, 255, 0.15);
     }
 
-    .test-sound-btn {
+    .test-sound-btn,
+    .settings-btn {
       background-color: rgba(255, 255, 255, 0.1);
     }
 
-    .test-sound-btn:hover {
+    .test-sound-btn:hover,
+    .settings-btn:hover {
       background-color: rgba(255, 255, 255, 0.2);
     }
 
     .minimize-btn mat-icon,
-    .test-sound-btn mat-icon {
+    .test-sound-btn mat-icon,
+    .settings-btn mat-icon {
       font-size: 18px;
       width: 18px;
       height: 18px;
       color: white;
+    }
+
+    /* Sound Settings Panel */
+    .sound-settings-panel {
+      padding: 16px;
+      min-width: 250px;
+      background: white;
+    }
+
+    .sound-settings-panel h4 {
+      margin: 0 0 16px 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 8px;
+    }
+
+    .sound-option-group,
+    .sound-volume-group {
+      margin-bottom: 16px;
+    }
+
+    .sound-option-group label,
+    .sound-volume-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #555;
+      margin-bottom: 8px;
+    }
+
+    .sound-volume-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sound-volume-group label {
+      margin-bottom: 0;
+      min-width: 60px;
+    }
+
+    .volume-slider {
+      flex: 1;
+      height: 6px;
+      border-radius: 3px;
+      background: #ddd;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #0084ff;
+      cursor: pointer;
+      border: 2px solid white;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    .volume-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #0084ff;
+      cursor: pointer;
+      border: 2px solid white;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    .volume-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+      min-width: 35px;
+    }
+
+    .sound-actions {
+      display: flex;
+      justify-content: center;
+      padding-top: 8px;
+      border-top: 1px solid #eee;
+    }
+
+    .test-btn {
+      background: linear-gradient(135deg, #0084ff, #00c6ff) !important;
+      color: white !important;
+      border-radius: 6px !important;
+      font-size: 13px !important;
+      padding: 8px 16px !important;
+      min-height: 36px !important;
+    }
+
+    .test-btn mat-icon {
+      font-size: 16px !important;
+      width: 16px !important;
+      height: 16px !important;
+      margin-right: 6px !important;
     }
 
     .unread-badge {
@@ -873,6 +1024,10 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
   isAudioInitialized = false; // Public for template access
   private pendingSoundPlay = false;
   
+  // Sound settings
+  selectedSoundType = 'beep'; // Default sound
+  soundVolume = 0.4; // Default volume
+  
   // Touch event handling
   private touchStartTime = 0;
 
@@ -960,6 +1115,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
     // Load chat state from localStorage
     this.loadChatState();
     
+    // Load sound settings from localStorage
+    this.loadSoundSettings();
+    
     // Initialize message sound
     this.initializeMessageSound();
   }
@@ -1046,6 +1204,49 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
   testSound(): void {
     console.log('🔊 Testing notification sound...');
     this.playMessageSound();
+  }
+
+  /**
+   * Handle sound type change
+   */
+  onSoundTypeChange(): void {
+    console.log('🔊 Sound type changed to:', this.selectedSoundType);
+    this.saveSoundSettings();
+  }
+
+  /**
+   * Handle volume change
+   */
+  onVolumeChange(): void {
+    console.log('🔊 Volume changed to:', this.soundVolume);
+    this.saveSoundSettings();
+  }
+
+  /**
+   * Save sound settings to localStorage
+   */
+  private saveSoundSettings(): void {
+    const settings = {
+      soundType: this.selectedSoundType,
+      volume: this.soundVolume
+    };
+    localStorage.setItem('chatSoundSettings', JSON.stringify(settings));
+  }
+
+  /**
+   * Load sound settings from localStorage
+   */
+  private loadSoundSettings(): void {
+    try {
+      const settingsStr = localStorage.getItem('chatSoundSettings');
+      if (settingsStr) {
+        const settings = JSON.parse(settingsStr);
+        this.selectedSoundType = settings.soundType || 'beep';
+        this.soundVolume = settings.volume || 0.4;
+      }
+    } catch (error) {
+      console.error('Error loading sound settings:', error);
+    }
   }
 
   /**
@@ -1355,8 +1556,12 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
    */
   private playMessageSound(): void {
     try {
-      if (!this.messageSound) return;
-      
+      // Check if sounds are disabled
+      if (this.selectedSoundType === 'none') {
+        console.log('🔇 Sound disabled by user settings');
+        return;
+      }
+
       // If audio is not initialized on iOS, queue the sound for later
       if (!this.isAudioInitialized) {
         this.pendingSoundPlay = true;
@@ -1364,62 +1569,157 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
         return;
       }
       
-      // Reset the audio to the beginning
-      this.messageSound.currentTime = 0;
-      
-      // Ensure volume is set correctly
-      this.messageSound.volume = 0.4;
-      
-      // Play the sound with promise handling
-      const playPromise = this.messageSound.play();
-      
-      if (playPromise !== undefined) {
-        playPromise.then(() => {
-          console.log('📱 Message sound played successfully');
-        }).catch(error => {
-          console.warn('Could not play message sound:', error);
-          
-          // Fallback: try to create a beep using Web Audio API
-          this.playFallbackBeep();
-        });
+      // Try to play HTML5 audio first
+      if (this.messageSound && this.selectedSoundType === 'beep') {
+        this.messageSound.currentTime = 0;
+        this.messageSound.volume = this.soundVolume;
+        
+        const playPromise = this.messageSound.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            console.log('📱 Message sound played successfully');
+          }).catch(error => {
+            console.warn('Could not play message sound:', error);
+            this.playWebAudioSound();
+          });
+        }
+      } else {
+        // Use Web Audio API for other sound types
+        this.playWebAudioSound();
       }
       
     } catch (error) {
       console.warn('Error playing message sound:', error);
-      this.playFallbackBeep();
+      this.playWebAudioSound();
     }
   }
 
   /**
-   * Fallback beep using Web Audio API for iOS
+   * Play notification sound using Web Audio API
    */
-  private playFallbackBeep(): void {
+  private playWebAudioSound(): void {
     try {
-      if (this.audioContext && this.audioContext.state === 'running') {
-        // Create a simple beep tone
-        const oscillator = this.audioContext.createOscillator();
-        const gainNode = this.audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(this.audioContext.destination);
-        
-        // Configure the beep
-        oscillator.frequency.setValueAtTime(800, this.audioContext.currentTime); // 800Hz
-        oscillator.type = 'sine';
-        
-        // Configure volume envelope
-        gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.1, this.audioContext.currentTime + 0.01);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.2);
-        
-        // Play the beep
-        oscillator.start(this.audioContext.currentTime);
-        oscillator.stop(this.audioContext.currentTime + 0.2);
-        
-        console.log('📱 Fallback beep played using Web Audio API');
+      if (!this.audioContext || this.audioContext.state !== 'running') {
+        console.warn('AudioContext not available');
+        return;
       }
+
+      const currentTime = this.audioContext.currentTime;
+      const oscillator = this.audioContext.createOscillator();
+      const gainNode = this.audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+      
+      // Configure sound based on selected type
+      switch (this.selectedSoundType) {
+        case 'beep':
+          // Classic notification beep
+          oscillator.frequency.setValueAtTime(800, currentTime);
+          oscillator.type = 'sine';
+          gainNode.gain.setValueAtTime(0, currentTime);
+          gainNode.gain.linearRampToValueAtTime(this.soundVolume * 0.3, currentTime + 0.01);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.2);
+          oscillator.start(currentTime);
+          oscillator.stop(currentTime + 0.2);
+          break;
+          
+        case 'chime':
+          // Soft chime sound
+          this.playChimeSound(currentTime);
+          break;
+          
+        case 'ping':
+          // Message ping
+          oscillator.frequency.setValueAtTime(1200, currentTime);
+          oscillator.type = 'sine';
+          gainNode.gain.setValueAtTime(0, currentTime);
+          gainNode.gain.linearRampToValueAtTime(this.soundVolume * 0.2, currentTime + 0.01);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.15);
+          oscillator.start(currentTime);
+          oscillator.stop(currentTime + 0.15);
+          break;
+          
+        case 'ding':
+          // Notification ding
+          this.playDingSound(currentTime);
+          break;
+          
+        case 'pop':
+          // Chat pop sound
+          oscillator.frequency.setValueAtTime(600, currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(1000, currentTime + 0.1);
+          oscillator.type = 'square';
+          gainNode.gain.setValueAtTime(0, currentTime);
+          gainNode.gain.linearRampToValueAtTime(this.soundVolume * 0.1, currentTime + 0.01);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.1);
+          oscillator.start(currentTime);
+          oscillator.stop(currentTime + 0.1);
+          break;
+          
+        default:
+          // Default beep
+          oscillator.frequency.setValueAtTime(800, currentTime);
+          oscillator.type = 'sine';
+          gainNode.gain.setValueAtTime(0, currentTime);
+          gainNode.gain.linearRampToValueAtTime(this.soundVolume * 0.3, currentTime + 0.01);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.2);
+          oscillator.start(currentTime);
+          oscillator.stop(currentTime + 0.2);
+      }
+      
+      console.log(`🔊 ${this.selectedSoundType} sound played using Web Audio API`);
+      
     } catch (error) {
-      console.warn('Could not play fallback beep:', error);
+      console.warn('Could not play Web Audio sound:', error);
     }
+  }
+
+  /**
+   * Play chime sound (multiple tones)
+   */
+  private playChimeSound(startTime: number): void {
+    const frequencies = [523, 659, 784]; // C5, E5, G5
+    frequencies.forEach((freq, index) => {
+      const oscillator = this.audioContext!.createOscillator();
+      const gainNode = this.audioContext!.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(this.audioContext!.destination);
+      
+      oscillator.frequency.setValueAtTime(freq, startTime + index * 0.1);
+      oscillator.type = 'sine';
+      
+      gainNode.gain.setValueAtTime(0, startTime + index * 0.1);
+      gainNode.gain.linearRampToValueAtTime(this.soundVolume * 0.15, startTime + index * 0.1 + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + index * 0.1 + 0.3);
+      
+      oscillator.start(startTime + index * 0.1);
+      oscillator.stop(startTime + index * 0.1 + 0.3);
+    });
+  }
+
+  /**
+   * Play ding sound (bell-like)
+   */
+  private playDingSound(startTime: number): void {
+    const oscillator = this.audioContext!.createOscillator();
+    const gainNode = this.audioContext!.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(this.audioContext!.destination);
+    
+    // Bell-like frequency modulation
+    oscillator.frequency.setValueAtTime(1000, startTime);
+    oscillator.frequency.exponentialRampToValueAtTime(800, startTime + 0.1);
+    oscillator.frequency.exponentialRampToValueAtTime(900, startTime + 0.3);
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0, startTime);
+    gainNode.gain.linearRampToValueAtTime(this.soundVolume * 0.25, startTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + 0.8);
+    
+    oscillator.start(startTime);
+    oscillator.stop(startTime + 0.8);
   }
 }
