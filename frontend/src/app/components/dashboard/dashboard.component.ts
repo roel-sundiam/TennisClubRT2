@@ -628,6 +628,40 @@ import { environment } from '../../../environments/environment';
                 </button>
               </mat-card-actions>
             </mat-card>
+
+            <!-- PlaySquad Partner -->
+            <mat-card class="partner-card general-partner" (click)="openPlaySquad()">
+              <mat-card-header>
+                <img src="playsquad-logo.png" alt="PlaySquad Logo" mat-card-avatar class="partner-logo-header playsquad-logo" loading="lazy">
+                <mat-card-title>PlaySquad</mat-card-title>
+                <mat-card-subtitle>Find teammates and organize sports activities</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <div class="partner-content">
+                  <p>Connect with fellow sports enthusiasts and organize games effortlessly! Build your sports community and never play alone again.</p>
+                  <div class="partner-features">
+                    <div class="feature-item">
+                      <mat-icon>group</mat-icon>
+                      <span>Team Building</span>
+                    </div>
+                    <div class="feature-item">
+                      <mat-icon>event</mat-icon>
+                      <span>Event Organization</span>
+                    </div>
+                    <div class="feature-item">
+                      <mat-icon>sports</mat-icon>
+                      <span>Sports Community</span>
+                    </div>
+                  </div>
+                </div>
+              </mat-card-content>
+              <mat-card-actions>
+                <button mat-raised-button class="partner-btn general-btn" (click)="openPlaySquad()">
+                  <mat-icon>open_in_new</mat-icon>
+                  Join Now
+                </button>
+              </mat-card-actions>
+            </mat-card>
           </div>
         </div>
       </div>
@@ -713,6 +747,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
 
     window.open('https://tennis-marketplace.netlify.app/browse', '_blank');
+  }
+
+  openPlaySquad(): void {
+    // Track partner click analytics
+    this.analyticsService.trackUserActivity('partner_click', 'dashboard', {
+      partnerName: 'PlaySquad',
+      partnerUrl: 'https://play-squad.netlify.app/',
+      partnerType: 'general',
+      clickSource: 'partner_card'
+    });
+
+    window.open('https://play-squad.netlify.app/', '_blank');
   }
 
   /**
