@@ -639,17 +639,30 @@ click "Try Again" below to reconnect.
           players: r.players 
         })));
         
-        // Filter out cancelled reservations and yesterday's reservations
+        // Filter out cancelled reservations and past date/time reservations
+        const now = new Date();
         const today = new Date();
         today.setHours(0, 0, 0, 0); // Set to start of today
         
         const activeReservations = reservations.filter((r: any) => {
           if (r.status === 'cancelled') return false;
           
-          // Exclude yesterday's and older reservations
           const reservationDate = new Date(r.date);
           reservationDate.setHours(0, 0, 0, 0);
-          return reservationDate >= today;
+          
+          // Future dates: include
+          if (reservationDate > today) return true;
+          
+          // Past dates: exclude
+          if (reservationDate < today) return false;
+          
+          // Today: check if time slot hasn't passed yet
+          if (reservationDate.getTime() === today.getTime()) {
+            const currentHour = now.getHours();
+            return r.timeSlot > currentHour; // Only show future time slots
+          }
+          
+          return false;
         });
         console.log('🔍 Active reservations before grouping:', activeReservations.length);
         console.log('🔍 Active reservations details:', activeReservations.map(r => ({
