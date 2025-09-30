@@ -14,13 +14,14 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
-import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
 import { CreditService, CreditTransaction } from '../../services/credit.service';
 import { PaymentConfirmationDialogComponent, PaymentConfirmationData } from '../payment-confirmation-dialog/payment-confirmation-dialog.component';
 import { UnrecordConfirmationDialogComponent, UnrecordDialogData } from '../unrecord-confirmation-dialog/unrecord-confirmation-dialog.component';
+import { EditPaymentAmountDialogComponent, EditPaymentAmountData } from '../edit-payment-amount-dialog/edit-payment-amount-dialog.component';
 import { environment } from '../../../environments/environment';
 
 interface PaymentRecord {
@@ -108,7 +109,8 @@ interface PaymentsReportData {
     MatDividerModule,
     MatDialogModule,
     MatTabsModule,
-    ReactiveFormsModule
+    ReactiveFormsModule,
+    FormsModule
   ],
   template: `
     <div class="report-container">
@@ -359,7 +361,17 @@ interface PaymentsReportData {
                 <ng-container matColumnDef="totalAmount">
                   <th mat-header-cell *matHeaderCellDef>Total Amount</th>
                   <td mat-cell *matCellDef="let payment">
-                    <strong class="total-amount">₱{{payment.amount.toFixed(2)}}</strong>
+                    <div class="amount-container">
+                      <!-- Show all amounts with click handler that provides appropriate feedback -->
+                      <div class="amount-display" 
+                           [class.editable]="canEditPayment(payment)"
+                           [class.readonly]="!canEditPayment(payment)"
+                           (click)="handleAmountClick(payment)"
+                           [title]="getAmountTitle(payment)">
+                        <strong class="total-amount">₱{{payment.amount.toFixed(2)}}</strong>
+                        <mat-icon class="action-icon">{{getAmountIcon(payment.status)}}</mat-icon>
+                      </div>
+                    </div>
                   </td>
                 </ng-container>
 
@@ -1266,6 +1278,92 @@ interface PaymentsReportData {
         grid-template-columns: 1fr;
       }
     }
+
+    /* Amount Display Styles */
+    .amount-container {
+      width: 100%;
+    }
+
+    .amount-display {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+      min-width: 110px;
+    }
+
+    /* Editable amounts (pending payments) */
+    .amount-display.editable {
+      cursor: pointer;
+      background: rgba(59, 130, 246, 0.03);
+    }
+
+    .amount-display.editable:hover {
+      background: rgba(59, 130, 246, 0.08);
+      border-color: rgba(59, 130, 246, 0.2);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+    }
+
+    .amount-display.editable:hover .total-amount {
+      color: #1d4ed8;
+    }
+
+    /* Read-only amounts (completed/recorded payments) */
+    .amount-display.readonly {
+      cursor: default;
+      background: rgba(107, 114, 128, 0.03);
+    }
+
+    .amount-display.readonly:hover {
+      background: rgba(107, 114, 128, 0.05);
+    }
+
+    .amount-display .total-amount {
+      font-weight: 600;
+      font-size: 14px;
+      color: #1e293b;
+      transition: color 0.2s ease;
+    }
+
+    /* Action icon for all payment types */
+    .action-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      transition: all 0.2s ease;
+    }
+
+    /* Edit icon for pending payments */
+    .amount-display.editable .action-icon {
+      color: #94a3b8;
+      opacity: 0;
+    }
+
+    .amount-display.editable:hover .action-icon {
+      opacity: 1;
+      color: #3b82f6;
+    }
+
+    /* Status icon for completed payments */
+    .amount-display.readonly .action-icon {
+      color: #6b7280;
+      opacity: 0.7;
+    }
+
+    .amount-display.readonly:hover .action-icon {
+      opacity: 1;
+    }
+
+    /* Modal Panel Styling */
+    ::ng-deep .edit-amount-dialog .mat-mdc-dialog-container {
+      padding: 0;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    }
   `]
 })
 export class CourtReceiptsReportComponent implements OnInit {
@@ -1284,6 +1382,11 @@ export class CourtReceiptsReportComponent implements OnInit {
   creditDeposits: CreditTransaction[] = [];
   creditDepositsColumns = ['requestDate', 'member', 'amount', 'paymentMethod', 'status', 'actions'];
   loadingCreditDeposits = false;
+  
+  // Amount editing
+  updatingPayment = false;
+  
+  private apiUrl = environment.apiUrl;
   
   
   dateRangeForm = new FormGroup({
@@ -2069,5 +2172,145 @@ export class CourtReceiptsReportComponent implements OnInit {
       minute: '2-digit',
       hour12: true
     });
+  }
+
+  // Amount editing methods
+  handleAmountClick(payment: PaymentRecord): void {
+    
+    // Only allow admins to edit amounts
+    if (!this.authService.isAdmin()) {
+      this.snackBar.open('Only admins can edit payment amounts', 'Close', {
+        duration: 3000
+      });
+      return;
+    }
+
+    // Check payment status restrictions
+    if (payment.status === 'record') {
+      this.snackBar.open('Recorded payments cannot be edited. Use unrecord feature first.', 'Close', {
+        duration: 4000
+      });
+      return;
+    }
+
+    if (payment.status === 'refunded') {
+      this.snackBar.open('Refunded payments cannot be edited.', 'Close', {
+        duration: 4000
+      });
+      return;
+    }
+
+    // Allow editing pending, completed, and failed payments
+    if (!['pending', 'completed', 'failed'].includes(payment.status)) {
+      this.snackBar.open(`Cannot edit ${payment.status} payments.`, 'Close', {
+        duration: 4000
+      });
+      return;
+    }
+
+    // If we get here, the payment can be edited
+    this.openEditAmountModal(payment);
+  }
+
+  openEditAmountModal(payment: PaymentRecord): void {
+    const dialogData: EditPaymentAmountData = {
+      paymentId: payment._id,
+      memberName: payment.memberName,
+      currentAmount: payment.amount,
+      reservationDate: payment.reservationDate,
+      timeSlot: payment.timeSlotDisplay
+    };
+
+    const dialogRef = this.dialog.open(EditPaymentAmountDialogComponent, {
+      width: '500px',
+      maxWidth: '90vw',
+      data: dialogData,
+      disableClose: false,
+      panelClass: 'edit-amount-dialog'
+    });
+
+    dialogRef.afterClosed().subscribe(newAmount => {
+      if (newAmount && newAmount !== payment.amount) {
+        this.updatePaymentAmount(payment, newAmount);
+      }
+    });
+  }
+
+  canEditPayment(payment: PaymentRecord): boolean {
+    if (!this.authService.isAdmin()) {
+      return false;
+    }
+    
+    // Admins can edit pending, completed, and failed payments
+    return ['pending', 'completed', 'failed'].includes(payment.status);
+  }
+
+  getAmountTitle(payment: PaymentRecord): string {
+    if (!this.authService.isAdmin()) {
+      return 'Only admins can edit payment amounts';
+    }
+    
+    if (this.canEditPayment(payment)) {
+      return 'Click to edit amount';
+    }
+    
+    const titles: {[key: string]: string} = {
+      'record': 'Payment recorded in financial reports - use unrecord feature first',
+      'refunded': 'Refunded payments cannot be edited'
+    };
+    return titles[payment.status] || 'Amount cannot be edited';
+  }
+
+  getAmountIcon(status: string): string {
+    // Show edit icon for editable payments
+    if (['pending', 'completed', 'failed'].includes(status)) {
+      return 'edit';
+    }
+    
+    const icons: {[key: string]: string} = {
+      'record': 'assignment',
+      'refunded': 'money_off'
+    };
+    return icons[status] || 'lock';
+  }
+
+  private updatePaymentAmount(payment: PaymentRecord, newAmount: number): void {
+    this.updatingPayment = true;
+
+    const updateData = {
+      customAmount: newAmount
+    };
+
+    this.http.put<any>(`${this.apiUrl}/payments/${payment._id}`, updateData)
+      .subscribe({
+        next: (response) => {
+          if (response.success) {
+            this.snackBar.open('Payment amount updated successfully', 'Close', {
+              duration: 3000
+            });
+            
+            // Update the payment in the local data
+            if (this.reportData && this.reportData.payments) {
+              const paymentIndex = this.reportData.payments.findIndex(p => p._id === payment._id);
+              if (paymentIndex !== -1) {
+                this.reportData.payments[paymentIndex].amount = newAmount;
+              }
+            }
+          } else {
+            this.snackBar.open(response.message || 'Failed to update payment amount', 'Close', {
+              duration: 3000
+            });
+          }
+        },
+        error: (error) => {
+          console.error('Error updating payment amount:', error);
+          this.snackBar.open('Error updating payment amount', 'Close', {
+            duration: 3000
+          });
+        },
+        complete: () => {
+          this.updatingPayment = false;
+        }
+      });
   }
 }
