@@ -145,6 +145,67 @@ export class PWANotificationService {
   }
 
   /**
+   * Show chat message notification
+   */
+  showChatNotification(title: string, body: string, data?: any): void {
+    if (this.getNotificationPermission() !== 'granted') {
+      console.log('Notification permission not granted');
+      return;
+    }
+
+    // Don't show notification if app is in focus and visible
+    if (document.visibilityState === 'visible') {
+      console.log('App is in focus, skipping notification');
+      return;
+    }
+
+    try {
+      const notification = new Notification(title, {
+        body,
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/icon-192x192.png',
+        tag: 'chat-message-notification',
+        requireInteraction: false, // Allow auto-dismiss for chat messages
+        silent: false,
+        data: data || {},
+        actions: [
+          {
+            action: 'reply',
+            title: '💬 Reply',
+            icon: '/icons/icon-192x192.png'
+          },
+          {
+            action: 'view',
+            title: '👀 View Chat',
+            icon: '/icons/icon-192x192.png'
+          }
+        ]
+      });
+
+      notification.onclick = () => {
+        console.log('💬 Chat notification clicked, opening app');
+        window.focus();
+        
+        // Navigate to chat or dashboard
+        if (data?.url) {
+          window.location.href = data.url;
+        } else {
+          window.location.href = '/dashboard';
+        }
+        notification.close();
+      };
+
+      // Auto close after 8 seconds for chat messages
+      setTimeout(() => {
+        notification.close();
+      }, 8000);
+
+    } catch (error) {
+      console.error('Error showing chat notification:', error);
+    }
+  }
+
+  /**
    * Show local notification for Open Play events
    */
   showOpenPlayNotification(title: string, body: string, data?: any): void {

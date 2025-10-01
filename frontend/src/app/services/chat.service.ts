@@ -153,6 +153,9 @@ export class ChatService implements OnDestroy {
   ) {
     console.log('💬 ChatService initialized');
     
+    // Initialize PWA notifications
+    this.initializePushNotifications();
+    
     // Initialize chat when user is authenticated
     this.authService.currentUser$.pipe(
       takeUntil(this.destroy$)
@@ -161,6 +164,9 @@ export class ChatService implements OnDestroy {
         console.log('💬 User authenticated, initializing chat');
         this.currentUser = user;
         this.isAuthenticated = true;
+        
+        // Subscribe to push notifications for this user
+        this.subscribeToPushNotifications();
         this.initializeChat();
       } else if (!user && this.isAuthenticated) {
         console.log('💬 User logged out, cleaning up chat');
@@ -706,64 +712,58 @@ export class ChatService implements OnDestroy {
         const notificationTitle = `${roomName} - ${message.user?.fullName || 'Someone'}`;
         const notificationBody = message.content;
         
-        // Show notification using service worker
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({
-            type: 'SHOW_NOTIFICATION',
-            payload: {
-              title: notificationTitle,
-              body: notificationBody,
-              icon: '/assets/icons/icon-192x192.png',
-              badge: '/assets/icons/icon-72x72.png',
-              tag: `chat-${message.roomId}`,
-              data: {
-                type: 'chat_message',
-                roomId: message.roomId,
-                messageId: message._id,
-                url: window.location.origin
-              },
-              actions: [
-                {
-                  action: 'view',
-                  title: 'View Chat'
-                },
-                {
-                  action: 'close',
-                  title: 'Close'
-                }
-              ]
-            }
-          });
-        } else {
-          // Fallback to regular notification
-          const notification = new Notification(notificationTitle, {
-            body: notificationBody,
-            icon: '/assets/icons/icon-192x192.png',
-            tag: `chat-${message.roomId}`,
-            requireInteraction: false
-          });
-
-          // Auto-close after 5 seconds
-          setTimeout(() => {
-            notification.close();
-          }, 5000);
-
-          // Handle click
-          notification.onclick = () => {
-            window.focus();
-            // Focus on the chat window (could emit an event here)
-            notification.close();
-          };
-        }
+        // Use the enhanced PWA notification service
+        this.pwaNotificationService.showChatNotification(
+          notificationTitle,
+          notificationBody,
+          {
+            url: '/dashboard',
+            type: 'chat_message',
+            messageId: message._id,
+            roomId: message.roomId,
+            roomName: roomName,
+            senderId: message.userId,
+            senderName: message.user?.fullName || 'Someone',
+            timestamp: message.createdAt
+          }
+        );
       } else if (Notification.permission === 'default') {
-        // Request permission
-        Notification.requestPermission().then(permission => {
-          if (permission === 'granted') {
-            // Retry showing notification
+        // Request permission using PWA service
+        this.pwaNotificationService.requestNotificationPermission().then(granted => {
+          if (granted) {
+            console.log('💬 Notification permission granted, retrying...');
             this.showMessageNotification(message);
+          } else {
+            console.log('💬 Notification permission denied');
           }
         });
+      } else {
+        console.log('💬 Notifications are disabled by user');
       }
+    }
+  }
+
+  /**
+   * Initialize push notifications for chat
+   */
+  private initializePushNotifications(): void {
+    console.log('💬 Initializing push notifications for chat');
+    this.pwaNotificationService.init();
+  }
+
+  /**
+   * Subscribe to push notifications for chat messages
+   */
+  private subscribeToPushNotifications(): void {
+    if (this.isAuthenticated && this.pwaNotificationService.isPushNotificationSupported()) {
+      console.log('💬 Subscribing to push notifications for chat');
+      this.pwaNotificationService.subscribeToPushNotifications().then(subscription => {
+        if (subscription) {
+          console.log('💬 Successfully subscribed to push notifications');
+        } else {
+          console.log('💬 Failed to subscribe to push notifications');
+        }
+      });
     }
   }
 }
