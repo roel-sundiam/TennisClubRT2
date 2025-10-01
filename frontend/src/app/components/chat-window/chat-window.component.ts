@@ -38,6 +38,14 @@ import { AuthService } from '../../services/auth.service';
   ],
   template: `
     <div class="chat-container" [class.minimized]="isMinimized" [class.closed]="isClosed">
+      <!-- Mobile Backdrop (only on mobile when chat is open) -->
+      <div 
+        class="chat-backdrop" 
+        *ngIf="!isClosed && !isMinimized"
+        (click)="minimize()"
+        (touchstart)="minimize()"
+      ></div>
+
       <!-- Chat Toggle Button (when minimized or closed) -->
       <div 
         class="chat-toggle-button" 
@@ -215,6 +223,10 @@ import { AuthService } from '../../services/auth.service';
       z-index: 1000;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    .chat-backdrop {
+      display: none;
     }
 
     .chat-toggle-button {
@@ -803,6 +815,19 @@ import { AuthService } from '../../services/auth.service';
         z-index: 1000;
       }
 
+      .chat-backdrop {
+        display: block !important;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.3);
+        z-index: 999;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
       .chat-container.minimized,
       .chat-container.closed {
         position: fixed;
@@ -822,6 +847,8 @@ import { AuthService } from '../../services/auth.service';
         max-height: 100%;
         border-radius: 0;
         box-shadow: none;
+        position: relative;
+        z-index: 1001;
       }
 
       .chat-toggle-button {
@@ -1054,7 +1081,8 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
 
   constructor(
     private chatService: ChatService,
-    private authService: AuthService
+    private authService: AuthService,
+    private elementRef: ElementRef
   ) {}
 
   ngOnInit(): void {
@@ -1297,6 +1325,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
       }
     }
   }
+
 
   /**
    * Get unread count for General Chat

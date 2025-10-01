@@ -764,8 +764,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     console.log('📱 Touch end detected, action:', action);
     const touchDuration = Date.now() - this.touchStartTime;
     
-    // Only trigger if it's a quick tap (less than 500ms)
-    if (touchDuration < 500) {
+    // Only trigger if it's a quick tap (less than 200ms for more responsive feel)
+    if (touchDuration < 200) {
       event.preventDefault();
       event.stopPropagation();
       

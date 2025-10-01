@@ -777,7 +777,7 @@ app-coin-balance-alerts {
   .action-card {
     /* Critical mobile touch properties */
     touch-action: manipulation !important;
-    -webkit-tap-highlight-color: rgba(0, 132, 255, 0.3) !important;
+    -webkit-tap-highlight-color: rgba(0, 132, 255, 0.2) !important;
     -webkit-user-select: none !important;
     -moz-user-select: none !important;
     -ms-user-select: none !important;
@@ -799,39 +799,28 @@ app-coin-balance-alerts {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
     border: 1px solid rgba(0, 0, 0, 0.05) !important;
     cursor: pointer !important;
-    transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+    transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease !important;
     position: relative !important;
     z-index: 10 !important;
     overflow: hidden !important;
 
-    /* Immediate touch feedback */
+    /* Immediate touch feedback - faster and more responsive */
     &:active {
-      transform: translateY(-1px) scale(0.95) !important;
+      transform: translateY(0px) scale(0.96) !important;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2) !important;
-      background: rgba(0, 132, 255, 0.1) !important;
+      background: rgba(0, 132, 255, 0.08) !important;
       transition: all 0.05s ease !important;
     }
 
     &:hover {
-      transform: translateY(-2px) !important;
+      transform: translateY(-1px) !important;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
     }
 
-    /* Ensure click events reach the card element */
-    * {
+    /* Simplified pointer events - only disable child elements that might interfere */
+    .mobile-card-icon,
+    .mobile-card-title {
       pointer-events: none !important;
-    }
-    
-    /* Re-enable pointer events on the card itself */
-    &::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      z-index: 1;
-      pointer-events: auto;
     }
 
     /* Hide desktop content on mobile */
