@@ -232,7 +232,7 @@ const startServer = async () => {
     // syncService.startSync();
     console.log('⚠️  Google Sheets sync DISABLED for testing recorded payments integration');
     
-    httpServer.listen(PORT, '0.0.0.0', () => {
+    httpServer.listen(Number(PORT), '0.0.0.0', () => {
       console.log(`🚀 Tennis Club RT2 Backend running on port ${PORT}`);
       console.log(`📱 Environment: ${process.env.NODE_ENV}`);
       console.log(`🔗 Health check: http://localhost:${PORT}/health`);
@@ -250,7 +250,7 @@ const startServer = async () => {
     webSocketService.initialize(httpServer);
     console.log('🔌 WebSocket service initialized (emergency mode)');
     
-    httpServer.listen(PORT, '0.0.0.0', () => {
+    httpServer.listen(Number(PORT), '0.0.0.0', () => {
       console.log(`🚀 Tennis Club RT2 Backend running on port ${PORT} (NO DATABASE)`);
       console.log(`📱 Environment: ${process.env.NODE_ENV}`);
       console.log(`🔗 Health check: http://localhost:${PORT}/health`);
