@@ -156,6 +156,9 @@ export class ChatService implements OnDestroy {
     // Initialize PWA notifications
     this.initializePushNotifications();
     
+    // Make debug method available globally for mobile testing
+    (window as any).debugChat = () => this.debugChatState();
+    
     // Initialize chat when user is authenticated
     this.authService.currentUser$.pipe(
       takeUntil(this.destroy$)
@@ -190,11 +193,54 @@ export class ChatService implements OnDestroy {
   private initializeChat(): void {
     if (!this.currentUser) return;
 
+    console.log('💬 Initializing chat for mobile device');
+    
     // Authenticate with chat WebSocket
     this.authenticateChat();
     
     // Load initial chat rooms
     this.loadChatRooms();
+    
+    // Set up mobile-specific connection monitoring
+    this.setupMobileConnectionMonitoring();
+  }
+
+  /**
+   * Setup mobile-specific connection monitoring
+   */
+  private setupMobileConnectionMonitoring(): void {
+    // Monitor page visibility changes (important for mobile)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        console.log('📱 App became visible, checking chat connection');
+        this.checkAndReconnectChat();
+      }
+    });
+
+    // Monitor network changes
+    if ('navigator' in window && 'onLine' in navigator) {
+      window.addEventListener('online', () => {
+        console.log('📱 Network came back online, reconnecting chat');
+        setTimeout(() => this.checkAndReconnectChat(), 1000);
+      });
+    }
+  }
+
+  /**
+   * Check and reconnect chat if needed
+   */
+  private checkAndReconnectChat(): void {
+    if (!this.webSocketService.isConnected() && this.isAuthenticated) {
+      console.log('💬 Chat disconnected, attempting reconnection');
+      this.webSocketService.reconnect();
+      
+      // Re-authenticate after reconnection
+      setTimeout(() => {
+        if (this.webSocketService.isConnected()) {
+          this.authenticateChat();
+        }
+      }, 2000);
+    }
   }
 
   /**
@@ -228,7 +274,11 @@ export class ChatService implements OnDestroy {
     ).subscribe(connected => {
       if (connected && this.webSocketService.socket) {
         console.log('💬 Setting up WebSocket chat listeners');
+        console.log('📱 Device info - UserAgent:', navigator.userAgent);
+        console.log('📱 Connection state:', this.webSocketService.socket.connected);
         this.setupChatEventListeners();
+      } else {
+        console.warn('💬 WebSocket not connected, skipping chat listeners setup');
       }
     });
   }
@@ -286,6 +336,16 @@ export class ChatService implements OnDestroy {
    * Handle incoming chat message
    */
   private handleIncomingMessage(message: ChatMessage): void {
+    console.log('💬 Processing incoming message:', {
+      messageId: message._id,
+      content: message.content,
+      fromUser: message.user?.fullName,
+      messageRoomId: message.roomId,
+      currentRoom: this.currentRoomSubject.value,
+      isCurrentUser: message.userId === this.currentUser?._id,
+      timestamp: new Date().toISOString()
+    });
+
     const currentMessages = this.messagesSubject.value;
     const currentRoom = this.currentRoomSubject.value;
 
@@ -294,8 +354,15 @@ export class ChatService implements OnDestroy {
       // Check if message already exists (avoid duplicates)
       const existingIndex = currentMessages.findIndex(m => m._id === message._id);
       if (existingIndex === -1) {
-        this.messagesSubject.next([...currentMessages, message]);
+        console.log('💬 Adding new message to current room:', message._id);
+        const updatedMessages = [...currentMessages, message];
+        this.messagesSubject.next(updatedMessages);
+        console.log('💬 Messages array updated, new length:', updatedMessages.length);
+      } else {
+        console.log('💬 Message already exists, skipping duplicate:', message._id);
       }
+    } else {
+      console.log('💬 Message not for current room, currentRoom:', currentRoom, 'messageRoom:', message.roomId);
     }
 
     // Only update unread count for messages from other users
@@ -765,5 +832,27 @@ export class ChatService implements OnDestroy {
         }
       });
     }
+  }
+
+  /**
+   * Debug method to check chat state (call from browser console)
+   */
+  debugChatState(): any {
+    const debugInfo = {
+      isAuthenticated: this.isAuthenticated,
+      currentUser: this.currentUser?.fullName || 'Not logged in',
+      currentRoom: this.currentRoomSubject.value,
+      messagesCount: this.messagesSubject.value.length,
+      roomsCount: this.roomsSubject.value.length,
+      unreadCount: this.unreadCountSubject.value,
+      websocketConnected: this.webSocketService.isConnected(),
+      websocketId: this.webSocketService.socket?.id,
+      userAgent: navigator.userAgent,
+      onlineStatus: navigator.onLine,
+      visibilityState: document.visibilityState
+    };
+    
+    console.log('💬 Chat Debug Info:', debugInfo);
+    return debugInfo;
   }
 }
