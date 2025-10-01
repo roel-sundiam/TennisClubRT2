@@ -160,27 +160,47 @@ export class PWANotificationService {
     }
 
     try {
+      // Check if service worker is available for richer notifications
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        // Use service worker for richer notifications with actions
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SHOW_CHAT_NOTIFICATION',
+          payload: {
+            title,
+            body,
+            icon: '/icons/icon-192x192.png',
+            badge: '/icons/icon-192x192.png',
+            tag: 'chat-message-notification',
+            requireInteraction: false,
+            silent: false,
+            data: data || {},
+            actions: [
+              {
+                action: 'reply',
+                title: '💬 Reply',
+                icon: '/icons/icon-192x192.png'
+              },
+              {
+                action: 'view',
+                title: '👀 View Chat',
+                icon: '/icons/icon-192x192.png'
+              }
+            ]
+          }
+        });
+        return; // Exit early if service worker handled it
+      }
+
+      // Fallback to basic notification without actions
       const notification = new Notification(title, {
         body,
         icon: '/icons/icon-192x192.png',
         badge: '/icons/icon-192x192.png',
         tag: 'chat-message-notification',
-        requireInteraction: false, // Allow auto-dismiss for chat messages
+        requireInteraction: false,
         silent: false,
-        data: data || {},
-        actions: [
-          {
-            action: 'reply',
-            title: '💬 Reply',
-            icon: '/icons/icon-192x192.png'
-          },
-          {
-            action: 'view',
-            title: '👀 View Chat',
-            icon: '/icons/icon-192x192.png'
-          }
-        ]
-      });
+        data: data || {}
+      } as NotificationOptions);
 
       notification.onclick = () => {
         console.log('💬 Chat notification clicked, opening app');
