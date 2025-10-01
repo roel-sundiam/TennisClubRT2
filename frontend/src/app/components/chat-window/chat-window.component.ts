@@ -720,7 +720,7 @@ import { AuthService } from '../../services/auth.service';
       background-color: #f0f2f5;
       border: 1px solid transparent;
       border-radius: 20px;
-      font-size: 12px;
+      font-size: 16px;
       color: #050505;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       outline: none;
@@ -920,13 +920,13 @@ import { AuthService } from '../../services/auth.service';
       }
 
       .custom-message-input {
-        font-size: 13px;
+        font-size: 16px;
         min-height: 36px;
         padding: 8px 14px;
       }
 
       .custom-message-input::placeholder {
-        font-size: 13px;
+        font-size: 16px;
       }
 
       .message-input-container button {
@@ -1004,13 +1004,13 @@ import { AuthService } from '../../services/auth.service';
       }
 
       .custom-message-input {
-        font-size: 12px; /* Readable size for small mobile screens */
+        font-size: 16px; /* Prevent mobile browser zoom */
         min-height: 32px;
         padding: 6px 12px;
       }
 
       .custom-message-input::placeholder {
-        font-size: 12px;
+        font-size: 16px;
       }
 
       .message-input-container {
