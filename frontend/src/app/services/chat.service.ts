@@ -4,7 +4,6 @@ import { BehaviorSubject, Observable, Subject, map, takeUntil } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 import { WebSocketService } from './websocket.service';
-import { PWANotificationService } from './pwa-notification.service';
 
 // Chat interfaces
 export interface ChatRoom {
@@ -148,16 +147,9 @@ export class ChatService implements OnDestroy {
   constructor(
     private http: HttpClient,
     private authService: AuthService,
-    private webSocketService: WebSocketService,
-    private pwaNotificationService: PWANotificationService
+    private webSocketService: WebSocketService
   ) {
     console.log('💬 ChatService initialized');
-    
-    // Initialize PWA notifications
-    this.initializePushNotifications();
-    
-    // Make debug method available globally for mobile testing
-    (window as any).debugChat = () => this.debugChatState();
     
     // Initialize chat when user is authenticated
     this.authService.currentUser$.pipe(
@@ -167,9 +159,6 @@ export class ChatService implements OnDestroy {
         console.log('💬 User authenticated, initializing chat');
         this.currentUser = user;
         this.isAuthenticated = true;
-        
-        // Subscribe to push notifications for this user
-        this.subscribeToPushNotifications();
         this.initializeChat();
       } else if (!user && this.isAuthenticated) {
         console.log('💬 User logged out, cleaning up chat');
@@ -193,54 +182,13 @@ export class ChatService implements OnDestroy {
   private initializeChat(): void {
     if (!this.currentUser) return;
 
-    console.log('💬 Initializing chat for mobile device');
+    console.log('💬 Initializing chat');
     
     // Authenticate with chat WebSocket
     this.authenticateChat();
     
     // Load initial chat rooms
     this.loadChatRooms();
-    
-    // Set up mobile-specific connection monitoring
-    this.setupMobileConnectionMonitoring();
-  }
-
-  /**
-   * Setup mobile-specific connection monitoring
-   */
-  private setupMobileConnectionMonitoring(): void {
-    // Monitor page visibility changes (important for mobile)
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        console.log('📱 App became visible, checking chat connection');
-        this.checkAndReconnectChat();
-      }
-    });
-
-    // Monitor network changes
-    if ('navigator' in window && 'onLine' in navigator) {
-      window.addEventListener('online', () => {
-        console.log('📱 Network came back online, reconnecting chat');
-        setTimeout(() => this.checkAndReconnectChat(), 1000);
-      });
-    }
-  }
-
-  /**
-   * Check and reconnect chat if needed
-   */
-  private checkAndReconnectChat(): void {
-    if (!this.webSocketService.isConnected() && this.isAuthenticated) {
-      console.log('💬 Chat disconnected, attempting reconnection');
-      this.webSocketService.reconnect();
-      
-      // Re-authenticate after reconnection
-      setTimeout(() => {
-        if (this.webSocketService.isConnected()) {
-          this.authenticateChat();
-        }
-      }, 2000);
-    }
   }
 
   /**
@@ -274,11 +222,7 @@ export class ChatService implements OnDestroy {
     ).subscribe(connected => {
       if (connected && this.webSocketService.socket) {
         console.log('💬 Setting up WebSocket chat listeners');
-        console.log('📱 Device info - UserAgent:', navigator.userAgent);
-        console.log('📱 Connection state:', this.webSocketService.socket.connected);
         this.setupChatEventListeners();
-      } else {
-        console.warn('💬 WebSocket not connected, skipping chat listeners setup');
       }
     });
   }
@@ -336,15 +280,7 @@ export class ChatService implements OnDestroy {
    * Handle incoming chat message
    */
   private handleIncomingMessage(message: ChatMessage): void {
-    console.log('💬 Processing incoming message:', {
-      messageId: message._id,
-      content: message.content,
-      fromUser: message.user?.fullName,
-      messageRoomId: message.roomId,
-      currentRoom: this.currentRoomSubject.value,
-      isCurrentUser: message.userId === this.currentUser?._id,
-      timestamp: new Date().toISOString()
-    });
+    console.log('💬 Received message:', message.user?.fullName, message.content);
 
     const currentMessages = this.messagesSubject.value;
     const currentRoom = this.currentRoomSubject.value;
@@ -354,15 +290,9 @@ export class ChatService implements OnDestroy {
       // Check if message already exists (avoid duplicates)
       const existingIndex = currentMessages.findIndex(m => m._id === message._id);
       if (existingIndex === -1) {
-        console.log('💬 Adding new message to current room:', message._id);
         const updatedMessages = [...currentMessages, message];
         this.messagesSubject.next(updatedMessages);
-        console.log('💬 Messages array updated, new length:', updatedMessages.length);
-      } else {
-        console.log('💬 Message already exists, skipping duplicate:', message._id);
       }
-    } else {
-      console.log('💬 Message not for current room, currentRoom:', currentRoom, 'messageRoom:', message.roomId);
     }
 
     // Only update unread count for messages from other users
@@ -487,6 +417,35 @@ export class ChatService implements OnDestroy {
    * Send message to room
    */
   sendMessage(roomId: string, request: SendMessageRequest): Observable<ChatMessage> {
+    const currentRoom = this.currentRoomSubject.value;
+    
+    // Create optimistic message for immediate UI update
+    if (roomId === currentRoom && this.currentUser) {
+      const optimisticMessage: ChatMessage = {
+        _id: 'temp-' + Date.now(),
+        roomId: roomId,
+        userId: this.currentUser._id,
+        user: {
+          _id: this.currentUser._id,
+          username: this.currentUser.username,
+          fullName: this.currentUser.fullName,
+          profilePicture: this.currentUser.profilePicture,
+          role: this.currentUser.role
+        },
+        content: request.content,
+        type: request.type || 'text',
+        isEdited: false,
+        isDeleted: false,
+        metadata: {},
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Add optimistic message immediately
+      const currentMessages = this.messagesSubject.value;
+      this.messagesSubject.next([...currentMessages, optimisticMessage]);
+    }
+    
     return this.http.post<{ success: boolean; data: ChatMessage }>(`${this.apiUrl}/${roomId}/messages`, request)
       .pipe(
         map(response => {
@@ -494,15 +453,16 @@ export class ChatService implements OnDestroy {
             throw new Error('Failed to send message');
           }
           
-          // Optimistically add message to current messages if it's for the current room
-          const currentRoom = this.currentRoomSubject.value;
+          // Replace optimistic message with real message from server
           if (response.data.roomId === currentRoom) {
             const currentMessages = this.messagesSubject.value;
-            const existingIndex = currentMessages.findIndex(m => m._id === response.data._id);
             
-            // Only add if message doesn't already exist (avoid duplicates)
+            // Remove optimistic message and add real message
+            const filteredMessages = currentMessages.filter(m => !m._id.startsWith('temp-'));
+            const existingIndex = filteredMessages.findIndex(m => m._id === response.data._id);
+            
             if (existingIndex === -1) {
-              this.messagesSubject.next([...currentMessages, response.data]);
+              this.messagesSubject.next([...filteredMessages, response.data]);
             }
             
             // Mark room as read since user is actively in this room and just sent a message
@@ -761,98 +721,5 @@ export class ChatService implements OnDestroy {
     return result;
   }
 
-  /**
-   * Show PWA notification for new message
-   */
-  showMessageNotification(message: ChatMessage): void {
-    console.log('💬 New message notification:', message.user?.fullName, message.content);
-    
-    // Show PWA notification if available
-    if ('Notification' in window) {
-      // Check if notifications are allowed
-      if (Notification.permission === 'granted') {
-        // Get room name for notification
-        const room = this.roomsSubject.value.find(r => r._id === message.roomId);
-        const roomName = room?.name || 'Chat';
-        
-        // Create notification
-        const notificationTitle = `${roomName} - ${message.user?.fullName || 'Someone'}`;
-        const notificationBody = message.content;
-        
-        // Use the enhanced PWA notification service
-        this.pwaNotificationService.showChatNotification(
-          notificationTitle,
-          notificationBody,
-          {
-            url: '/dashboard',
-            type: 'chat_message',
-            messageId: message._id,
-            roomId: message.roomId,
-            roomName: roomName,
-            senderId: message.userId,
-            senderName: message.user?.fullName || 'Someone',
-            timestamp: message.createdAt
-          }
-        );
-      } else if (Notification.permission === 'default') {
-        // Request permission using PWA service
-        this.pwaNotificationService.requestNotificationPermission().then(granted => {
-          if (granted) {
-            console.log('💬 Notification permission granted, retrying...');
-            this.showMessageNotification(message);
-          } else {
-            console.log('💬 Notification permission denied');
-          }
-        });
-      } else {
-        console.log('💬 Notifications are disabled by user');
-      }
-    }
-  }
 
-  /**
-   * Initialize push notifications for chat
-   */
-  private initializePushNotifications(): void {
-    console.log('💬 Initializing push notifications for chat');
-    this.pwaNotificationService.init();
-  }
-
-  /**
-   * Subscribe to push notifications for chat messages
-   */
-  private subscribeToPushNotifications(): void {
-    if (this.isAuthenticated && this.pwaNotificationService.isPushNotificationSupported()) {
-      console.log('💬 Subscribing to push notifications for chat');
-      this.pwaNotificationService.subscribeToPushNotifications().then(subscription => {
-        if (subscription) {
-          console.log('💬 Successfully subscribed to push notifications');
-        } else {
-          console.log('💬 Failed to subscribe to push notifications');
-        }
-      });
-    }
-  }
-
-  /**
-   * Debug method to check chat state (call from browser console)
-   */
-  debugChatState(): any {
-    const debugInfo = {
-      isAuthenticated: this.isAuthenticated,
-      currentUser: this.currentUser?.fullName || 'Not logged in',
-      currentRoom: this.currentRoomSubject.value,
-      messagesCount: this.messagesSubject.value.length,
-      roomsCount: this.roomsSubject.value.length,
-      unreadCount: this.unreadCountSubject.value,
-      websocketConnected: this.webSocketService.isConnected(),
-      websocketId: this.webSocketService.socket?.id,
-      userAgent: navigator.userAgent,
-      onlineStatus: navigator.onLine,
-      visibilityState: document.visibilityState
-    };
-    
-    console.log('💬 Chat Debug Info:', debugInfo);
-    return debugInfo;
-  }
 }

@@ -33,6 +33,13 @@ export class WebSocketService implements OnDestroy {
   private serverUrl = environment.socketUrl;
   private connectionSubject = new BehaviorSubject<boolean>(false);
   private openPlayNotificationSubject = new Subject<OpenPlayNotificationEvent>();
+  
+  // Production resilience
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 1000; // Start with 1 second
+  private heartbeatInterval: any = null;
+  private isProduction = environment.production;
 
   public isConnected$ = this.connectionSubject.asObservable();
   public openPlayNotifications$ = this.openPlayNotificationSubject.asObservable();
@@ -63,32 +70,70 @@ export class WebSocketService implements OnDestroy {
 
     console.log('🔌 Connecting to WebSocket server at:', this.serverUrl);
     
-    this.socket = io(this.serverUrl, {
+    // Production-optimized socket configuration
+    const socketOptions: any = {
       transports: ['websocket', 'polling'],
       upgrade: true,
-      rememberUpgrade: true
-    });
+      rememberUpgrade: true,
+      timeout: this.isProduction ? 20000 : 5000,
+      reconnection: true,
+      reconnectionAttempts: this.maxReconnectAttempts,
+      reconnectionDelay: this.reconnectDelay,
+      reconnectionDelayMax: 10000,
+      maxReconnectionAttempts: this.maxReconnectAttempts,
+      forceNew: false
+    };
+
+    // Additional production settings for Render.com
+    if (this.isProduction) {
+      socketOptions.pingTimeout = 60000;
+      socketOptions.pingInterval = 25000;
+    }
+    
+    this.socket = io(this.serverUrl, socketOptions);
 
     this.socket.on('connect', () => {
       console.log('✅ Connected to WebSocket server:', this.socket?.id);
+      this.reconnectAttempts = 0; // Reset on successful connection
       this.connectionSubject.next(true);
       this.subscribeToOpenPlayNotifications();
+      
+      // Start heartbeat for production
+      if (this.isProduction) {
+        this.startHeartbeat();
+      }
     });
 
     this.socket.on('disconnect', (reason) => {
       console.log('❌ Disconnected from WebSocket server:', reason);
       this.connectionSubject.next(false);
+      this.stopHeartbeat();
+      
+      // Auto-reconnect for production if not intentional disconnect
+      if (this.isProduction && reason !== 'io client disconnect') {
+        this.scheduleReconnect();
+      }
     });
 
     this.socket.on('reconnect', () => {
       console.log('🔄 Reconnected to WebSocket server');
+      this.reconnectAttempts = 0;
       this.connectionSubject.next(true);
       this.subscribeToOpenPlayNotifications();
+      
+      if (this.isProduction) {
+        this.startHeartbeat();
+      }
     });
 
     this.socket.on('connect_error', (error) => {
       console.error('🚨 WebSocket connection error:', error);
       this.connectionSubject.next(false);
+      this.reconnectAttempts++;
+      
+      if (this.isProduction && this.reconnectAttempts < this.maxReconnectAttempts) {
+        this.scheduleReconnect();
+      }
     });
 
     // Listen for open play notifications
@@ -211,7 +256,46 @@ export class WebSocketService implements OnDestroy {
     }
   }
 
+  /**
+   * Start heartbeat for production connection stability
+   */
+  private startHeartbeat(): void {
+    this.stopHeartbeat(); // Ensure no duplicate intervals
+    
+    this.heartbeatInterval = setInterval(() => {
+      if (this.socket?.connected) {
+        this.socket.emit('ping');
+      }
+    }, 30000); // Ping every 30 seconds
+  }
+
+  /**
+   * Stop heartbeat
+   */
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  /**
+   * Schedule reconnection with exponential backoff
+   */
+  private scheduleReconnect(): void {
+    const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts), 30000);
+    console.log(`🔄 Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`);
+    
+    setTimeout(() => {
+      if (!this.socket?.connected && this.authService.isAuthenticated()) {
+        console.log(`🔄 Attempting reconnect ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`);
+        this.reconnect();
+      }
+    }, delay);
+  }
+
   ngOnDestroy(): void {
+    this.stopHeartbeat();
     this.disconnect();
   }
 }

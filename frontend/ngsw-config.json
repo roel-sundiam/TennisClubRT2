@@ -41,6 +41,18 @@
   ],
   "dataGroups": [
     {
+      "name": "chat-api-realtime",
+      "urls": [
+        "https://tennis-club-rt2-backend.onrender.com/api/chat/**"
+      ],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 0,
+        "maxAge": "0s",
+        "timeout": "3s"
+      }
+    },
+    {
       "name": "auth-api",
       "urls": [
         "https://tennis-club-rt2-backend.onrender.com/api/auth/**"

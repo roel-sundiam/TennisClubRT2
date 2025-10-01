@@ -146,11 +146,12 @@ import { AuthService } from '../../services/auth.service';
                 [class.system-message]="message.type === 'system'"
                 [class.announcement-message]="message.type === 'announcement'"
               >
-                <!-- Skip System Messages -->
-                <div *ngIf="message.type === 'text'" class="message-content">
+                <!-- Show all messages except system messages -->
+                <div *ngIf="message.type !== 'system'" class="message-content" [class.sending]="message._id.startsWith('temp-')">
                   <div class="message-header">
                     <span class="sender-name">{{ message.user?.fullName || 'Unknown' }}</span>
                     <span class="message-time">{{ formatTime(message.createdAt) }}</span>
+                    <mat-icon *ngIf="message._id.startsWith('temp-')" class="sending-icon" title="Sending...">schedule</mat-icon>
                   </div>
                   <div class="message-text">{{ message.content }}</div>
                   <div *ngIf="message.isEdited" class="edited-indicator">
@@ -541,6 +542,26 @@ import { AuthService } from '../../services/auth.service';
       border-radius: 18px 18px 18px 4px;
       word-wrap: break-word;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      transition: opacity 0.2s ease;
+    }
+
+    .message-content.sending {
+      opacity: 0.7;
+      background: #e8f4f8;
+    }
+
+    .sending-icon {
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
+      margin-left: 4px;
+      color: #666;
+      animation: rotation 1s infinite linear;
+    }
+
+    @keyframes rotation {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
     }
 
     .message-header {
@@ -1065,7 +1086,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
     this.chatService.messages$.pipe(
       takeUntil(this.destroy$)
     ).subscribe(messages => {
-      console.log('💬 Messages updated:', messages);
+      console.log('💬 Messages updated:', messages.length);
       this.messages = messages;
       this.shouldScrollToBottom = true;
     });
@@ -1097,7 +1118,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
         
         // Show visual notification if chat is minimized/closed
         if (this.isMinimized || this.isClosed) {
-          this.chatService.showMessageNotification(message);
+          this.showMessageNotification(message);
         }
       }
     });
@@ -1117,6 +1138,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
     
     // Load sound settings from localStorage
     this.loadSoundSettings();
+
     
     // Initialize message sound
     this.initializeMessageSound();
@@ -1722,4 +1744,5 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewChecked 
     oscillator.start(startTime);
     oscillator.stop(startTime + 0.8);
   }
+
 }

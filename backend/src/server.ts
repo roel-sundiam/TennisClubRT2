@@ -64,8 +64,10 @@ if (false && process.env.NODE_ENV === 'production') {
 // CORS configuration
 const allowedOrigins: string[] = [
   'http://localhost:4200',
-  'http://localhost:4201', 
+  'http://localhost:4201',
   'http://localhost:3000',
+  'http://192.168.68.113:4200',
+  'http://192.168.68.113:4201',
   'https://tennisclubrt2.netlify.app',
   'https://main--tennisclubrt2.netlify.app'
 ];
@@ -230,10 +232,11 @@ const startServer = async () => {
     // syncService.startSync();
     console.log('⚠️  Google Sheets sync DISABLED for testing recorded payments integration');
     
-    httpServer.listen(PORT, () => {
+    httpServer.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Tennis Club RT2 Backend running on port ${PORT}`);
       console.log(`📱 Environment: ${process.env.NODE_ENV}`);
       console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+      console.log(`🔗 Network access: http://192.168.68.113:${PORT}/health`);
       console.log(`🔌 WebSocket server ready for real-time updates`);
     });
   } catch (error) {
@@ -247,10 +250,11 @@ const startServer = async () => {
     webSocketService.initialize(httpServer);
     console.log('🔌 WebSocket service initialized (emergency mode)');
     
-    httpServer.listen(PORT, () => {
+    httpServer.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Tennis Club RT2 Backend running on port ${PORT} (NO DATABASE)`);
       console.log(`📱 Environment: ${process.env.NODE_ENV}`);
       console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+      console.log(`🔗 Network access: http://192.168.68.113:${PORT}/health`);
       console.log('⚠️ Database unavailable - some features may not work');
       console.log(`🔌 WebSocket server ready for real-time updates`);
     });
