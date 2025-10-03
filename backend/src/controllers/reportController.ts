@@ -857,6 +857,11 @@ export const getCourtReceiptsReport = asyncHandler(async (req: AuthenticatedRequ
   });
 });
 
+// Helper function to format currency without commas
+function formatCurrency(amount: number): string {
+  return `₱${amount.toFixed(2)}`;
+}
+
 // Get court usage report with static data from screenshots
 export const getCourtUsageFromSheet = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -916,8 +921,26 @@ export const getCourtUsageFromSheet = asyncHandler(async (req: AuthenticatedRequ
       { name: "Louise Soliman", jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 20, jul: 0, aug: 60, sep: 0 }
     ];
 
-    const monthNames = ['January 2025', 'February 2025', 'March 2025', 'April 2025', 'May 2025', 'June 2025', 'July 2025', 'August 2025', 'September 2025'];
-    const monthKeys = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep'] as const;
+    // Generate dynamic month columns (this is static data, so using 2025 full year)
+    const currentDate = new Date();
+    const year = 2025; // Static data is for 2025
+    const monthNames: string[] = [];
+    const monthKeys: string[] = [];
+    
+    // For static data, show all months from Jan to current month (or all 12 if past year)
+    const endMonth = (year === currentDate.getFullYear()) ? (currentDate.getMonth() + 1) : 12;
+    
+    const staticMonthKeys = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    const staticMonthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    
+    for (let month = 0; month < endMonth; month++) {
+      const monthName = staticMonthNames[month];
+      const monthKey = staticMonthKeys[month];
+      if (monthName && monthKey) {
+        monthNames.push(`${monthName} ${year}`);
+        monthKeys.push(monthKey);
+      }
+    }
 
     // Create the report data from static data
     const rawData = staticData.map(member => {
@@ -930,12 +953,12 @@ export const getCourtUsageFromSheet = asyncHandler(async (req: AuthenticatedRequ
         const monthName = monthNames[index];
         if (monthName) {
           const amount = (member as any)[monthKey] || 0;
-          row[monthName] = amount > 0 ? `₱${amount.toFixed(2)}` : '₱0.00';
+          row[monthName] = amount > 0 ? formatCurrency(amount) : '₱0.00';
           total += amount;
         }
       });
       
-      row['Total'] = `₱${total.toFixed(2)}`;
+      row['Total'] = formatCurrency(total);
       return row;
     });
 
@@ -950,13 +973,50 @@ export const getCourtUsageFromSheet = asyncHandler(async (req: AuthenticatedRequ
       return sum + parseFloat(member['Total']?.replace('₱', '') || '0');
     }, 0);
 
+    // Calculate monthly totals for the totals row
+    const monthlyTotals: number[] = [];
+    let grandTotal = 0;
+    
+    // For each month, sum all member amounts
+    monthNames.forEach((monthName, index) => {
+      let monthTotal = 0;
+      rawData.forEach(memberRow => {
+        const amountStr = memberRow[monthName] || '₱0.00';
+        const amount = parseFloat(amountStr.replace('₱', ''));
+        monthTotal += amount;
+      });
+      monthlyTotals.push(monthTotal);
+      grandTotal += monthTotal;
+    });
+    
+    // Create the totals row with special formatting
+    const totalsRow: any = {
+      'Players/Members': 'MONTHLY TOTALS',
+      _isTotal: true // Special flag for frontend styling
+    };
+    
+    // Add monthly totals to the totals row
+    monthNames.forEach((monthName, index) => {
+      const monthTotal = monthlyTotals[index] || 0;
+      totalsRow[monthName] = monthTotal > 0 ? formatCurrency(monthTotal) : '₱0.00';
+    });
+    
+    // Add grand total
+    totalsRow['Total'] = formatCurrency(grandTotal);
+    
+    // Add the totals row to rawData
+    rawData.push(totalsRow);
+    
+    console.log(`📊 Added monthly totals row - Grand total: ₱${grandTotal.toFixed(2)}`);
+    console.log(`📅 Monthly totals:`, monthlyTotals.map((total, i) => `${monthNames[i]}: ₱${total.toFixed(2)}`));
+
     const headers = ['Players/Members', ...monthNames, 'Total'];
 
     const courtUsageData = {
       summary: {
         totalMembers: staticData.length,
         totalRecordedPayments: staticData.length * 9,
-        totalRevenue: `₱${totalRevenue.toFixed(2)}`,
+        totalRevenue: formatCurrency(totalRevenue),
         lastUpdated: new Date().toISOString()
       },
       rawData,
