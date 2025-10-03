@@ -200,17 +200,14 @@ async function subtractFromCourtUsageReport(payment: any): Promise<void> {
     const month = new Date(usageDate).getMonth(); // 0-11
     const year = new Date(usageDate).getFullYear();
     
-    // Map month number to field name
-    const monthFields = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-    const monthField = monthFields[month];
+    // Create dynamic month key in YYYY-MM format for the new Map-based storage
+    const monthKey = `${year}-${(month + 1).toString().padStart(2, '0')}`;
+    const monthName = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long' });
     
-    // Only update if it's within our supported months (January-September)
-    if (month > 8 || !monthField) { // September is index 8
-      console.log(`⚠️ Payment date is in ${monthFields[month]}, which is not tracked in court usage report`);
-      return;
-    }
+    // All months are now supported with the dynamic system
+    console.log(`📊 Processing ${monthName} ${year} (${monthKey}) for court usage report`);
     
-    console.log(`📊 Subtracting ₱${payment.amount} from ${memberName}'s ${monthField} ${year} court usage`);
+    console.log(`📊 Subtracting ₱${payment.amount} from ${memberName}'s ${monthName} ${year} court usage`);
     
     // Find the member's court usage record
     const courtUsageRecord = await CourtUsageReport.findOne({ 
@@ -223,17 +220,23 @@ async function subtractFromCourtUsageReport(payment: any): Promise<void> {
       return;
     }
     
-    // Subtract from existing amount (but don't go below 0)
-    const currentAmount = (courtUsageRecord as any)[monthField] as number || 0;
+    // Subtract from existing amount using the Map, but don't go below 0
+    const currentAmount = courtUsageRecord.monthlyAmounts?.get(monthKey) || 0;
     const newAmount = Math.max(0, currentAmount - payment.amount);
-    (courtUsageRecord as any)[monthField] = newAmount;
     
-    console.log(`📊 Subtracted from ${memberName}'s ${monthField} from ₱${currentAmount} to ₱${newAmount}`);
+    if (newAmount > 0) {
+      courtUsageRecord.monthlyAmounts.set(monthKey, newAmount);
+    } else {
+      courtUsageRecord.monthlyAmounts.delete(monthKey); // Remove entry if amount becomes 0
+    }
+    courtUsageRecord.markModified('monthlyAmounts');
+    
+    console.log(`📊 Updated ${memberName}'s ${monthName} from ₱${currentAmount} to ₱${newAmount}`);
     
     // Save the record (totalAmount will be calculated automatically by pre-save middleware)
     await courtUsageRecord.save();
     
-    console.log(`✅ Court usage report updated for ${memberName}: -₱${payment.amount} in ${monthField} ${year}`);
+    console.log(`✅ Court usage report updated for ${memberName}: -₱${payment.amount} in ${monthName} ${year}`);
     
     // Emit real-time update for court usage report
     try {
@@ -243,7 +246,7 @@ async function subtractFromCourtUsageReport(payment: any): Promise<void> {
           type: 'court_usage_data_updated',
           data: null, // Will trigger a full refresh on the frontend
           timestamp: new Date().toISOString(),
-          message: `📊 Court usage updated: ${memberName} -₱${payment.amount} (${monthField} ${year})`
+          message: `📊 Court usage updated: ${memberName} -₱${payment.amount} (${monthName} ${year})`
         });
         console.log('📡 Real-time court usage update broadcasted');
       }
@@ -276,17 +279,14 @@ async function updateCourtUsageReport(payment: any): Promise<void> {
     const month = new Date(usageDate).getMonth(); // 0-11
     const year = new Date(usageDate).getFullYear();
     
-    // Map month number to field name
-    const monthFields = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-    const monthField = monthFields[month];
+    // Create dynamic month key in YYYY-MM format for the new Map-based storage
+    const monthKey = `${year}-${(month + 1).toString().padStart(2, '0')}`;
+    const monthName = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long' });
     
-    // Only update if it's within our supported months (January-September)
-    if (month > 8 || !monthField) { // September is index 8
-      console.log(`⚠️ Payment date is in ${monthFields[month]}, which is not tracked in court usage report`);
-      return;
-    }
+    // All months are now supported with the dynamic system
+    console.log(`📊 Processing ${monthName} ${year} (${monthKey}) for court usage report`);
     
-    console.log(`📊 Updating ${memberName}'s ${monthField} ${year} court usage with ₱${payment.amount}`);
+    console.log(`📊 Updating ${memberName}'s ${monthName} ${year} court usage with ₱${payment.amount}`);
     
     // Find or create the member's court usage record
     let courtUsageRecord = await CourtUsageReport.findOne({ 
@@ -295,24 +295,26 @@ async function updateCourtUsageReport(payment: any): Promise<void> {
     });
     
     if (!courtUsageRecord) {
-      // Create new record for this member
+      // Create new record for this member with Map-based storage
       courtUsageRecord = new CourtUsageReport({
         memberName: memberName,
-        year: year
+        year: year,
+        monthlyAmounts: new Map()
       });
-      (courtUsageRecord as any)[monthField] = payment.amount;
+      courtUsageRecord.monthlyAmounts.set(monthKey, payment.amount);
       console.log(`📊 Created new court usage record for ${memberName} (${year})`);
     } else {
-      // Update existing record - add to existing amount
-      const currentAmount = (courtUsageRecord as any)[monthField] as number || 0;
-      (courtUsageRecord as any)[monthField] = currentAmount + payment.amount;
-      console.log(`📊 Updated ${memberName}'s ${monthField} from ₱${currentAmount} to ₱${currentAmount + payment.amount}`);
+      // Update existing record - add to existing amount using Map
+      const currentAmount = courtUsageRecord.monthlyAmounts?.get(monthKey) || 0;
+      courtUsageRecord.monthlyAmounts.set(monthKey, currentAmount + payment.amount);
+      courtUsageRecord.markModified('monthlyAmounts');
+      console.log(`📊 Updated ${memberName}'s ${monthName} from ₱${currentAmount} to ₱${currentAmount + payment.amount}`);
     }
     
     // Save the record (totalAmount will be calculated automatically by pre-save middleware)
     await courtUsageRecord.save();
     
-    console.log(`✅ Court usage report updated for ${memberName}: +₱${payment.amount} in ${monthField} ${year}`);
+    console.log(`✅ Court usage report updated for ${memberName}: +₱${payment.amount} in ${monthName} ${year}`);
     
     // Emit real-time update for court usage report
     try {
@@ -322,7 +324,7 @@ async function updateCourtUsageReport(payment: any): Promise<void> {
           type: 'court_usage_data_updated',
           data: null, // Will trigger a full refresh on the frontend
           timestamp: new Date().toISOString(),
-          message: `📊 Court usage updated: ${memberName} +₱${payment.amount} (${monthField} ${year})`
+          message: `📊 Court usage updated: ${memberName} +₱${payment.amount} (${monthName} ${year})`
         });
         console.log('📡 Real-time court usage update broadcasted');
       }
