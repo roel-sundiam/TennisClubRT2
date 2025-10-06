@@ -68,3 +68,9 @@ coverage/
 .yarn-integrity
 # Local Netlify folder
 .netlify
+
+# Distribution and marketplace files
+PACKAGE-READY.md
+codecanyon/
+gumroad/
+*.zip
