@@ -624,10 +624,11 @@ click "Try Again" below to reconnect.
     if (showLoading) {
       this.loading = true;
     }
-    
+
     // Use the general reservations endpoint with showAll=true to get all reservations
+    // Set high limit to fetch all reservations (default is 10)
     const timestamp = new Date().getTime();
-    this.http.get<any>(`${this.apiUrl}/reservations?showAll=true&_t=${timestamp}`).subscribe({
+    this.http.get<any>(`${this.apiUrl}/reservations?showAll=true&limit=1000&_t=${timestamp}`).subscribe({
       next: (response) => {
         const reservations = response.data || [];
         console.log('🔍 Raw reservations received:', reservations.length);
