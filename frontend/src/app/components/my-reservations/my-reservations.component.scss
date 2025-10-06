@@ -1959,14 +1959,177 @@ button:focus {
   // Show weather info with purple styling
   .weather {
     color: $homeowner;
-    
+
     .weather-icon {
       color: $homeowner;
     }
-    
+
     .rain-chance {
       color: $homeowner;
       font-weight: 500;
     }
+  }
+}
+
+// Admin Stats Card
+.admin-stats-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07),
+              0 1px 3px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(59, 130, 246, 0.1);
+
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 1.5rem 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: $text-primary;
+
+    mat-icon {
+      color: #3b82f6;
+      font-size: 1.5rem;
+      width: 1.5rem;
+      height: 1.5rem;
+    }
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+
+    @media (max-width: 768px) {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+    }
+
+    @media (max-width: 480px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .stat-item {
+    background: white;
+    padding: 1rem;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border-left: 4px solid #e2e8f0;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-label {
+      font-size: 0.875rem;
+      color: $text-secondary;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: $text-primary;
+    }
+
+    // Status-specific colors
+    &.status-pending {
+      border-left-color: #FF9800;
+      background: linear-gradient(135deg, #ffffff 0%, rgba(255, 152, 0, 0.03) 100%);
+
+      .stat-value {
+        color: #F57C00;
+      }
+    }
+
+    &.status-confirmed {
+      border-left-color: #2196F3;
+      background: linear-gradient(135deg, #ffffff 0%, rgba(33, 150, 243, 0.03) 100%);
+
+      .stat-value {
+        color: #1976D2;
+      }
+    }
+
+    &.status-cancelled {
+      border-left-color: #e53e3e;
+      background: linear-gradient(135deg, #ffffff 0%, rgba(229, 62, 62, 0.03) 100%);
+
+      .stat-value {
+        color: #c53030;
+      }
+    }
+
+    &.status-completed {
+      border-left-color: #4CAF50;
+      background: linear-gradient(135deg, #ffffff 0%, rgba(76, 175, 80, 0.03) 100%);
+
+      .stat-value {
+        color: #388E3C;
+      }
+    }
+
+    // Revenue colors
+    &.revenue-total {
+      border-left-color: #8b5cf6;
+      background: linear-gradient(135deg, #ffffff 0%, rgba(139, 92, 246, 0.03) 100%);
+
+      .stat-value {
+        color: #7c3aed;
+      }
+    }
+
+    &.revenue-paid {
+      border-left-color: #10b981;
+      background: linear-gradient(135deg, #ffffff 0%, rgba(16, 185, 129, 0.03) 100%);
+
+      .stat-value {
+        color: #059669;
+      }
+    }
+
+    &.revenue-pending {
+      border-left-color: #f59e0b;
+      background: linear-gradient(135deg, #ffffff 0%, rgba(245, 158, 11, 0.03) 100%);
+
+      .stat-value {
+        color: #d97706;
+      }
+    }
+  }
+}
+
+// Admin Report specific styling
+.reservation-card-compact.admin-report {
+  // Cancelled reservations styling
+  &.cancelled-reservation {
+    opacity: 0.7;
+    background: rgba(229, 62, 62, 0.05);
+
+    .date-badge.cancelled {
+      background: #e53e3e;
+      color: white;
+    }
+  }
+
+  // Completed reservations styling
+  &.completed-reservation {
+    background: rgba(76, 175, 80, 0.05);
+  }
+
+  // Show payment status chip for admin report
+  .payment-chip {
+    display: inline-flex !important;
   }
 }

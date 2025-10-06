@@ -104,7 +104,7 @@ interface Reservation {
               </div>
               
               <div *ngIf="!loading && allReservations.length > 0" class="reservations-list">
-                <!-- NEW COMPACT DESIGN LOADED --> 
+                <!-- NEW COMPACT DESIGN LOADED -->
                 <div *ngFor="let reservation of allReservations" 
                      class="reservation-card-compact all-reservations"
                      [class.homeowner-day]="reservation.isHomeownerDay"
@@ -244,13 +244,13 @@ interface Reservation {
                 <mat-spinner diameter="50"></mat-spinner>
                 <p>Loading reservation history...</p>
               </div>
-              
+
               <div *ngIf="!loading && pastReservations.length === 0" class="no-reservations">
                 <mat-icon class="large-icon">history</mat-icon>
                 <h2>No Past Reservations</h2>
                 <p>Your reservation history will appear here.</p>
               </div>
-              
+
               <div *ngIf="!loading" class="reservations-list">
                 <div *ngFor="let reservation of pastReservations" class="reservation-card-compact past">
                   <div class="card-left">
@@ -274,6 +274,114 @@ interface Reservation {
                     </div>
                     <div class="fee-weather">
                       <span class="fee">₱{{reservation.totalFee}}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </mat-tab>
+
+          <!-- Admin Report Tab (Admin Only) -->
+          <mat-tab [label]="isMobileView ? 'Admin' : 'Admin Report'" [disabled]="loading">
+            <div class="tab-content">
+              <!-- Summary Statistics Card -->
+              <div class="admin-stats-card" *ngIf="!loading && sortedAdminReservations.length > 0">
+                <h3>
+                  <mat-icon>analytics</mat-icon>
+                  Report Summary
+                </h3>
+                <div class="stats-grid">
+                  <div class="stat-item">
+                    <span class="stat-label">Total Reservations</span>
+                    <span class="stat-value">{{adminStats.total}}</span>
+                  </div>
+                  <div class="stat-item status-pending">
+                    <span class="stat-label">Pending</span>
+                    <span class="stat-value">{{adminStats.pending}}</span>
+                  </div>
+                  <div class="stat-item status-confirmed">
+                    <span class="stat-label">Confirmed</span>
+                    <span class="stat-value">{{adminStats.confirmed}}</span>
+                  </div>
+                  <div class="stat-item status-cancelled">
+                    <span class="stat-label">Cancelled</span>
+                    <span class="stat-value">{{adminStats.cancelled}}</span>
+                  </div>
+                  <div class="stat-item status-completed">
+                    <span class="stat-label">Completed</span>
+                    <span class="stat-value">{{adminStats.completed}}</span>
+                  </div>
+                  <div class="stat-item revenue-total">
+                    <span class="stat-label">Total Revenue</span>
+                    <span class="stat-value">₱{{adminStats.totalRevenue}}</span>
+                  </div>
+                  <div class="stat-item revenue-paid">
+                    <span class="stat-label">Paid Revenue</span>
+                    <span class="stat-value">₱{{adminStats.paidRevenue}}</span>
+                  </div>
+                  <div class="stat-item revenue-pending">
+                    <span class="stat-label">Pending Revenue</span>
+                    <span class="stat-value">₱{{adminStats.pendingRevenue}}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div *ngIf="loading" class="loading-container">
+                <mat-spinner diameter="50"></mat-spinner>
+                <p>Loading admin report...</p>
+              </div>
+
+              <div *ngIf="!loading && sortedAdminReservations.length === 0" class="no-reservations">
+                <mat-icon class="large-icon">assessment</mat-icon>
+                <h2>No Reservations Data</h2>
+                <p>No court reservations found in the system.</p>
+              </div>
+
+              <div *ngIf="!loading && sortedAdminReservations.length > 0" class="reservations-list">
+                <div *ngFor="let reservation of sortedAdminReservations; let idx = index"
+                     class="reservation-card-compact admin-report"
+                     [class.cancelled-reservation]="reservation.status === 'cancelled'"
+                     [class.completed-reservation]="reservation.status === 'completed'"
+                     [style.border-left-color]="getWeatherBorderColor(reservation)">
+                  <div class="card-left">
+                    <div class="date-badge"
+                         [ngClass]="{
+                           'past': isPastReservation(reservation.date),
+                           'cancelled': reservation.status === 'cancelled'
+                         }">
+                      <span class="date-day">{{getDay(reservation.date)}}</span>
+                      <span class="date-info">{{getShortDate(reservation.date)}}</span>
+                    </div>
+                    <div class="reservation-main show-user-info">
+                      <div class="time-slot">{{reservation.timeSlotDisplay}}</div>
+                      <div class="user-info" *ngIf="reservation.userId">
+                        <mat-icon class="inline-icon">person</mat-icon>
+                        <span class="user-text">{{reservation.userId.fullName}}</span>
+                      </div>
+                      <div class="players-info">
+                        <mat-icon class="inline-icon">people</mat-icon>
+                        <span class="players-text">{{getFilteredPlayers(reservation).join(', ')}}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="card-right">
+                    <div class="status-chips">
+                      <mat-chip class="status-chip" [ngClass]="'status-' + reservation.status">
+                        {{reservation.status | titlecase}}
+                      </mat-chip>
+                      <mat-chip class="payment-chip" [ngClass]="'payment-' + reservation.paymentStatus">
+                        {{getPaymentStatusText(reservation.paymentStatus)}}
+                      </mat-chip>
+                    </div>
+                    <div class="fee-weather">
+                      <span class="fee">₱{{reservation.totalFee}}</span>
+                      <span class="weather" *ngIf="reservation.weatherForecast">
+                        <mat-icon class="weather-icon">{{getWeatherIcon(reservation.weatherForecast.icon)}}</mat-icon>
+                        {{reservation.weatherForecast.temperature}}°C
+                        <span class="rain-chance" *ngIf="reservation.weatherForecast.rainChance !== undefined">
+                          {{reservation.weatherForecast.rainChance}}%
+                        </span>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -319,8 +427,22 @@ export class MyReservationsComponent implements OnInit, OnDestroy {
   upcomingReservations: Reservation[] = [];
   pastReservations: Reservation[] = [];
   allReservations: Reservation[] = [];
+  adminReservations: Reservation[] = [];
+  sortedAdminReservations: Reservation[] = [];
   loading = true;
   currentTab = 0;
+
+  // Admin statistics
+  adminStats = {
+    total: 0,
+    pending: 0,
+    confirmed: 0,
+    cancelled: 0,
+    completed: 0,
+    totalRevenue: 0,
+    paidRevenue: 0,
+    pendingRevenue: 0
+  };
   
   // Responsive tab labels for modern compact design
   isMobileView = false;
@@ -583,6 +705,13 @@ click "Try Again" below to reconnect.
         
         // Load all reservations since it's now the first tab (without showing loading again)
         this.loadAllReservations(false);
+
+        // Also load admin reservations if user is admin
+        const user = this.authService.currentUser;
+        if (user?.role === 'admin' || user?.role === 'superadmin') {
+          console.log('✅ Admin user detected, loading admin reservations on init');
+          this.loadAdminReservations(false);
+        }
       },
       error: (error) => {
         console.error('❌ HTTP request failed:', error);
@@ -612,10 +741,17 @@ click "Try Again" below to reconnect.
   onTabChange(event: any): void {
     this.currentTab = event.index;
     console.log('🔄 Tab changed to index:', event.index);
+
     // Load all reservations when switching to "All Reservations" tab (index 0)
     if (event.index === 0) {
-      console.log('📋 Loading All Reservations tab, current length:', this.allReservations.length);
+      console.log('📋 Loading All Reservations tab');
       this.loadAllReservations();
+    }
+
+    // Load admin report when switching to "Admin Report" tab (index 3)
+    if (event.index === 3) {
+      console.log('📋 Loading Admin Report tab');
+      this.loadAdminReservations(true);
     }
   }
 
@@ -657,10 +793,11 @@ click "Try Again" below to reconnect.
           // Past dates: exclude
           if (reservationDate < today) return false;
           
-          // Today: check if time slot hasn't passed yet
+          // Today: check if reservation end time hasn't passed yet
           if (reservationDate.getTime() === today.getTime()) {
             const currentHour = now.getHours();
-            return r.timeSlot > currentHour; // Only show future time slots
+            const endHour = r.endTimeSlot || (r.timeSlot + (r.duration || 1));
+            return endHour > currentHour; // Show until entire reservation time is over
           }
           
           return false;
@@ -675,7 +812,7 @@ click "Try Again" below to reconnect.
         })));
         
         this.allReservations = this.groupConsecutiveReservations(activeReservations);
-        
+
         // Ensure all time displays use AM/PM format
         this.convertToAMPMFormat(this.allReservations);
         console.log('🔍 After grouping:', this.allReservations.length);
@@ -707,8 +844,160 @@ click "Try Again" below to reconnect.
     });
   }
 
+  loadAdminReservations(showLoading: boolean = true): void {
+    console.log('📊 Loading admin reservations report...');
+    if (showLoading) {
+      this.loading = true;
+    }
+
+    // Fetch ALL reservations without any filtering - no status filter, no date filter
+    const timestamp = new Date().getTime();
+    this.http.get<any>(`${this.apiUrl}/reservations?showAll=true&limit=10000&_t=${timestamp}`).subscribe({
+      next: (response) => {
+        console.log('📊 ADMIN REPORT - Full response:', response);
+        const reservations = response.data || [];
+        console.log('🔍 Admin Report - Raw reservations received:', reservations.length);
+        console.log('🔍 First reservation raw data:', reservations[0]);
+        console.log('🔍 Status breakdown before filtering:', {
+          pending: reservations.filter((r: any) => r.status === 'pending').length,
+          confirmed: reservations.filter((r: any) => r.status === 'confirmed').length,
+          cancelled: reservations.filter((r: any) => r.status === 'cancelled').length,
+          completed: reservations.filter((r: any) => r.status === 'completed').length
+        });
+
+        // Sort reservations in DESCENDING order (newest first)
+        this.adminReservations = reservations.sort((a: any, b: any) => {
+          const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
+          if (dateCompare !== 0) return dateCompare;
+          // If same date, sort by time slot descending
+          return b.timeSlot - a.timeSlot;
+        });
+
+        // Convert time displays to AM/PM format
+        this.convertToAMPMFormat(this.adminReservations);
+
+        console.log('📊 Admin reservations loaded:', this.adminReservations.length);
+
+        // Calculate statistics
+        this.calculateAdminStats(reservations);
+
+        // Update sorted array for template binding
+        this.sortedAdminReservations = this.getSortedAdminReservations();
+
+        console.log('📊 Admin Report loaded - Total:', this.adminReservations.length, 'Sorted (descending):', this.sortedAdminReservations.length);
+
+        if (showLoading) {
+          this.loading = false;
+        }
+      },
+      error: (error) => {
+        console.error('Error loading admin reservations:', error);
+        if (showLoading) {
+          this.loading = false;
+        }
+        this.snackBar.open('Failed to load admin report', 'Close', {
+          duration: 3000,
+          panelClass: ['error-snackbar']
+        });
+      }
+    });
+  }
+
+  calculateAdminStats(reservations: any[]): void {
+    this.adminStats = {
+      total: reservations.length,
+      pending: reservations.filter(r => r.status === 'pending').length,
+      confirmed: reservations.filter(r => r.status === 'confirmed').length,
+      cancelled: reservations.filter(r => r.status === 'cancelled').length,
+      completed: reservations.filter(r => r.status === 'completed').length,
+      totalRevenue: reservations.reduce((sum, r) => sum + (r.totalFee || 0), 0),
+      paidRevenue: reservations.filter(r => r.paymentStatus === 'paid').reduce((sum, r) => sum + (r.totalFee || 0), 0),
+      pendingRevenue: reservations.filter(r => r.paymentStatus === 'pending').reduce((sum, r) => sum + (r.totalFee || 0), 0)
+    };
+  }
+
+  isAdmin(): boolean {
+    const user = this.authService.currentUser;
+    console.log('🔐 isAdmin check - Current user:', user);
+    console.log('🔐 User role:', user?.role);
+    const result = user?.role === 'admin' || user?.role === 'superadmin';
+    console.log('🔐 isAdmin result:', result);
+    return result;
+  }
+
+  getSortedAdminReservations(): Reservation[] {
+    // For admin report, use adminReservations if available, otherwise use allReservations
+    const source = this.adminReservations.length > 0 ? this.adminReservations : this.allReservations;
+
+    // Sort in DESCENDING order - newest dates first, then highest time slots first
+    return [...source].sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+
+      // Sort by date descending (newest first)
+      if (dateB !== dateA) {
+        return dateB - dateA;
+      }
+
+      // Same date: sort by time slot descending (latest time first)
+      return b.timeSlot - a.timeSlot;
+    });
+  }
+
+  groupConsecutiveReservationsDescending(reservations: any[]): Reservation[] {
+    // Assumes reservations are already sorted in DESCENDING order
+    // Does NOT re-sort to preserve the descending order
+    const grouped: Reservation[] = [];
+    let i = 0;
+
+    while (i < reservations.length) {
+      const current = reservations[i];
+      const consecutiveGroup = [current];
+
+      // Find consecutive reservations for the same date (in descending order)
+      let j = i + 1;
+      while (j < reservations.length) {
+        const next = reservations[j];
+        const isSameDate = new Date(current.date).toDateString() === new Date(next.date).toDateString();
+        // For descending order, next timeSlot should be one less than current
+        const isConsecutive = next.timeSlot === (consecutiveGroup[consecutiveGroup.length - 1].timeSlot - 1);
+        const haveSamePlayers = JSON.stringify(current.players.sort()) === JSON.stringify(next.players.sort());
+
+        if (isSameDate && isConsecutive && haveSamePlayers) {
+          consecutiveGroup.push(next);
+          j++;
+        } else {
+          break;
+        }
+      }
+
+      // Create a merged reservation if we have multiple consecutive slots
+      if (consecutiveGroup.length > 1) {
+        const firstSlot = consecutiveGroup[0]; // Highest time slot (descending)
+        const lastSlot = consecutiveGroup[consecutiveGroup.length - 1]; // Lowest time slot
+        const totalFee = consecutiveGroup.reduce((sum, res) => sum + res.totalFee, 0);
+
+        const mergedReservation: Reservation = {
+          ...firstSlot,
+          timeSlotDisplay: this.formatTimeRange(lastSlot.timeSlot, firstSlot.timeSlot + 1),
+          totalFee: totalFee,
+          feePerPlayer: totalFee / firstSlot.players.length
+        };
+
+        grouped.push(mergedReservation);
+      } else {
+        // Single reservation, keep as is
+        grouped.push(current);
+      }
+
+      i = j;
+    }
+
+    return grouped;
+  }
+
   groupConsecutiveReservations(reservations: any[]): Reservation[] {
-    // First, sort reservations by date and timeSlot
+    // First, sort reservations by date and timeSlot in ASCENDING order
     const sorted = reservations.sort((a, b) => {
       const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
       if (dateCompare !== 0) return dateCompare;
@@ -1138,10 +1427,14 @@ click "Try Again" below to reconnect.
     
     // Add entries to the beginning of the list
     this.allReservations = [...homeownerEntries, ...this.allReservations];
-    
-    // Sort by date to maintain chronological order
-    this.allReservations.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
+
+    // Sort by date AND timeSlot to maintain chronological order
+    this.allReservations.sort((a, b) => {
+      const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
+      if (dateCompare !== 0) return dateCompare;
+      return a.timeSlot - b.timeSlot;
+    });
+
     console.log(`✅ Added ${homeownerEntries.length} Homeowner's Day entries`);
   }
 

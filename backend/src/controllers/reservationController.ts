@@ -105,7 +105,7 @@ export const getReservations = asyncHandler(async (req: AuthenticatedRequest, re
   const total = await Reservation.countDocuments(filter);
   const reservations = await Reservation.find(filter)
     .populate('userId', 'username fullName email')
-    .sort({ date: -1, timeSlot: 1 })
+    .sort({ date: 1, timeSlot: 1 })
     .skip(skip)
     .limit(limit);
 
