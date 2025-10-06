@@ -208,10 +208,10 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
         (r.status === 'pending' || r.status === 'confirmed')
       );
     } else {
-      // For other hours: can be end time if no reservation STARTS at that hour or extends beyond it
+      // For other hours: can be end time if hour-1 is not occupied by any reservation
       canBeEndTime = !reservations.find((r: any) =>
         r.timeSlot < hour &&
-        (r.endTimeSlot || r.timeSlot + (r.duration || 1)) > hour &&
+        (r.endTimeSlot || r.timeSlot + (r.duration || 1)) >= hour &&
         (r.status === 'pending' || r.status === 'confirmed')
       );
     }
