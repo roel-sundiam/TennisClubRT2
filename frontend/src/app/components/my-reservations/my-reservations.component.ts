@@ -281,8 +281,8 @@ interface Reservation {
             </div>
           </mat-tab>
 
-          <!-- Admin Report Tab (Admin Only) -->
-          <mat-tab [label]="isMobileView ? 'Admin' : 'Admin Report'" [disabled]="loading">
+          <!-- Admin Report Tab (Superadmin Only) -->
+          <mat-tab *ngIf="isSuperAdmin()" [label]="isMobileView ? 'Admin' : 'Admin Report'" [disabled]="loading">
             <div class="tab-content">
               <!-- Summary Statistics Card -->
               <div class="admin-stats-card" *ngIf="!loading && sortedAdminReservations.length > 0">
@@ -923,6 +923,11 @@ click "Try Again" below to reconnect.
     const result = user?.role === 'admin' || user?.role === 'superadmin';
     console.log('🔐 isAdmin result:', result);
     return result;
+  }
+
+  isSuperAdmin(): boolean {
+    const user = this.authService.currentUser;
+    return user?.role === 'superadmin';
   }
 
   getSortedAdminReservations(): Reservation[] {
