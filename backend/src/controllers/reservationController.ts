@@ -196,13 +196,25 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
       (r.status === 'pending' || r.status === 'confirmed')
     );
 
-    // For END TIME availability: hour can be used as end time if no reservation OCCUPIES that hour
-    // This allows 16:00-17:00 booking even if there's a 17:00-19:00 reservation (back-to-back is OK)
-    const canBeEndTime = !reservations.find((r: any) =>
-      hour > r.timeSlot &&
-      hour <= (r.endTimeSlot || r.timeSlot + (r.duration || 1)) &&
-      (r.status === 'pending' || r.status === 'confirmed')
-    );
+    // For END TIME availability: hour can be used as end time if no reservation STARTS at that hour
+    // Key insight: A reservation ending at time X means the next reservation can START at time X
+    // So hour H can be an END time if there's no reservation that STARTS at H
+    // Special case: hour 22 (10 PM) can ONLY be used as end time, never as start time
+    let canBeEndTime = false;
+    if (hour === 22) {
+      // Hour 22 is available as end time if there's no reservation that extends beyond 22
+      canBeEndTime = !reservations.find((r: any) =>
+        (r.endTimeSlot || r.timeSlot + (r.duration || 1)) > 22 &&
+        (r.status === 'pending' || r.status === 'confirmed')
+      );
+    } else {
+      // For other hours: can be end time if no reservation STARTS at that hour or extends beyond it
+      canBeEndTime = !reservations.find((r: any) =>
+        r.timeSlot <= hour &&
+        (r.endTimeSlot || r.timeSlot + (r.duration || 1)) > hour &&
+        (r.status === 'pending' || r.status === 'confirmed')
+      );
+    }
 
     const isBlockedByOpenPlay = blockedSlots.has(hour);
     const openPlayEvent = isBlockedByOpenPlay ?
@@ -214,7 +226,7 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
     
 
     // Enhanced debugging for specific hours that might be problematic
-    if (hour === 17) {
+    if (hour === 17 || hour === 21 || hour === 22) {
       console.log(`🔍 DETAILED DEBUG for hour ${hour} (NEW LOGIC):`);
       console.log(`  - Occupying reservation: ${occupyingReservation ? `${occupyingReservation.timeSlot}:00-${(occupyingReservation.endTimeSlot || occupyingReservation.timeSlot + (occupyingReservation.duration || 1))}:00 (status: ${occupyingReservation.status})` : 'NONE'}`);
       console.log(`  - Can be end time: ${canBeEndTime}`);
@@ -257,9 +269,9 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
       weatherSuitability
     };
 
-    // Special logging for hour 17 to debug frontend issue
-    if (hour === 17) {
-      console.log(`🔍 BACKEND RESPONSE DATA for Hour 17:`);
+    // Special logging for hour 17, 21, and 22 to debug frontend issue
+    if (hour === 17 || hour === 21 || hour === 22) {
+      console.log(`🔍 BACKEND RESPONSE DATA for Hour ${hour}:`);
       console.log(`  - hour:`, slotData.hour);
       console.log(`  - available:`, slotData.available);
       console.log(`  - availableAsEndTime:`, slotData.availableAsEndTime);
@@ -338,7 +350,7 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
   }
 
   // Validate time slot
-  if (timeSlot < 5 || timeSlot > 22) {
+  if (timeSlot < 5 || timeSlot > 21) {
     res.status(400).json({
       success: false,
       error: 'Court operates from 5:00 AM to 10:00 PM'
@@ -677,7 +689,7 @@ export const updateReservation = asyncHandler(async (req: AuthenticatedRequest, 
     }
 
     // Validate time slot
-    if (newTimeSlot < 5 || newTimeSlot > 22) {
+    if (newTimeSlot < 5 || newTimeSlot > 21) {
       res.status(400).json({
         success: false,
         error: 'Court operates from 5:00 AM to 10:00 PM'

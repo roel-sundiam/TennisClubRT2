@@ -558,7 +558,8 @@ export class ReservationsComponent implements OnInit, OnDestroy {
   userCreditBalance = 0;
   willUseCredits = false;
   creditAmountToUse = 0;
-  timeSlots: TimeSlot[] = [];
+  timeSlots: TimeSlot[] = []; // For START times (hours 5-21)
+  allTimeSlots: TimeSlot[] = []; // All slots including hour 22 for END time calculations
   existingReservations: Reservation[] = [];
   members: Member[] = [];
   loadingMembers = false;
@@ -960,7 +961,7 @@ export class ReservationsComponent implements OnInit, OnDestroy {
 
       if (hour <= 21) {
         // For regular operating hours (5-21), check END TIME availability
-        const slot = this.timeSlots.find((s) => s.hour === hour);
+        const slot = this.allTimeSlots.find((s) => s.hour === hour);
         console.log(`🔍 Hour ${hour} slot:`, slot);
 
         // FIXED: Use availableAsEndTime for end time calculations
@@ -1004,9 +1005,15 @@ export class ReservationsComponent implements OnInit, OnDestroy {
           break;
         }
       } else if (hour === 22) {
-        // Special case: 22:00 (court closing time) - only add if previous hour (21:00) was available
+        // Special case: 22:00 (court closing time) - check if it's available as end time
         console.log('🔍 Checking 22:00 as potential court closing end time');
-        if (this.availableEndTimes.length > 0) {
+        const slot22 = this.allTimeSlots.find((s) => s.hour === 22);
+        const canUse22AsEndTime = slot22 && (slot22.availableAsEndTime !== undefined ? slot22.availableAsEndTime : slot22.available);
+
+        console.log(`🔍 Hour 22 slot data:`, slot22);
+        console.log(`🔍 Can use 22 as end time:`, canUse22AsEndTime);
+
+        if (canUse22AsEndTime) {
           console.log('✅ Adding 22:00 as court closing end time');
           this.availableEndTimes.push({
             hour: hour,
@@ -1015,7 +1022,7 @@ export class ReservationsComponent implements OnInit, OnDestroy {
             isPeak: false, // 22:00 is not in peak hours
           });
         } else {
-          console.log('❌ Cannot add 22:00 - no consecutive slots available before it');
+          console.log('❌ Hour 22 is not available as end time');
         }
       }
     }
@@ -1117,15 +1124,19 @@ export class ReservationsComponent implements OnInit, OnDestroy {
           console.log('🔍 Backend timeSlots raw data:', response.data.timeSlots);
           console.log('🚫 Backend blocked slots:', response.data.timeSlots.filter((s: any) => s.blockedByOpenPlay).length);
 
-          this.timeSlots = response.data.timeSlots.map((backendSlot: any) => ({
+          // Store ALL time slots (including hour 22) for end time calculations
+          this.allTimeSlots = response.data.timeSlots.map((backendSlot: any) => ({
             hour: backendSlot.hour,
             display: `${backendSlot.hour}:00 - ${backendSlot.hour + 1}:00`,
             available: backendSlot.available,
-            availableAsEndTime: backendSlot.availableAsEndTime, // CRITICAL: Include the availableAsEndTime field from backend
+            availableAsEndTime: backendSlot.availableAsEndTime,
             isPeak: this.peakHours.includes(backendSlot.hour),
             blockedByOpenPlay: backendSlot.blockedByOpenPlay || false,
             openPlayEvent: backendSlot.openPlayEvent || null
           }));
+
+          // For START times: filter out hour 22 (court closes at 10 PM, last start is 9 PM)
+          this.timeSlots = this.allTimeSlots.filter((slot: any) => slot.hour <= 21);
 
           // Log specific slots for debugging
           const blockedSlots = this.timeSlots.filter(s => s.blockedByOpenPlay);
