@@ -210,7 +210,7 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
     } else {
       // For other hours: can be end time if no reservation STARTS at that hour or extends beyond it
       canBeEndTime = !reservations.find((r: any) =>
-        r.timeSlot <= hour &&
+        r.timeSlot < hour &&
         (r.endTimeSlot || r.timeSlot + (r.duration || 1)) > hour &&
         (r.status === 'pending' || r.status === 'confirmed')
       );
