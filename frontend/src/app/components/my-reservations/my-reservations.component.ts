@@ -927,7 +927,7 @@ click "Try Again" below to reconnect.
 
   isSuperAdmin(): boolean {
     const user = this.authService.currentUser;
-    return user?.role === 'superadmin';
+    return user?.role === 'superadmin'; // Only superadmins see Admin Report tab
   }
 
   getSortedAdminReservations(): Reservation[] {
