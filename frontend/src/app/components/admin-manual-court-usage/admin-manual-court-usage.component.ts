@@ -35,11 +35,14 @@ interface PlayerPayment {
 interface ManualCourtUsageSession {
   date: Date;
   timeSlot: number;
+  startTime?: number;
+  endTime?: number;
   players: Array<{ playerName: string; amount: number; status: string }>;
   totalAmount: number;
   createdBy: string;
   createdAt: Date;
   description: string;
+  playerNames?: string[];
 }
 
 @Component({
@@ -78,7 +81,7 @@ export class AdminManualCourtUsageComponent implements OnInit {
   calculating = false;
   history: ManualCourtUsageSession[] = [];
   displayedColumns = ['playerName', 'amount', 'actions'];
-  historyColumns = ['date', 'timeSlot', 'players', 'totalAmount', 'createdBy', 'createdAt'];
+  historyColumns = ['date', 'timeSlot', 'players', 'totalAmount'];
 
   // Peak hours configuration
   peakHours = [5, 18, 19, 21]; // 5AM, 6PM, 7PM, 9PM
@@ -130,10 +133,30 @@ export class AdminManualCourtUsageComponent implements OnInit {
     });
   }
 
-  formatTimeSlot(hour: number): string {
+  formatTimeSlot(hour: number | ManualCourtUsageSession): string {
+    // Handle session object with startTime/endTime
+    if (typeof hour === 'object') {
+      const session = hour;
+
+      // If no time data available, show "Not recorded"
+      if (session.startTime === null || session.startTime === undefined) {
+        return 'Not recorded';
+      }
+
+      const startTime = session.startTime;
+      const endTime = session.endTime ?? startTime + 1;
+
+      return `${this.format24Hour(startTime)} - ${this.format24Hour(endTime)}`;
+    }
+
+    // Handle single hour (for dropdown)
     const period = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
     return `${displayHour}:00 ${period}`;
+  }
+
+  format24Hour(hour: number): string {
+    return `${hour.toString().padStart(2, '0')}:00`;
   }
 
   loadMembers(): void {
@@ -183,6 +206,7 @@ export class AdminManualCourtUsageComponent implements OnInit {
     this.http.get<any>(`${environment.apiUrl}/manual-court-usage`).subscribe({
       next: (response) => {
         this.history = response.data?.sessions || [];
+        console.log('📊 Loaded history sessions:', this.history.length);
       },
       error: (error) => {
         console.error('Failed to load history:', error);
@@ -370,7 +394,49 @@ export class AdminManualCourtUsageComponent implements OnInit {
     return new Date(date).toLocaleDateString();
   }
 
-  getPlayersList(players: any[]): string {
-    return players.map(p => p.playerName).join(', ');
+  getPlayersList(session: ManualCourtUsageSession | any[] | any): string {
+    // Handle array of players (old format)
+    if (Array.isArray(session)) {
+      return session.map(p => p.playerName).join(', ');
+    }
+
+    // Use playerNames array (populated by backend)
+    if (session.playerNames && session.playerNames.length > 0) {
+      return session.playerNames.join(', ');
+    }
+
+    // Fallback to players array
+    if (session.players && session.players.length > 0) {
+      return session.players.map((p: any) => p.playerName).join(', ');
+    }
+
+    return 'No players';
+  }
+
+  // Get initials from a name for avatars
+  getInitials(name: string): string {
+    if (!name) return '?';
+    const parts = name.trim().split(' ');
+    if (parts.length === 1) {
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  // Get total number of unique players from history
+  getTotalPlayers(): number {
+    const uniquePlayers = new Set<string>();
+    this.history.forEach(session => {
+      session.players.forEach((player: any) => {
+        uniquePlayers.add(player.playerName);
+      });
+    });
+    return uniquePlayers.size;
+  }
+
+  // Get total revenue from all history sessions
+  getTotalRevenue(): string {
+    const total = this.history.reduce((sum, session) => sum + session.totalAmount, 0);
+    return total.toFixed(2);
   }
 }

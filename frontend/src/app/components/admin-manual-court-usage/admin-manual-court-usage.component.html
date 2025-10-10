@@ -1,119 +1,273 @@
 <div class="manual-court-usage-container">
-  <div class="header-section">
+  <!-- Modern Header with Gradient -->
+  <div class="page-header">
     <button mat-icon-button (click)="goBack()" class="back-button">
       <mat-icon>arrow_back</mat-icon>
     </button>
-    <h1>Manual Court Usage</h1>
+    <div class="header-content">
+      <h1><mat-icon>edit_calendar</mat-icon> Manual Court Usage</h1>
+      <p class="subtitle">Record past court usage and create pending payments for verification</p>
+    </div>
   </div>
 
-  <mat-card class="form-card">
-    <mat-card-header>
-      <mat-icon mat-card-avatar>edit_calendar</mat-icon>
-      <mat-card-title>Record Court Usage</mat-card-title>
-      <mat-card-subtitle>Create pending payments for court usage</mat-card-subtitle>
-    </mat-card-header>
+  <!-- Stats Cards -->
+  <div class="stats-grid" *ngIf="history.length > 0">
+    <mat-card class="stat-card">
+      <div class="stat-content">
+        <mat-icon class="stat-icon">history</mat-icon>
+        <div class="stat-details">
+          <span class="stat-value">{{ history.length }}</span>
+          <span class="stat-label">Total Records</span>
+        </div>
+      </div>
+    </mat-card>
 
+    <mat-card class="stat-card">
+      <div class="stat-content">
+        <mat-icon class="stat-icon">people</mat-icon>
+        <div class="stat-details">
+          <span class="stat-value">{{ getTotalPlayers() }}</span>
+          <span class="stat-label">Total Players</span>
+        </div>
+      </div>
+    </mat-card>
+
+    <mat-card class="stat-card">
+      <div class="stat-content">
+        <mat-icon class="stat-icon">payments</mat-icon>
+        <div class="stat-details">
+          <span class="stat-value">₱{{ getTotalRevenue() }}</span>
+          <span class="stat-label">Total Amount</span>
+        </div>
+      </div>
+    </mat-card>
+  </div>
+
+  <!-- Main Form Card -->
+  <mat-card class="main-form-card" elevation="2">
     <mat-card-content>
-      <form [formGroup]="courtUsageForm" class="court-usage-form">
-        <!-- Date and Time Selection -->
-        <div class="form-row">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Usage Date</mat-label>
-            <input matInput [matDatepicker]="picker" formControlName="date" required>
-            <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
-            <mat-datepicker #picker></mat-datepicker>
-            <mat-error>Date is required</mat-error>
-          </mat-form-field>
+      <form [formGroup]="courtUsageForm" class="modern-form">
+
+        <!-- Step 1: Date & Time -->
+        <div class="form-section">
+          <div class="section-header">
+            <div class="step-indicator">
+              <span class="step-number">1</span>
+            </div>
+            <div class="section-title">
+              <h3>Date & Time</h3>
+              <p>Select when the court was used</p>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <mat-form-field appearance="outline" class="modern-field">
+              <mat-label><mat-icon>calendar_today</mat-icon> Usage Date</mat-label>
+              <input matInput [matDatepicker]="picker" formControlName="date" required>
+              <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+              <mat-datepicker #picker></mat-datepicker>
+              <mat-error>Please select a date</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="modern-field">
+              <mat-label><mat-icon>schedule</mat-icon> Start Time</mat-label>
+              <mat-select formControlName="startTime" required>
+                <mat-option *ngFor="let slot of timeSlots" [value]="slot.value">
+                  {{ slot.label }}
+                </mat-option>
+              </mat-select>
+              <mat-error>Start time required</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="modern-field">
+              <mat-label><mat-icon>schedule</mat-icon> End Time</mat-label>
+              <mat-select formControlName="endTime" required>
+                <mat-option *ngFor="let slot of timeSlots" [value]="slot.value">
+                  {{ slot.label }}
+                </mat-option>
+              </mat-select>
+              <mat-error>End time required</mat-error>
+              <mat-hint>When the session ended</mat-hint>
+            </mat-form-field>
+          </div>
         </div>
 
-        <div class="form-row">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Start Time</mat-label>
-            <mat-select formControlName="startTime" required>
-              <mat-option *ngFor="let slot of timeSlots" [value]="slot.value">
-                {{ slot.label }}
-              </mat-option>
-            </mat-select>
-            <mat-error>Start time is required</mat-error>
-          </mat-form-field>
+        <mat-divider></mat-divider>
 
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>End Time</mat-label>
-            <mat-select formControlName="endTime" required>
-              <mat-option *ngFor="let slot of timeSlots" [value]="slot.value">
-                {{ slot.label }}
-              </mat-option>
-            </mat-select>
-            <mat-error>End time is required</mat-error>
-            <mat-hint>Select the hour when the session ends</mat-hint>
-          </mat-form-field>
-        </div>
+        <!-- Step 2: Players -->
+        <div class="form-section">
+          <div class="section-header">
+            <div class="step-indicator">
+              <span class="step-number">2</span>
+            </div>
+            <div class="section-title">
+              <h3>Players</h3>
+              <p>Add all players who used the court</p>
+            </div>
+          </div>
 
-        <!-- Player Selection -->
-        <div class="player-section">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Add Players</mat-label>
+          <mat-form-field appearance="outline" class="modern-field player-field">
+            <mat-label><mat-icon>person_add</mat-icon> Add Players</mat-label>
             <input
               matInput
               formControlName="playerInput"
               [matAutocomplete]="auto"
               (input)="onPlayerInputChange($event)"
               (keydown.enter)="addManualPlayer(); $event.preventDefault()"
-              placeholder="Type player name and press Enter"
+              placeholder="Type name or select from list"
             >
-            <button mat-icon-button matSuffix (click)="addManualPlayer()" type="button">
-              <mat-icon>add</mat-icon>
+            <button mat-icon-button matIconSuffix (click)="addManualPlayer()" type="button" class="add-player-btn">
+              <mat-icon>add_circle</mat-icon>
             </button>
-            <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onMemberSelected($event)" [panelWidth]="'auto'">
+            <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onMemberSelected($event)">
               <mat-option *ngFor="let member of filteredMembers" [value]="member.fullName">
-                {{ member.fullName }}
+                <div class="member-option">
+                  <div class="member-avatar">{{ getInitials(member.fullName) }}</div>
+                  <span>{{ member.fullName }}</span>
+                </div>
               </mat-option>
             </mat-autocomplete>
-            <mat-hint>{{ filteredMembers.length }} member(s) available - Select from dropdown or type to search</mat-hint>
+            <mat-hint>
+              <mat-icon class="hint-icon">info</mat-icon>
+              {{ filteredMembers.length }} members available - Press Enter to add
+            </mat-hint>
           </mat-form-field>
 
-          <!-- Selected Players Chips -->
-          <div class="selected-players" *ngIf="selectedPlayers.length > 0">
-            <mat-chip-set>
-              <mat-chip *ngFor="let player of selectedPlayers" (removed)="removePlayer(player)">
-                {{ player }}
-                <button matChipRemove>
-                  <mat-icon>cancel</mat-icon>
-                </button>
-              </mat-chip>
-            </mat-chip-set>
+          <!-- Selected Players Grid -->
+          <div class="players-grid" *ngIf="selectedPlayers.length > 0">
+            <div class="player-chip" *ngFor="let player of selectedPlayers">
+              <div class="chip-avatar">{{ getInitials(player) }}</div>
+              <span class="chip-name">{{ player }}</span>
+              <button mat-icon-button (click)="removePlayer(player)" class="chip-remove">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <div class="empty-state" *ngIf="selectedPlayers.length === 0">
+            <mat-icon>person_add</mat-icon>
+            <p>No players added yet</p>
           </div>
         </div>
 
-        <!-- Calculate Button -->
-        <div class="action-row">
+        <mat-divider></mat-divider>
+
+        <!-- Step 3: Calculate Fees -->
+        <div class="form-section">
+          <div class="section-header">
+            <div class="step-indicator">
+              <span class="step-number">3</span>
+            </div>
+            <div class="section-title">
+              <h3>Calculate Fees</h3>
+              <p>Calculate individual payment amounts</p>
+            </div>
+          </div>
+
           <button
             mat-raised-button
             color="primary"
             type="button"
             (click)="calculateFees()"
             [disabled]="selectedPlayers.length === 0 || !courtUsageForm.get('startTime')?.value || !courtUsageForm.get('endTime')?.value || calculating"
+            class="calculate-btn"
           >
-            <mat-icon>calculate</mat-icon>
-            Calculate Fees
+            <mat-spinner *ngIf="calculating" diameter="20" class="btn-spinner"></mat-spinner>
+            <mat-icon *ngIf="!calculating">calculate</mat-icon>
+            {{ calculating ? 'Calculating...' : 'Calculate Fees' }}
           </button>
         </div>
 
-        <!-- Player Payments Table -->
-        <div class="payments-section" *ngIf="playerPayments.length > 0">
-          <h3>Player Payments (Editable)</h3>
-          <table mat-table [dataSource]="playerPayments" class="payments-table">
-            <!-- Player Name Column -->
-            <ng-container matColumnDef="playerName">
-              <th mat-header-cell *matHeaderCellDef>Player Name</th>
-              <td mat-cell *matCellDef="let payment">{{ payment.playerName }}</td>
-            </ng-container>
+        <mat-divider *ngIf="playerPayments.length > 0"></mat-divider>
 
-            <!-- Amount Column -->
-            <ng-container matColumnDef="amount">
-              <th mat-header-cell *matHeaderCellDef>Amount (₱)</th>
-              <td mat-cell *matCellDef="let payment">
-                <mat-form-field appearance="outline" class="amount-field">
+        <!-- Step 4: Review & Submit -->
+        <div class="form-section" *ngIf="playerPayments.length > 0">
+          <div class="section-header">
+            <div class="step-indicator success">
+              <mat-icon>check</mat-icon>
+            </div>
+            <div class="section-title">
+              <h3>Review Payments</h3>
+              <p>Review and adjust amounts before creating</p>
+            </div>
+          </div>
+
+          <!-- Payments Table (Desktop) -->
+          <div class="payments-table-wrapper desktop-only">
+            <table mat-table [dataSource]="playerPayments" class="modern-table">
+              <ng-container matColumnDef="playerName">
+                <th mat-header-cell *matHeaderCellDef>
+                  <mat-icon>person</mat-icon> Player
+                </th>
+                <td mat-cell *matCellDef="let payment">
+                  <div class="player-cell">
+                    <div class="player-avatar-small">{{ getInitials(payment.playerName) }}</div>
+                    <span>{{ payment.playerName }}</span>
+                  </div>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="amount">
+                <th mat-header-cell *matHeaderCellDef>
+                  <mat-icon>payments</mat-icon> Amount
+                </th>
+                <td mat-cell *matCellDef="let payment">
+                  <mat-form-field appearance="outline" class="amount-field">
+                    <span matTextPrefix>₱</span>
+                    <input
+                      matInput
+                      type="number"
+                      [value]="payment.amount"
+                      (input)="updatePlayerAmount(payment.playerName, $any($event.target).value)"
+                      min="0"
+                      step="0.01"
+                    >
+                  </mat-form-field>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef>Actions</th>
+                <td mat-cell *matCellDef="let payment">
+                  <button
+                    mat-icon-button
+                    color="warn"
+                    (click)="removePlayer(payment.playerName)"
+                    type="button"
+                    matTooltip="Remove player"
+                  >
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="table-row"></tr>
+            </table>
+          </div>
+
+          <!-- Payment Cards (Mobile) -->
+          <div class="payment-cards mobile-only">
+            <mat-card *ngFor="let payment of playerPayments" class="payment-card">
+              <div class="payment-card-header">
+                <div class="player-info">
+                  <div class="player-avatar-large">{{ getInitials(payment.playerName) }}</div>
+                  <span class="player-name">{{ payment.playerName }}</span>
+                </div>
+                <button
+                  mat-icon-button
+                  color="warn"
+                  (click)="removePlayer(payment.playerName)"
+                  class="remove-btn"
+                >
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+              <mat-divider></mat-divider>
+              <div class="payment-card-body">
+                <mat-form-field appearance="outline" class="amount-field-mobile">
+                  <mat-label>Amount</mat-label>
+                  <span matTextPrefix>₱</span>
                   <input
                     matInput
                     type="number"
@@ -123,112 +277,147 @@
                     step="0.01"
                   >
                 </mat-form-field>
-              </td>
-            </ng-container>
-
-            <!-- Actions Column -->
-            <ng-container matColumnDef="actions">
-              <th mat-header-cell *matHeaderCellDef>Actions</th>
-              <td mat-cell *matCellDef="let payment">
-                <button mat-icon-button color="warn" (click)="removePlayer(payment.playerName)" type="button">
-                  <mat-icon>delete</mat-icon>
-                </button>
-              </td>
-            </ng-container>
-
-            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-          </table>
-
-          <!-- Total -->
-          <div class="total-row">
-            <strong>Total Amount:</strong>
-            <span class="total-amount">₱{{ getTotalAmount().toFixed(2) }}</span>
+              </div>
+            </mat-card>
           </div>
-        </div>
 
-        <!-- Description -->
-        <mat-form-field appearance="outline" class="full-width" *ngIf="playerPayments.length > 0">
-          <mat-label>Description (Optional)</mat-label>
-          <input matInput formControlName="description" placeholder="E.g., Training session">
-          <mat-hint>Add notes about this court usage</mat-hint>
-        </mat-form-field>
+          <!-- Total Summary -->
+          <div class="total-summary">
+            <div class="summary-content">
+              <div class="summary-label">
+                <mat-icon>receipt</mat-icon>
+                <span>Total Amount</span>
+              </div>
+              <div class="summary-value">₱{{ getTotalAmount().toFixed(2) }}</div>
+            </div>
+          </div>
 
-        <!-- Submit Button -->
-        <div class="submit-row" *ngIf="playerPayments.length > 0">
-          <button
-            mat-raised-button
-            color="accent"
-            type="button"
-            (click)="submitCourtUsage()"
-            [disabled]="!canSubmit() || loading"
-          >
-            <mat-spinner *ngIf="loading" diameter="20" class="inline-spinner"></mat-spinner>
-            <mat-icon *ngIf="!loading">check_circle</mat-icon>
-            {{ loading ? 'Creating...' : 'Create Pending Payments' }}
-          </button>
-          <button mat-button type="button" (click)="resetForm()" [disabled]="loading">
-            <mat-icon>clear</mat-icon>
-            Reset
-          </button>
+          <!-- Description -->
+          <mat-form-field appearance="outline" class="modern-field description-field">
+            <mat-label><mat-icon>notes</mat-icon> Description (Optional)</mat-label>
+            <textarea
+              matInput
+              formControlName="description"
+              placeholder="Add notes about this court usage session..."
+              rows="3"
+            ></textarea>
+            <mat-hint>E.g., Training session, Tournament, etc.</mat-hint>
+          </mat-form-field>
+
+          <!-- Action Buttons -->
+          <div class="action-buttons">
+            <button
+              mat-raised-button
+              color="accent"
+              type="button"
+              (click)="submitCourtUsage()"
+              [disabled]="!canSubmit() || loading"
+              class="submit-btn"
+            >
+              <mat-spinner *ngIf="loading" diameter="20" class="btn-spinner"></mat-spinner>
+              <mat-icon *ngIf="!loading">check_circle</mat-icon>
+              {{ loading ? 'Creating Payments...' : 'Create Pending Payments' }}
+            </button>
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="resetForm()"
+              [disabled]="loading"
+              class="reset-btn"
+            >
+              <mat-icon>refresh</mat-icon>
+              Reset Form
+            </button>
+          </div>
         </div>
       </form>
     </mat-card-content>
   </mat-card>
 
   <!-- History Section -->
-  <mat-card class="history-card" *ngIf="history.length > 0">
+  <mat-card class="history-card" *ngIf="history.length > 0" elevation="2">
     <mat-card-header>
-      <mat-icon mat-card-avatar>history</mat-icon>
-      <mat-card-title>Manual Court Usage History</mat-card-title>
-      <mat-card-subtitle>{{ history.length }} record(s)</mat-card-subtitle>
+      <div class="history-header">
+        <div class="header-left">
+          <mat-icon class="header-icon">history</mat-icon>
+          <div>
+            <mat-card-title>Usage History</mat-card-title>
+            <mat-card-subtitle>{{ history.length }} record(s) created</mat-card-subtitle>
+          </div>
+        </div>
+      </div>
     </mat-card-header>
 
     <mat-card-content>
-      <table mat-table [dataSource]="history" class="history-table">
-        <!-- Date Column -->
-        <ng-container matColumnDef="date">
-          <th mat-header-cell *matHeaderCellDef>Date</th>
-          <td mat-cell *matCellDef="let session">{{ formatDate(session.date) }}</td>
-        </ng-container>
+      <!-- History Table (Desktop) -->
+      <div class="history-table-wrapper desktop-only">
+        <table mat-table [dataSource]="history" class="modern-table history-table">
+          <ng-container matColumnDef="date">
+            <th mat-header-cell *matHeaderCellDef>
+              <mat-icon>calendar_today</mat-icon> Date
+            </th>
+            <td mat-cell *matCellDef="let session">{{ formatDate(session.date) }}</td>
+          </ng-container>
 
-        <!-- Time Slot Column -->
-        <ng-container matColumnDef="timeSlot">
-          <th mat-header-cell *matHeaderCellDef>Time</th>
-          <td mat-cell *matCellDef="let session">{{ formatTimeSlot(session.timeSlot) }}</td>
-        </ng-container>
+          <ng-container matColumnDef="timeSlot">
+            <th mat-header-cell *matHeaderCellDef>
+              <mat-icon>schedule</mat-icon> Time
+            </th>
+            <td mat-cell *matCellDef="let session">{{ formatTimeSlot(session) }}</td>
+          </ng-container>
 
-        <!-- Players Column -->
-        <ng-container matColumnDef="players">
-          <th mat-header-cell *matHeaderCellDef>Players</th>
-          <td mat-cell *matCellDef="let session">
-            <span matTooltip="{{ getPlayersList(session.players) }}">
-              {{ session.players.length }} player(s)
-            </span>
-          </td>
-        </ng-container>
+          <ng-container matColumnDef="players">
+            <th mat-header-cell *matHeaderCellDef>
+              <mat-icon>people</mat-icon> Players
+            </th>
+            <td mat-cell *matCellDef="let session">
+              <div class="players-list">
+                <span class="player-names">{{ getPlayersList(session) }}</span>
+              </div>
+            </td>
+          </ng-container>
 
-        <!-- Total Amount Column -->
-        <ng-container matColumnDef="totalAmount">
-          <th mat-header-cell *matHeaderCellDef>Total Amount</th>
-          <td mat-cell *matCellDef="let session">₱{{ session.totalAmount.toFixed(2) }}</td>
-        </ng-container>
+          <ng-container matColumnDef="totalAmount">
+            <th mat-header-cell *matHeaderCellDef>
+              <mat-icon>payments</mat-icon> Amount
+            </th>
+            <td mat-cell *matCellDef="let session">
+              <span class="amount-value">₱{{ session.totalAmount.toFixed(2) }}</span>
+            </td>
+          </ng-container>
 
-        <!-- Created By Column -->
-        <ng-container matColumnDef="createdBy">
-          <th mat-header-cell *matHeaderCellDef>Created By</th>
-          <td mat-cell *matCellDef="let session">{{ session.createdBy }}</td>
-        </ng-container>
+          <tr mat-header-row *matHeaderRowDef="historyColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: historyColumns;" class="table-row"></tr>
+        </table>
+      </div>
 
-        <!-- Created At Column -->
-        <ng-container matColumnDef="createdAt">
-          <th mat-header-cell *matHeaderCellDef>Created At</th>
-          <td mat-cell *matCellDef="let session">{{ formatDate(session.createdAt) }}</td>
-        </ng-container>
-
-        <tr mat-header-row *matHeaderRowDef="historyColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: historyColumns;"></tr>
-      </table>
+      <!-- History Cards (Mobile) -->
+      <div class="history-cards mobile-only">
+        <mat-card *ngFor="let session of history" class="history-item-card">
+          <div class="history-item-header">
+            <mat-icon class="calendar-icon">calendar_today</mat-icon>
+            <div class="date-info">
+              <div class="date">{{ formatDate(session.date) }}</div>
+              <div class="time">{{ formatTimeSlot(session) }}</div>
+            </div>
+          </div>
+          <mat-divider></mat-divider>
+          <div class="history-item-body">
+            <div class="info-row">
+              <mat-icon>people</mat-icon>
+              <span>{{ session.players.length }} players</span>
+            </div>
+            <div class="info-row">
+              <mat-icon>assignment</mat-icon>
+              <span class="player-names">{{ getPlayersList(session) }}</span>
+            </div>
+            <div class="info-row">
+              <mat-icon>payments</mat-icon>
+              <span class="amount">₱{{ session.totalAmount.toFixed(2) }}</span>
+            </div>
+          </div>
+        </mat-card>
+      </div>
     </mat-card-content>
   </mat-card>
 </div>

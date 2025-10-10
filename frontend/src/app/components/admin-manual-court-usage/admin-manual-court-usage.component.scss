@@ -1,251 +1,1010 @@
+// Modern Manual Court Usage Component Styles
+// Professional, clean, and mobile-friendly design
+
 .manual-court-usage-container {
-  padding: 24px;
+  padding: 20px;
   max-width: 1400px;
   margin: 0 auto;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
 
-  .header-section {
+  // ==================== HEADER ====================
+  .page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 32px;
+    border-radius: 16px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
     display: flex;
     align-items: center;
-    margin-bottom: 24px;
+    gap: 20px;
+    animation: fadeInDown 0.5s ease;
 
     .back-button {
-      margin-right: 16px;
+      color: white;
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
+      transition: all 0.3s ease;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateX(-4px);
+      }
     }
 
-    h1 {
-      margin: 0;
-      font-size: 28px;
-      font-weight: 500;
+    .header-content {
+      flex: 1;
+
+      h1 {
+        margin: 0 0 8px 0;
+        font-size: 32px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+
+        mat-icon {
+          font-size: 36px;
+          width: 36px;
+          height: 36px;
+        }
+      }
+
+      .subtitle {
+        margin: 0;
+        font-size: 16px;
+        opacity: 0.9;
+      }
     }
   }
 
-  .form-card,
-  .history-card {
+  // ==================== STATS GRID ====================
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
     margin-bottom: 24px;
+    animation: fadeInUp 0.5s ease 0.2s both;
 
-    mat-card-header {
-      margin-bottom: 20px;
+    .stat-card {
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      transition: all 0.3s ease;
+      background: white;
 
-      mat-icon {
-        color: #1976d2;
+      &:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
       }
-    }
-  }
 
-  .court-usage-form {
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      margin-bottom: 16px;
+      .stat-content {
+        display: flex;
+        align-items: center;
+        gap: 16px;
 
-      @media (max-width: 768px) {
-        grid-template-columns: 1fr;
-      }
-    }
+        .stat-icon {
+          width: 56px;
+          height: 56px;
+          font-size: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 12px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+        }
 
-    .full-width {
-      width: 100%;
-    }
+        .stat-details {
+          display: flex;
+          flex-direction: column;
 
-    .player-section {
-      margin-bottom: 24px;
+          .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2d3748;
+            line-height: 1;
+            margin-bottom: 4px;
+          }
 
-      .selected-players {
-        margin-top: 12px;
-
-        mat-chip-set {
-          mat-chip {
-            margin: 4px;
+          .stat-label {
+            font-size: 14px;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
           }
         }
       }
     }
+  }
 
-    .action-row {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 24px;
+  // ==================== MAIN FORM CARD ====================
+  .main-form-card {
+    border-radius: 16px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    animation: fadeInUp 0.5s ease 0.3s both;
+    background: white;
 
-      button {
+    mat-card-content {
+      padding: 32px;
+    }
+  }
+
+  // ==================== MODERN FORM ====================
+  .modern-form {
+    .form-section {
+      margin-bottom: 32px;
+      padding-bottom: 32px;
+
+      &:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      .section-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+
+        .step-indicator {
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          font-size: 20px;
+          flex-shrink: 0;
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+
+          &.success {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+
+            mat-icon {
+              font-size: 28px;
+              width: 28px;
+              height: 28px;
+            }
+          }
+
+          .step-number {
+            line-height: 1;
+          }
+        }
+
+        .section-title {
+          flex: 1;
+
+          h3 {
+            margin: 0 0 4px 0;
+            font-size: 20px;
+            font-weight: 600;
+            color: #2d3748;
+          }
+
+          p {
+            margin: 0;
+            font-size: 14px;
+            color: #718096;
+          }
+        }
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+      }
+
+      .modern-field {
+        width: 100%;
+
+        ::ng-deep {
+          .mat-mdc-form-field-flex {
+            align-items: center;
+          }
+
+          .mat-mdc-text-field-wrapper {
+            border-radius: 8px;
+          }
+
+          mat-label mat-icon {
+            font-size: 18px;
+            width: 18px;
+            height: 18px;
+            margin-right: 8px;
+            vertical-align: middle;
+          }
+
+          .mat-mdc-form-field-hint {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+
+            .hint-icon {
+              font-size: 16px;
+              width: 16px;
+              height: 16px;
+            }
+          }
+        }
+      }
+
+      .player-field {
+        margin-bottom: 16px;
+
+        .add-player-btn {
+          color: #667eea;
+        }
+      }
+
+      // Players Grid
+      .players-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 12px;
+        margin-top: 16px;
+
+        .player-chip {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 16px;
+          background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+          border-radius: 12px;
+          border: 2px solid #e2e8f0;
+          transition: all 0.3s ease;
+
+          &:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+          }
+
+          .chip-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            flex-shrink: 0;
+          }
+
+          .chip-name {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 500;
+            color: #2d3748;
+          }
+
+          .chip-remove {
+            width: 28px;
+            height: 28px;
+            flex-shrink: 0;
+
+            mat-icon {
+              font-size: 18px;
+              width: 18px;
+              height: 18px;
+            }
+          }
+        }
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: #a0aec0;
+
+        mat-icon {
+          font-size: 64px;
+          width: 64px;
+          height: 64px;
+          margin-bottom: 16px;
+          opacity: 0.5;
+        }
+
+        p {
+          margin: 0;
+          font-size: 16px;
+        }
+      }
+
+      .calculate-btn {
+        min-width: 200px;
+        min-height: 48px;
+        font-size: 16px;
+        font-weight: 600;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        transition: all 0.3s ease;
+
+        &:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-spinner {
+          margin-right: 8px;
+          display: inline-block;
+        }
+
         mat-icon {
           margin-right: 8px;
         }
       }
     }
+  }
 
-    .payments-section {
-      margin: 24px 0;
-      padding: 16px;
-      background-color: #f5f5f5;
-      border-radius: 8px;
+  // ==================== PAYMENTS TABLE ====================
+  .payments-table-wrapper {
+    margin: 24px 0;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 
-      h3 {
-        margin-top: 0;
-        margin-bottom: 16px;
-        font-size: 18px;
-        font-weight: 500;
+    .modern-table {
+      width: 100%;
+
+      th {
+        background: #f7fafc;
+        font-weight: 600;
+        font-size: 14px;
+        color: #4a5568;
+        padding: 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+
+        mat-icon {
+          font-size: 18px;
+          width: 18px;
+          height: 18px;
+          margin-right: 8px;
+          vertical-align: middle;
+        }
       }
 
-      .payments-table {
-        width: 100%;
-        background-color: white;
-        border-radius: 4px;
-        overflow: hidden;
+      td {
+        padding: 16px;
+        border-bottom: 1px solid #e2e8f0;
+      }
 
-        .amount-field {
-          width: 120px;
-          margin: 0;
+      .table-row {
+        transition: all 0.3s ease;
 
-          ::ng-deep .mat-mdc-form-field-infix {
+        &:hover {
+          background: #f7fafc;
+        }
+      }
+
+      .player-cell {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+
+        .player-avatar-small {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          font-weight: 600;
+          flex-shrink: 0;
+        }
+      }
+
+      .amount-field {
+        width: 140px;
+        margin: 0;
+
+        ::ng-deep {
+          .mat-mdc-form-field-infix {
             padding: 8px 0;
           }
 
           input {
             text-align: right;
             font-size: 16px;
-            font-weight: 500;
+            font-weight: 600;
+            color: #2d3748;
+          }
+        }
+      }
+    }
+  }
+
+  // ==================== PAYMENT CARDS (MOBILE) ====================
+  .payment-cards {
+    display: grid;
+    gap: 16px;
+    margin: 24px 0;
+
+    .payment-card {
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+      .payment-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px;
+        background: #f7fafc;
+
+        .player-info {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+
+          .player-avatar-large {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 600;
+          }
+
+          .player-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2d3748;
           }
         }
       }
 
-      .total-row {
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        gap: 16px;
-        margin-top: 16px;
-        padding: 12px 16px;
-        background-color: #e3f2fd;
-        border-radius: 4px;
-        font-size: 18px;
+      .payment-card-body {
+        padding: 16px;
 
-        .total-amount {
-          color: #1976d2;
-          font-weight: 600;
-          font-size: 20px;
-        }
-      }
-    }
+        .amount-field-mobile {
+          width: 100%;
+          margin: 0;
 
-    .submit-row {
-      display: flex;
-      gap: 12px;
-      margin-top: 24px;
-
-      button {
-        mat-icon,
-        .inline-spinner {
-          margin-right: 8px;
-        }
-
-        .inline-spinner {
-          display: inline-block;
-          vertical-align: middle;
+          ::ng-deep input {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2d3748;
+          }
         }
       }
     }
   }
 
-  .history-card {
-    .history-table {
-      width: 100%;
-      background-color: white;
+  // ==================== TOTAL SUMMARY ====================
+  .total-summary {
+    margin: 24px 0;
+    padding: 20px;
+    background: linear-gradient(135deg, #edf2f7 0%, #e2e8f0 100%);
+    border-radius: 12px;
+    border: 2px solid #667eea;
 
-      th {
+    .summary-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      .summary-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 16px;
         font-weight: 600;
-        background-color: #f5f5f5;
+        color: #4a5568;
+
+        mat-icon {
+          color: #667eea;
+        }
       }
 
-      td,
-      th {
-        padding: 12px 16px;
+      .summary-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: #667eea;
+      }
+    }
+  }
+
+  // ==================== DESCRIPTION FIELD ====================
+  .description-field {
+    margin: 24px 0;
+
+    ::ng-deep textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+  }
+
+  // ==================== ACTION BUTTONS ====================
+  .action-buttons {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+
+    button {
+      min-height: 48px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 12px;
+      transition: all 0.3s ease;
+
+      mat-icon {
+        margin-right: 8px;
       }
 
-      tr:hover {
-        background-color: #f9f9f9;
+      .btn-spinner {
+        margin-right: 8px;
+        display: inline-block;
       }
+    }
+
+    .submit-btn {
+      flex: 1;
+      min-width: 200px;
+      box-shadow: 0 4px 12px rgba(0, 191, 165, 0.3);
+
+      &:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0, 191, 165, 0.4);
+      }
+    }
+
+    .reset-btn {
+      min-width: 150px;
+    }
+  }
+
+  // ==================== HISTORY CARD ====================
+  .history-card {
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    animation: fadeInUp 0.5s ease 0.4s both;
+    background: white;
+
+    mat-card-header {
+      padding: 24px 24px 16px 24px;
+
+      .history-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+
+        .header-left {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+
+          .header-icon {
+            width: 48px;
+            height: 48px;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+          }
+        }
+      }
+    }
+
+    .history-table-wrapper {
+      .history-table {
+        .players-list {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+
+          .player-count {
+            font-size: 13px;
+            font-weight: 600;
+            color: #4a5568;
+          }
+
+          .player-names {
+            font-size: 14px;
+            color: #667eea;
+            word-break: break-word;
+            line-height: 1.4;
+          }
+        }
+
+        .amount-value {
+          font-weight: 600;
+          color: #667eea;
+          font-size: 16px;
+        }
+      }
+    }
+  }
+
+  // ==================== HISTORY CARDS (MOBILE) ====================
+  .history-cards {
+    display: grid;
+    gap: 16px;
+
+    .history-item-card {
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      transition: all 0.3s ease;
+
+      &:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        transform: translateY(-2px);
+      }
+
+      .history-item-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+
+        .calendar-icon {
+          font-size: 32px;
+          width: 32px;
+          height: 32px;
+        }
+
+        .date-info {
+          .date {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+          }
+
+          .time {
+            font-size: 14px;
+            opacity: 0.9;
+          }
+        }
+      }
+
+      .history-item-body {
+        padding: 16px;
+
+        .info-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 8px 0;
+          font-size: 14px;
+          color: #4a5568;
+
+          mat-icon {
+            color: #667eea;
+            font-size: 20px;
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+          }
+
+          .amount {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 16px;
+          }
+
+          .player-names {
+            flex: 1;
+            word-break: break-word;
+            line-height: 1.4;
+          }
+        }
+      }
+    }
+  }
+
+  // ==================== MEMBER OPTION (AUTOCOMPLETE) ====================
+  .member-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+
+    .member-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+  }
+
+  // ==================== RESPONSIVE UTILITIES ====================
+  .desktop-only {
+    display: block;
+  }
+
+  .mobile-only {
+    display: none;
+  }
+
+  // ==================== ANIMATIONS ====================
+  @keyframes fadeInDown {
+    from {
+      opacity: 0;
+      transform: translateY(-30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 }
 
-// Mobile responsive
+// ==================== MOBILE RESPONSIVE ====================
 @media (max-width: 768px) {
   .manual-court-usage-container {
     padding: 16px;
 
-    .header-section h1 {
-      font-size: 24px;
-    }
+    .page-header {
+      padding: 20px;
+      flex-direction: column;
+      text-align: center;
 
-    .court-usage-form {
-      .payments-section {
-        padding: 12px;
+      .back-button {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+      }
 
-        .payments-table {
-          font-size: 14px;
+      .header-content {
+        h1 {
+          font-size: 24px;
+          justify-content: center;
 
-          .amount-field {
-            width: 100px;
+          mat-icon {
+            font-size: 28px;
+            width: 28px;
+            height: 28px;
           }
+        }
+
+        .subtitle {
+          font-size: 14px;
         }
       }
     }
 
-    .history-card {
-      .history-table {
-        font-size: 12px;
+    .stats-grid {
+      grid-template-columns: 1fr;
+      gap: 12px;
 
-        td,
-        th {
-          padding: 8px 12px;
+      .stat-card {
+        padding: 16px;
+      }
+    }
+
+    .main-form-card {
+      mat-card-content {
+        padding: 20px;
+      }
+    }
+
+    .modern-form {
+      .form-section {
+        margin-bottom: 24px;
+        padding-bottom: 24px;
+
+        .section-header {
+          .step-indicator {
+            width: 40px;
+            height: 40px;
+            font-size: 18px;
+          }
+
+          .section-title {
+            h3 {
+              font-size: 18px;
+            }
+
+            p {
+              font-size: 13px;
+            }
+          }
+        }
+
+        .form-grid {
+          grid-template-columns: 1fr;
+          gap: 16px;
+        }
+
+        .players-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .calculate-btn {
+          width: 100%;
+        }
+      }
+    }
+
+    .total-summary {
+      .summary-content {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+
+        .summary-value {
+          font-size: 24px;
+        }
+      }
+    }
+
+    .action-buttons {
+      flex-direction: column;
+
+      button {
+        width: 100%;
+      }
+    }
+
+    .desktop-only {
+      display: none;
+    }
+
+    .mobile-only {
+      display: block;
+    }
+
+    .history-card {
+      mat-card-header {
+        padding: 16px;
+
+        .history-header {
+          .header-left {
+            gap: 12px;
+
+            .header-icon {
+              width: 40px;
+              height: 40px;
+              font-size: 24px;
+            }
+          }
         }
       }
     }
   }
 }
 
-// Senior-friendly design
+// ==================== TABLET ====================
+@media (min-width: 769px) and (max-width: 1024px) {
+  .manual-court-usage-container {
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .modern-form {
+      .form-section {
+        .form-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+    }
+  }
+}
+
+// ==================== SENIOR-FRIENDLY ENHANCEMENTS ====================
 .manual-court-usage-container {
   ::ng-deep {
-    // Larger fonts for senior members
+    // Larger font sizes
     .mat-mdc-form-field {
       font-size: 16px;
-    }
 
-    .mat-mdc-button {
-      font-size: 16px;
-      min-height: 48px;
-    }
-
-    // High contrast
-    .mat-mdc-form-field-error {
-      font-size: 14px;
+      input,
+      textarea,
+      select {
+        font-size: 16px;
+      }
     }
 
     // Touch-friendly buttons
-    .mat-icon-button {
+    .mat-mdc-button,
+    .mat-mdc-raised-button,
+    .mat-mdc-stroked-button {
+      font-size: 16px;
+      min-height: 48px;
+      padding: 0 24px;
+    }
+
+    .mat-mdc-icon-button {
       width: 48px;
       height: 48px;
+
+      mat-icon {
+        font-size: 24px;
+        width: 24px;
+        height: 24px;
+      }
     }
 
-    // Make autocomplete dropdown show ALL players (no height limit)
+    // High contrast errors
+    .mat-mdc-form-field-error {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    // Autocomplete panel
     .mat-mdc-autocomplete-panel {
-      max-height: 90vh !important; // Very large height to show all members
-      min-width: 300px !important;
-      overflow-y: auto !important;
+      max-height: 70vh !important;
+
+      .mat-mdc-option {
+        min-height: 56px;
+        font-size: 16px;
+        padding: 0 16px;
+      }
     }
 
-    .mat-mdc-option {
-      min-height: 48px; // Touch-friendly
+    // Table cells
+    .mat-mdc-table {
       font-size: 16px;
-      padding: 0 16px;
+
+      th,
+      td {
+        padding: 16px;
+      }
+    }
+  }
+}
+
+// ==================== PRINT STYLES ====================
+@media print {
+  .manual-court-usage-container {
+    background: white;
+
+    .page-header,
+    .back-button,
+    .action-buttons,
+    .calculate-btn {
+      display: none;
     }
 
-    // Alternative: If you want a very large scrollable list instead
-    // .mat-mdc-autocomplete-panel {
-    //   max-height: 600px !important; // Very large but still scrollable
-    //   min-width: 300px !important;
-    // }
+    .main-form-card,
+    .history-card {
+      box-shadow: none;
+      border: 1px solid #e2e8f0;
+    }
   }
 }

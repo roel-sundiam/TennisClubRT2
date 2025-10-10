@@ -180,35 +180,54 @@ export const getManualCourtUsageHistory = asyncHandler(async (req: Authenticated
     .sort({ createdAt: -1 })
     .lean();
 
-  // Group payments by court usage session (same date, time slot, and createdAt)
+  // Group payments by court usage session (same date, time, and createdAt)
   const sessionsMap = new Map<string, any>();
 
   for (const payment of manualPayments) {
-    const sessionKey = `${payment.metadata?.courtUsageDate?.toISOString()}_${payment.metadata?.timeSlot}_${payment.createdAt.toISOString()}`;
+    // Use startTime/endTime for proper time range, fallback to timeSlot for old records
+    const startTime = payment.metadata?.startTime ?? payment.metadata?.timeSlot ?? null;
+    const endTime = payment.metadata?.endTime ?? (payment.metadata?.timeSlot ? payment.metadata.timeSlot + 1 : null);
+
+    const sessionKey = `${payment.metadata?.courtUsageDate?.toISOString()}_${startTime}_${endTime}_${payment.createdAt.toISOString()}`;
 
     if (!sessionsMap.has(sessionKey)) {
       sessionsMap.set(sessionKey, {
         date: payment.metadata?.courtUsageDate,
-        timeSlot: payment.metadata?.timeSlot,
+        startTime: startTime,
+        endTime: endTime,
+        timeSlot: startTime, // For compatibility with formatTimeSlot
         players: [],
         totalAmount: 0,
-        createdBy: (payment.metadata as any)?.createdBy,
+        createdBy: payment.metadata?.createdBy || 'Admin',
         createdAt: payment.createdAt,
-        description: payment.description
+        description: payment.description,
+        playerNames: payment.metadata?.playerNames || []
       });
     }
 
     const session = sessionsMap.get(sessionKey);
+    const playerName = (payment.userId as any)?.fullName || 'Unknown';
+
     session.players.push({
-      playerName: (payment.userId as any)?.fullName || 'Unknown',
+      playerName: playerName,
       amount: payment.amount,
       status: payment.status,
       paymentId: (payment._id as any).toString()
     });
     session.totalAmount += payment.amount;
+
+    // Build playerNames array from actual players
+    if (!session.playerNames.includes(playerName)) {
+      session.playerNames.push(playerName);
+    }
   }
 
   const sessions = Array.from(sessionsMap.values())
+    .map(session => {
+      // Always build playerNames from actual players for consistency
+      session.playerNames = session.players.map((p: any) => p.playerName);
+      return session;
+    })
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   console.log(`📊 Found ${sessions.length} manual court usage sessions`);
