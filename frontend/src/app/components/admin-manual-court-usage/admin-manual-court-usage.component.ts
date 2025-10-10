@@ -244,15 +244,11 @@ export class AdminManualCourtUsageComponent implements OnInit {
   }
 
   removePlayer(playerName: string): void {
-    const index = this.selectedPlayers.indexOf(playerName);
-    if (index >= 0) {
-      this.selectedPlayers.splice(index, 1);
-    }
-    // Also remove from player payments if exists
-    const paymentIndex = this.playerPayments.findIndex(p => p.playerName === playerName);
-    if (paymentIndex >= 0) {
-      this.playerPayments.splice(paymentIndex, 1);
-    }
+    // Remove from selected players
+    this.selectedPlayers = this.selectedPlayers.filter(p => p !== playerName);
+
+    // Remove from player payments and trigger change detection
+    this.playerPayments = this.playerPayments.filter(p => p.playerName !== playerName);
   }
 
   calculateFees(): void {
@@ -325,10 +321,13 @@ export class AdminManualCourtUsageComponent implements OnInit {
   }
 
   updatePlayerAmount(playerName: string, newAmount: string): void {
-    const payment = this.playerPayments.find(p => p.playerName === playerName);
-    if (payment) {
-      payment.amount = parseFloat(newAmount) || 0;
-    }
+    // Create new array to trigger change detection
+    this.playerPayments = this.playerPayments.map(p => {
+      if (p.playerName === playerName) {
+        return { ...p, amount: parseFloat(newAmount) || 0 };
+      }
+      return p;
+    });
   }
 
   getTotalAmount(): number {
@@ -440,3 +439,4 @@ export class AdminManualCourtUsageComponent implements OnInit {
     return total.toFixed(2);
   }
 }
+
