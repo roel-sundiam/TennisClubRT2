@@ -16,10 +16,10 @@ const createOverduePayment = async () => {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('📥 Connected to MongoDB');
 
-    // Find RoelSundiam user
-    const user = await User.findOne({ username: 'RoelSundiam' });
+    // Find LeaNacu user
+    const user = await User.findOne({ username: 'LeaNacu' });
     if (!user) {
-      throw new Error('RoelSundiam user not found. Please ensure user exists.');
+      throw new Error('LeaNacu user not found. Please ensure user exists.');
     }
     
     console.log('👤 Found user:', user.username, '- ID:', user._id);
@@ -123,7 +123,7 @@ const createOverduePayment = async () => {
     }
 
     console.log('\n✅ Test data created successfully!');
-    console.log('🧪 You can now login as RoelSundiam (password: RT2Tennis) to test overdue payment notifications');
+    console.log('🧪 You can now login as LeaNacu to test overdue payment notifications');
     
   } catch (error) {
     console.error('❌ Error creating test data:', error);

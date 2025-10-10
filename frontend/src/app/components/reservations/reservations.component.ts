@@ -539,6 +539,36 @@ interface Reservation {
           </button>
         </div>
       </div>
+
+      <!-- Overdue Payment Modal -->
+      <div class="modal-overlay" *ngIf="showOverduePaymentModal">
+        <div class="modal-content overdue-payment-modal">
+          <div class="modal-header">
+            <h2>⚠️ Overdue Payment</h2>
+          </div>
+
+          <div class="modal-body">
+            <p class="warning-message">
+              You have <strong>{{overduePaymentDetails.length}}</strong> overdue payment(s).
+              Please settle your pending payments before making a new reservation.
+            </p>
+
+            <div class="overdue-list">
+              <div *ngFor="let payment of overduePaymentDetails" class="overdue-item">
+                <div class="payment-info">
+                  <span class="amount">₱{{payment.amount}}</span>
+                  <span class="days-overdue">{{payment.daysOverdue}} day(s) overdue</span>
+                </div>
+                <div class="payment-description">{{payment.description}}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button class="settle-btn" (click)="goToPayments()">Settle Payments</button>
+          </div>
+        </div>
+      </div>
     </div>
   `,
   styleUrl: './reservations.component.scss',
@@ -576,6 +606,10 @@ export class ReservationsComponent implements OnInit, OnDestroy {
   isEditMode = false;
   editingReservationId: string | null = null;
 
+  // Overdue payment modal
+  showOverduePaymentModal = false;
+  overduePaymentDetails: any[] = [];
+
   // Debounce timer for fee calculation
   private feeCalculationTimer: any;
 
@@ -604,6 +638,9 @@ export class ReservationsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // Check for overdue payments immediately on page load
+    this.checkOverduePayments();
+
     // Set minimum date to today in Philippine time and update it dynamically
     this.updateMinDate();
     // Load members for player selection
@@ -1551,8 +1588,15 @@ export class ReservationsComponent implements OnInit, OnDestroy {
       .catch((error) => {
         console.error('❌ Reservation failed:', error);
         this.loading = false;
-        const message = error.error?.message || 'Failed to create reservation. Please try again.';
-        this.showError('Booking Failed', message);
+
+        // Check if error is due to overdue payments
+        if (error.status === 403 && error.error?.overduePayments) {
+          this.overduePaymentDetails = error.error.overduePayments;
+          this.showOverduePaymentModal = true;
+        } else {
+          const message = error.error?.message || 'Failed to create reservation. Please try again.';
+          this.showError('Booking Failed', message);
+        }
       });
   }
 
@@ -1738,4 +1782,38 @@ export class ReservationsComponent implements OnInit, OnDestroy {
 
     return 'unknown';
   }
+
+  // Overdue payment modal methods
+  checkOverduePayments(): void {
+    console.log('🔍 Checking for overdue payments on page load...');
+    this.http.get<any>(`${this.apiUrl}/payments/check-overdue`).subscribe({
+      next: (response) => {
+        console.log('🔍 Overdue payment check response:', response);
+        if (response.success && response.hasOverdue) {
+          this.overduePaymentDetails = response.overduePayments;
+          this.showOverduePaymentModal = true;
+          console.log(`⚠️ Found ${response.count} overdue payment(s), showing modal`);
+        } else {
+          console.log('✅ No overdue payments found');
+        }
+      },
+      error: (error) => {
+        console.error('❌ Error checking overdue payments:', error);
+        // Don't show error to user - this is a background check
+      }
+    });
+  }
+
+  closeOverdueModal(): void {
+    this.showOverduePaymentModal = false;
+    this.overduePaymentDetails = [];
+  }
+
+  goToPayments(): void {
+    this.showOverduePaymentModal = false;
+    this.router.navigate(['/payments'], {
+      queryParams: { tab: 'pending' }
+    });
+  }
 }
+

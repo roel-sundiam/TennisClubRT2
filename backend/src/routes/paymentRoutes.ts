@@ -8,6 +8,7 @@ import {
   cancelPayment,
   getMyPayments,
   getOverduePayments,
+  checkMyOverduePayments,
   getPaymentStats,
   calculatePaymentAmount,
   cleanupDuplicatePayments,
@@ -78,7 +79,7 @@ router.get('/my', authenticateToken, (req, res, next) => {
   // Remove client cache headers to force fresh responses
   delete req.headers['if-none-match'];
   delete req.headers['if-modified-since'];
-  
+
   // Set no-cache headers at route level to prevent 304 responses
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -87,6 +88,13 @@ router.get('/my', authenticateToken, (req, res, next) => {
   });
   next();
 }, getMyPayments);
+
+/**
+ * @route GET /api/payments/check-overdue
+ * @desc Check current user's overdue payments
+ * @access Private
+ */
+router.get('/check-overdue', authenticateToken, checkMyOverduePayments);
 
 /**
  * @route GET /api/payments/overdue
