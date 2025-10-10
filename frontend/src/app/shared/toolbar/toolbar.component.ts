@@ -179,6 +179,11 @@ import { Subscription } from 'rxjs';
               <mat-icon>monetization_on</mat-icon>
               <span>Coin Management</span>
             </button>
+
+            <button mat-button class="mobile-nav-item admin-item" *ngIf="isSuperAdmin" (click)="navigateAndClose('/admin/manual-court-usage')">
+              <mat-icon>edit_calendar</mat-icon>
+              <span>Manual Court Usage</span>
+            </button>
           </div>
           
           <!-- Profile & Logout -->
@@ -202,6 +207,7 @@ import { Subscription } from 'rxjs';
 export class ToolbarComponent implements OnInit, OnDestroy {
   currentUser: User | null = null;
   isAdmin = false;
+  isSuperAdmin = false;
   isMobileMenuOpen = false;
   
   private userSubscription: Subscription = new Subscription();
@@ -221,6 +227,7 @@ export class ToolbarComponent implements OnInit, OnDestroy {
     this.userSubscription = this.authService.currentUser$.subscribe(user => {
       this.currentUser = user;
       this.isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+      this.isSuperAdmin = user?.role === 'superadmin';
     });
 
     // Subscribe to open play notifications
@@ -302,7 +309,8 @@ export class ToolbarComponent implements OnInit, OnDestroy {
       '/admin/members': 'Member Management',
       '/admin/reports': 'Reports & Analytics',
       '/admin/polls': 'Poll Management',
-      '/admin/coins': 'Admin Coin Management'
+      '/admin/coins': 'Admin Coin Management',
+      '/admin/manual-court-usage': 'Manual Court Usage'
     };
     return pathMap[path] || `Navigate to ${path}`;
   }

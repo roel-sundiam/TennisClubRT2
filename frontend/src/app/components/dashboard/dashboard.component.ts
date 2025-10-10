@@ -569,7 +569,7 @@ import { environment } from '../../../environments/environment';
                 <mat-icon>account_balance</mat-icon>
               </div>
               <div class="mobile-card-title">Financial Report</div>
-              
+
               <!-- Desktop Content -->
               <mat-card-header>
                 <mat-icon mat-card-avatar class="action-icon admin-icon">account_balance</mat-icon>
@@ -583,6 +583,31 @@ import { environment } from '../../../environments/environment';
                 <button mat-raised-button class="admin-btn" (click)="navigateTo('/admin/financial-report')">
                   <mat-icon>account_balance</mat-icon>
                   View Report
+                </button>
+              </mat-card-actions>
+            </mat-card>
+
+            <!-- Manual Court Usage (Superadmin Only) -->
+            <mat-card class="action-card admin-card superadmin-card" data-icon="edit_calendar" data-title="Manual Court Usage" (click)="navigateTo('/admin/manual-court-usage')" *ngIf="isAdmin">
+              <!-- Mobile Icon -->
+              <div class="mobile-card-icon">
+                <mat-icon>edit_calendar</mat-icon>
+              </div>
+              <div class="mobile-card-title">Manual Court Usage</div>
+
+              <!-- Desktop Content -->
+              <mat-card-header>
+                <mat-icon mat-card-avatar class="action-icon admin-icon">edit_calendar</mat-icon>
+                <mat-card-title>Manual Court Usage</mat-card-title>
+                <mat-card-subtitle>Record court usage manually</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <p>Manually create court usage records and pending payments for players.</p>
+              </mat-card-content>
+              <mat-card-actions>
+                <button mat-raised-button class="admin-btn" (click)="navigateTo('/admin/manual-court-usage')">
+                  <mat-icon>edit_calendar</mat-icon>
+                  Record Usage
                 </button>
               </mat-card-actions>
             </mat-card>
@@ -708,6 +733,7 @@ import { environment } from '../../../environments/environment';
 export class DashboardComponent implements OnInit, OnDestroy {
   currentUser: User | null = null;
   isAdmin = false;
+  isSuperAdmin = false;
   private apiUrl = environment.apiUrl;
   private subscriptions: Subscription[] = [];
 
@@ -726,11 +752,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.currentUser = this.authService.currentUser;
     this.isAdmin = this.authService.isAdmin();
-    
+    this.isSuperAdmin = this.authService.isSuperAdmin();
+
     // Subscribe to user changes
     const userSub = this.authService.currentUser$.subscribe((user: any) => {
       this.currentUser = user;
       this.isAdmin = this.authService.isAdmin();
+      this.isSuperAdmin = this.authService.isSuperAdmin();
     });
     this.subscriptions.push(userSub);
 

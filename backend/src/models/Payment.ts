@@ -37,6 +37,10 @@ export interface IPaymentDocument extends Document {
     isManualPayment?: boolean;
     playerNames?: string[];
     courtUsageDate?: Date;
+    startTime?: number;
+    endTime?: number;
+    createdBy?: string;
+    createdById?: string;
     // Cancellation metadata
     cancellation?: {
       reason: string;
@@ -168,6 +172,10 @@ const paymentSchema = new Schema<IPaymentDocument>({
     isManualPayment: { type: Boolean },
     playerNames: [{ type: String }],
     courtUsageDate: { type: Date },
+    startTime: { type: Number },
+    endTime: { type: Number },
+    createdBy: { type: String },
+    createdById: { type: String },
     // Cancellation metadata
     cancellation: {
       reason: { type: String },

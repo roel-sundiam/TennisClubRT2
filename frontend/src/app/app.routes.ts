@@ -29,7 +29,8 @@ import { ExpenseReportComponent } from './components/expense-report/expense-repo
 import { AdminMemberManagementComponent } from './components/admin-member-management/admin-member-management.component';
 import { ProfileComponent } from './components/profile/profile.component';
 import { RulesAndRegulationsComponent } from './components/rules-and-regulations/rules-and-regulations.component';
-import { authGuard, loginGuard, adminGuard } from './guards/auth.guard';
+import { AdminManualCourtUsageComponent } from './components/admin-manual-court-usage/admin-manual-court-usage.component';
+import { authGuard, loginGuard, adminGuard, superadminGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
@@ -189,5 +190,6 @@ export const routes: Routes = [
   { path: 'admin/polls', component: AdminPollManagementComponent, canActivate: [authGuard, adminGuard] },
   { path: 'admin/suggestions', component: AdminSuggestionsComponent, canActivate: [authGuard, adminGuard] },
   { path: 'admin/analytics', component: AdminAnalyticsComponent, canActivate: [authGuard, adminGuard] },
+  { path: 'admin/manual-court-usage', component: AdminManualCourtUsageComponent, canActivate: [authGuard, superadminGuard] },
   { path: '**', redirectTo: '/dashboard' }
 ];

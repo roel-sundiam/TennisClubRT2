@@ -186,9 +186,15 @@ router.put(
           });
           return;
         }
-        
-        // Members can only mark cash payments as completed
-        if (payment.paymentMethod !== 'cash') {
+
+        // Check if this is a manual payment or open play payment
+        const isManualPayment = payment.metadata?.isManualPayment === true;
+        const isOpenPlayPayment = !!payment.pollId;
+
+        // Members can mark manual court usage and open play payments as completed (any payment method)
+        // because admin will still need to verify and record them
+        // For regular reservations, members can only mark cash payments as completed
+        if (!isManualPayment && !isOpenPlayPayment && payment.paymentMethod !== 'cash') {
           res.status(403).json({
             success: false,
             error: 'Only admins can process non-cash payments'

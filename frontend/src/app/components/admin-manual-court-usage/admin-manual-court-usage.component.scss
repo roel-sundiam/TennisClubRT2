@@ -1,0 +1,251 @@
+.manual-court-usage-container {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+
+  .header-section {
+    display: flex;
+    align-items: center;
+    margin-bottom: 24px;
+
+    .back-button {
+      margin-right: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 500;
+    }
+  }
+
+  .form-card,
+  .history-card {
+    margin-bottom: 24px;
+
+    mat-card-header {
+      margin-bottom: 20px;
+
+      mat-icon {
+        color: #1976d2;
+      }
+    }
+  }
+
+  .court-usage-form {
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+
+      @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .full-width {
+      width: 100%;
+    }
+
+    .player-section {
+      margin-bottom: 24px;
+
+      .selected-players {
+        margin-top: 12px;
+
+        mat-chip-set {
+          mat-chip {
+            margin: 4px;
+          }
+        }
+      }
+    }
+
+    .action-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+
+      button {
+        mat-icon {
+          margin-right: 8px;
+        }
+      }
+    }
+
+    .payments-section {
+      margin: 24px 0;
+      padding: 16px;
+      background-color: #f5f5f5;
+      border-radius: 8px;
+
+      h3 {
+        margin-top: 0;
+        margin-bottom: 16px;
+        font-size: 18px;
+        font-weight: 500;
+      }
+
+      .payments-table {
+        width: 100%;
+        background-color: white;
+        border-radius: 4px;
+        overflow: hidden;
+
+        .amount-field {
+          width: 120px;
+          margin: 0;
+
+          ::ng-deep .mat-mdc-form-field-infix {
+            padding: 8px 0;
+          }
+
+          input {
+            text-align: right;
+            font-size: 16px;
+            font-weight: 500;
+          }
+        }
+      }
+
+      .total-row {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 16px;
+        margin-top: 16px;
+        padding: 12px 16px;
+        background-color: #e3f2fd;
+        border-radius: 4px;
+        font-size: 18px;
+
+        .total-amount {
+          color: #1976d2;
+          font-weight: 600;
+          font-size: 20px;
+        }
+      }
+    }
+
+    .submit-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+
+      button {
+        mat-icon,
+        .inline-spinner {
+          margin-right: 8px;
+        }
+
+        .inline-spinner {
+          display: inline-block;
+          vertical-align: middle;
+        }
+      }
+    }
+  }
+
+  .history-card {
+    .history-table {
+      width: 100%;
+      background-color: white;
+
+      th {
+        font-weight: 600;
+        background-color: #f5f5f5;
+      }
+
+      td,
+      th {
+        padding: 12px 16px;
+      }
+
+      tr:hover {
+        background-color: #f9f9f9;
+      }
+    }
+  }
+}
+
+// Mobile responsive
+@media (max-width: 768px) {
+  .manual-court-usage-container {
+    padding: 16px;
+
+    .header-section h1 {
+      font-size: 24px;
+    }
+
+    .court-usage-form {
+      .payments-section {
+        padding: 12px;
+
+        .payments-table {
+          font-size: 14px;
+
+          .amount-field {
+            width: 100px;
+          }
+        }
+      }
+    }
+
+    .history-card {
+      .history-table {
+        font-size: 12px;
+
+        td,
+        th {
+          padding: 8px 12px;
+        }
+      }
+    }
+  }
+}
+
+// Senior-friendly design
+.manual-court-usage-container {
+  ::ng-deep {
+    // Larger fonts for senior members
+    .mat-mdc-form-field {
+      font-size: 16px;
+    }
+
+    .mat-mdc-button {
+      font-size: 16px;
+      min-height: 48px;
+    }
+
+    // High contrast
+    .mat-mdc-form-field-error {
+      font-size: 14px;
+    }
+
+    // Touch-friendly buttons
+    .mat-icon-button {
+      width: 48px;
+      height: 48px;
+    }
+
+    // Make autocomplete dropdown show ALL players (no height limit)
+    .mat-mdc-autocomplete-panel {
+      max-height: 90vh !important; // Very large height to show all members
+      min-width: 300px !important;
+      overflow-y: auto !important;
+    }
+
+    .mat-mdc-option {
+      min-height: 48px; // Touch-friendly
+      font-size: 16px;
+      padding: 0 16px;
+    }
+
+    // Alternative: If you want a very large scrollable list instead
+    // .mat-mdc-autocomplete-panel {
+    //   max-height: 600px !important; // Very large but still scrollable
+    //   min-width: 300px !important;
+    // }
+  }
+}

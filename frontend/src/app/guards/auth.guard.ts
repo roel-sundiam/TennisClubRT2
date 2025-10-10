@@ -41,3 +41,15 @@ export const adminGuard = () => {
   router.navigate(['/dashboard']);
   return false;
 };
+
+export const superadminGuard = () => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  if (authService.isAuthenticated() && authService.isSuperAdmin()) {
+    return true;
+  }
+
+  router.navigate(['/dashboard']);
+  return false;
+};

@@ -70,6 +70,10 @@ interface Payment {
     isManualPayment?: boolean;
     playerNames?: string[];
     courtUsageDate?: Date;
+    startTime?: number;
+    endTime?: number;
+    createdBy?: string;
+    createdById?: string;
     // Cancellation metadata
     cancellation?: {
       reason: string;
@@ -456,15 +460,19 @@ interface Notification {
                   <mat-icon>event</mat-icon>
                 </div>
                 <div class="reservation-info">
-                  <h4>{{isOpenPlayPayment() ? 'Open Play Event' : 'Court Reservation'}}</h4>
+                  <h4>{{isManualPayment() ? 'Manual Court Usage' : isOpenPlayPayment() ? 'Open Play Event' : 'Court Reservation'}}</h4>
                   <div class="reservation-details">
                     <div class="detail-item">
                       <mat-icon>schedule</mat-icon>
                       <span>{{formatDate(selectedReservation.date)}} at {{selectedReservation.timeSlotDisplay}}</span>
                     </div>
-                    <div class="detail-item" *ngIf="!isOpenPlayPayment()">
+                    <div class="detail-item" *ngIf="!isOpenPlayPayment() && !isManualPayment()">
                       <mat-icon>group</mat-icon>
                       <span>{{selectedReservation.players.length}} player{{selectedReservation.players.length !== 1 ? 's' : ''}}: {{selectedReservation.players.join(', ')}}</span>
+                    </div>
+                    <div class="detail-item" *ngIf="isManualPayment()">
+                      <mat-icon>group</mat-icon>
+                      <span>Players: {{selectedReservation.players.join(', ')}}</span>
                     </div>
                     <div class="detail-item" *ngIf="isOpenPlayPayment()">
                       <mat-icon>sports_tennis</mat-icon>
@@ -581,7 +589,7 @@ interface Notification {
                 <div class="payment-header">
                   <div class="payment-info">
                     <h4>
-                      {{payment.reservationId ? 'Court Reservation' : 'Open Play Event'}}
+                      {{payment.metadata?.isManualPayment ? 'Manual Court Usage' : payment.reservationId ? 'Court Reservation' : 'Open Play Event'}}
                       <span class="overdue-badge" *ngIf="isPaymentOverdue(payment)">OVERDUE</span>
                     </h4>
                     <p>{{formatPaymentReservation(payment)}}</p>
@@ -622,24 +630,32 @@ interface Notification {
                     <!-- Payment Action Buttons Row 1: Primary Actions -->
                     <div class="payment-buttons-row">
                       <!-- Open Play events should show Pay Now button -->
-                      <button 
+                      <button
                         class="pay-btn"
                         (click)="payForOpenPlay(payment)"
                         *ngIf="payment.pollId">
                         Pay Now
                       </button>
-                      
+
+                      <!-- Manual court usage payments - always show Pay Now to choose payment method -->
+                      <button
+                        class="pay-btn"
+                        (click)="payForManualPayment(payment)"
+                        *ngIf="payment.metadata?.isManualPayment">
+                        Pay Now
+                      </button>
+
                       <!-- Court reservations can be marked as paid if cash -->
-                      <button 
+                      <button
                         class="pay-btn"
                         (click)="processPayment(payment._id)"
                         *ngIf="payment.reservationId && payment.paymentMethod === 'cash'"
                         [disabled]="processing.includes(payment._id)">
                         {{processing.includes(payment._id) ? 'Processing...' : 'Mark as Paid'}}
                       </button>
-                      
+
                       <!-- Other payment methods should show Pay Now -->
-                      <button 
+                      <button
                         class="pay-btn"
                         (click)="payForExistingPayment(payment)"
                         *ngIf="payment.reservationId && payment.paymentMethod !== 'cash'">
@@ -659,12 +675,21 @@ interface Notification {
                       </button>
                       
                       <!-- Cancel button for Open Play Events -->
-                      <button 
+                      <button
                         class="cancel-reservation-btn"
                         (click)="cancelPayment(payment._id)"
                         *ngIf="payment.pollId && canCancel(payment)"
                         [disabled]="processing.includes(payment._id)">
                         Cancel Open Play
+                      </button>
+
+                      <!-- Cancel button for Manual Court Usage -->
+                      <button
+                        class="cancel-reservation-btn"
+                        (click)="cancelPayment(payment._id)"
+                        *ngIf="payment.metadata?.isManualPayment && canCancel(payment)"
+                        [disabled]="processing.includes(payment._id)">
+                        Cancel Payment
                       </button>
                     </div>
                   </ng-container>
@@ -1005,17 +1030,24 @@ export class PaymentsComponent implements OnInit {
 
     this.loading = true;
     const formValue = this.paymentForm.value;
-    
+
     // Check if this is an Open Play payment
     const isOpenPlay = (this.selectedReservation as any)?.isOpenPlay;
+    const isManualPayment = (this.selectedReservation as any)?.isManualPayment;
     const originalPaymentId = (this.selectedReservation as any)?.originalPaymentId;
-    
+
     if (isOpenPlay && originalPaymentId) {
       // For Open Play, update the existing payment record with the chosen payment method
       this.updateOpenPlayPayment(originalPaymentId, formValue.paymentMethod, formValue.transactionId);
       return;
     }
-    
+
+    if (isManualPayment && originalPaymentId) {
+      // For Manual Payment, update the existing payment record with the chosen payment method
+      this.updateManualPayment(originalPaymentId, formValue.paymentMethod, formValue.transactionId);
+      return;
+    }
+
     // Check if this is for an existing payment that needs to be updated
     const existingPaymentId = (this.selectedReservation as any)?.existingPaymentId;
     
@@ -1356,19 +1388,32 @@ export class PaymentsComponent implements OnInit {
     if (payment.reservationId) {
       const date = new Date(payment.reservationId.date).toLocaleDateString('en-US', {
         weekday: 'short',
-        month: 'short', 
+        month: 'short',
         day: 'numeric',
         year: 'numeric'
       });
       // Use timeSlotDisplay if available (for grouped payments), otherwise calculate manually
-      const timeRange = payment.reservationId.timeSlotDisplay || 
+      const timeRange = payment.reservationId.timeSlotDisplay ||
         `${this.formatTime(payment.reservationId.timeSlot)}-${this.formatTime(payment.reservationId.timeSlot + 1)}`;
       return `${date} ${timeRange}`;
+    } else if (payment.metadata?.isManualPayment) {
+      // Format manual court usage payment
+      const date = new Date(payment.metadata.courtUsageDate).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+      const startTime = payment.metadata.startTime ?? payment.metadata.timeSlot ?? 0;
+      const endTime = payment.metadata.endTime ?? (payment.metadata.timeSlot ? payment.metadata.timeSlot + 1 : 0);
+      const timeRange = `${this.format24Hour(startTime)} - ${this.format24Hour(endTime)}`;
+      const players = payment.metadata.playerNames ? ` - Players: ${payment.metadata.playerNames.join(', ')}` : '';
+      return `${date} ${timeRange}${players}`;
     } else if (payment.pollId?.openPlayEvent) {
       const date = new Date(payment.pollId.openPlayEvent.eventDate).toLocaleDateString('en-US', {
         weekday: 'short',
         month: 'short',
-        day: 'numeric', 
+        day: 'numeric',
         year: 'numeric'
       });
       return `${date} - ${payment.pollId.title}`;
@@ -1384,6 +1429,13 @@ export class PaymentsComponent implements OnInit {
     if (hour < 12) return `${hour}AM`;
     if (hour === 12) return '12PM';
     return `${hour - 12}PM`;
+  }
+
+  /**
+   * Format time in 24-hour format (e.g., 18:00)
+   */
+  format24Hour(hour: number): string {
+    return `${hour.toString().padStart(2, '0')}:00`;
   }
 
   formatPaymentMethod(method: string): string {
@@ -1796,7 +1848,7 @@ export class PaymentsComponent implements OnInit {
 
   payForOpenPlay(payment: Payment): void {
     if (!payment.pollId) return;
-    
+
     // For Open Play events, create a reservation-like object for the payment form
     // This allows users to select payment method and complete the payment properly
     const openPlayAsReservation: Reservation = {
@@ -1809,16 +1861,61 @@ export class PaymentsComponent implements OnInit {
       paymentStatus: 'pending',
       totalFee: payment.amount // ₱120 for Open Play
     };
-    
+
     // Set a flag to indicate this is an Open Play payment
     (openPlayAsReservation as any).isOpenPlay = true;
     (openPlayAsReservation as any).originalPaymentId = payment._id;
-    
+
     this.selectedReservation = openPlayAsReservation;
     this.paymentForm.patchValue({
       reservationId: payment._id, // Use payment ID for Open Play
       paymentMethod: '' // Reset payment method so user can choose
     });
+  }
+
+  payForManualPayment(payment: Payment): void {
+    if (!payment.metadata?.isManualPayment) return;
+
+    console.log('💰 Opening payment form for manual payment:', payment._id);
+    console.log('💰 Payment metadata:', payment.metadata);
+
+    // For manual court usage payments, create a reservation-like object for the payment form
+    const startTime = payment.metadata.startTime ?? payment.metadata.timeSlot ?? 0;
+    const endTime = payment.metadata.endTime ?? (payment.metadata.timeSlot ? payment.metadata.timeSlot + 1 : 0);
+    const playerNames = payment.metadata.playerNames || [];
+    const date = payment.metadata.courtUsageDate || new Date();
+
+    console.log('💰 Time values - startTime:', startTime, 'endTime:', endTime);
+
+    const manualPaymentAsReservation: Reservation = {
+      _id: payment._id, // Use payment ID
+      date: date,
+      timeSlot: startTime,
+      players: playerNames, // Use the actual player names
+      timeSlotDisplay: `${this.format24Hour(startTime)} - ${this.format24Hour(endTime)}`,
+      status: 'confirmed',
+      paymentStatus: 'pending',
+      totalFee: payment.amount
+    };
+
+    // Set a flag to indicate this is a manual payment
+    (manualPaymentAsReservation as any).isManualPayment = true;
+    (manualPaymentAsReservation as any).originalPaymentId = payment._id;
+
+    this.selectedReservation = manualPaymentAsReservation;
+    this.paymentForm.patchValue({
+      reservationId: payment._id, // Use payment ID for manual payment
+      paymentMethod: '', // Reset payment method so user can choose
+      courtFee: payment.amount // Set the amount
+    });
+
+    // Scroll to top where payment form appears
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
+
+    console.log('💰 Payment form should now be visible. selectedReservation:', this.selectedReservation);
+    console.log('💰 Total fee set to:', payment.amount);
   }
 
   payForExistingPayment(payment: Payment): void {
@@ -1887,38 +1984,42 @@ export class PaymentsComponent implements OnInit {
   updateOpenPlayPayment(paymentId: string, paymentMethod: string, transactionId?: string): void {
     // For Open Play, we need to update the existing payment record with the new payment method
     // and then process it based on the method chosen
-    
+
     const updateData: any = {
       paymentMethod: paymentMethod
     };
-    
+
     if (transactionId) {
       updateData.transactionId = transactionId;
     }
-    
+
     // First update the payment method
     const requestUrl = `${this.apiUrl}/payments/${paymentId}`;
     console.log('💰 FRONTEND: Attempting PUT request to:', requestUrl);
     console.log('💰 FRONTEND: Update data:', updateData);
     console.log('💰 FRONTEND: Payment ID:', paymentId);
-    
+
     this.http.put<any>(requestUrl, updateData).subscribe({
       next: (response) => {
-        // Handle different payment methods
-        if (paymentMethod === 'cash') {
-          // For cash, automatically mark as completed
-          this.processPayment(paymentId, true);
-          this.loading = false;
-          this.showSuccess('Payment Logged', 'Open Play payment has been logged successfully');
-          this.resetForm();
-          this.loadPendingPayments(true);
-        } else {
-          // For other methods (gcash, bank_transfer), just update and keep as pending
-          this.loading = false;
-          this.showSuccess('Payment Updated', 'Payment method updated successfully. Please complete the payment via your chosen method.');
-          this.resetForm();
-          this.loadPendingPayments(true);
-        }
+        // Open Play payments: update payment method and mark as completed
+        // Then admin will verify and record it in Active Payments tab
+        this.processing.push(paymentId);
+
+        this.http.put<any>(`${this.apiUrl}/payments/${paymentId}/process`, {}).subscribe({
+          next: (processResponse) => {
+            this.processing = this.processing.filter(id => id !== paymentId);
+            this.loading = false;
+            this.showSuccess('Payment Method Selected', 'Payment method has been recorded. An admin will verify and record the payment.');
+            this.resetForm();
+            this.loadPendingPayments(true);
+          },
+          error: (processError) => {
+            this.processing = this.processing.filter(id => id !== paymentId);
+            this.loading = false;
+            console.error('Failed to process payment:', processError);
+            this.showError('Payment Processing Failed', 'Failed to mark payment as completed');
+          }
+        });
       },
       error: (error) => {
         this.loading = false;
@@ -1926,7 +2027,7 @@ export class PaymentsComponent implements OnInit {
         console.error('💰 Error response:', error.error);
         console.error('💰 Error status:', error.status);
         console.error('💰 Error message:', error.message);
-        
+
         let message = 'Failed to update Open Play payment';
         if (error.error?.error) {
           message = error.error.error;
@@ -1935,14 +2036,75 @@ export class PaymentsComponent implements OnInit {
         } else if (error.message) {
           message = error.message;
         }
-        
+
         this.showError('Open Play Payment Update Failed', `${message} (Status: ${error.status})`);
+      }
+    });
+  }
+
+  updateManualPayment(paymentId: string, paymentMethod: string, transactionId?: string): void {
+    // For Manual Payments, we need to update the existing payment record with the new payment method
+    // and then process it based on the method chosen
+
+    const updateData: any = {
+      paymentMethod: paymentMethod
+    };
+
+    if (transactionId) {
+      updateData.transactionId = transactionId;
+    }
+
+    // First update the payment method
+    const requestUrl = `${this.apiUrl}/payments/${paymentId}`;
+    console.log('💰 FRONTEND: Updating manual payment:', requestUrl);
+    console.log('💰 FRONTEND: Update data:', updateData);
+
+    this.http.put<any>(requestUrl, updateData).subscribe({
+      next: (response) => {
+        // Manual court usage payments: update payment method and mark as completed
+        // Then admin will verify and record it in Active Payments tab
+        this.processing.push(paymentId);
+
+        this.http.put<any>(`${this.apiUrl}/payments/${paymentId}/process`, {}).subscribe({
+          next: (processResponse) => {
+            this.processing = this.processing.filter(id => id !== paymentId);
+            this.loading = false;
+            this.showSuccess('Payment Method Selected', 'Payment method has been recorded. An admin will verify and record the payment.');
+            this.resetForm();
+            this.loadPendingPayments(true);
+          },
+          error: (processError) => {
+            this.processing = this.processing.filter(id => id !== paymentId);
+            this.loading = false;
+            console.error('Failed to process payment:', processError);
+            this.showError('Payment Processing Failed', 'Failed to mark payment as completed');
+          }
+        });
+      },
+      error: (error) => {
+        this.loading = false;
+        console.error('💰 Manual payment update error:', error);
+
+        let message = 'Failed to update manual payment';
+        if (error.error?.error) {
+          message = error.error.error;
+        } else if (error.error?.message) {
+          message = error.error.message;
+        } else if (error.message) {
+          message = error.message;
+        }
+
+        this.showError('Manual Payment Update Failed', `${message} (Status: ${error.status})`);
       }
     });
   }
 
   isOpenPlayPayment(): boolean {
     return !!(this.selectedReservation as any)?.isOpenPlay;
+  }
+
+  isManualPayment(): boolean {
+    return !!(this.selectedReservation as any)?.isManualPayment;
   }
 
   getTimeSlotInfo(): string {
@@ -2306,6 +2468,11 @@ export class PaymentsComponent implements OnInit {
       return '₱' + this.selectedReservation.totalFee.toFixed(2);
     }
 
+    if (this.isManualPayment()) {
+      // Manual court usage payments have fixed amounts set by admin
+      return '₱' + this.selectedReservation.totalFee.toFixed(2);
+    }
+
     // Create a mock payment object for fee calculation
     const mockPayment = {
       reservationId: {
@@ -2317,9 +2484,9 @@ export class PaymentsComponent implements OnInit {
 
     const feeInfo = this.getPlayerFeeInfo(mockPayment);
     const totalFee = (feeInfo.memberCount * feeInfo.memberFee) + (feeInfo.nonMemberCount * feeInfo.nonMemberFee);
-    
+
     console.log(`💰 Reservation form amount: ₱${totalFee} (${feeInfo.memberCount} members × ₱${feeInfo.memberFee} + ${feeInfo.nonMemberCount} non-members × ₱${feeInfo.nonMemberFee})`);
-    
+
     return '₱' + totalFee.toFixed(2);
   }
 
@@ -2344,14 +2511,18 @@ export class PaymentsComponent implements OnInit {
     if (courtFee && courtFee > 0) {
       return parseFloat(courtFee);
     }
-    
+
     // Fallback to calculated logic
     if (!this.selectedReservation) return 0;
-    
+
     if (this.isOpenPlayPayment()) {
       return this.selectedReservation.totalFee;
     }
-    
+
+    if (this.isManualPayment()) {
+      return this.selectedReservation.totalFee;
+    }
+
     const mockPayment = {
       reservationId: {
         players: this.selectedReservation.players,
@@ -2359,7 +2530,7 @@ export class PaymentsComponent implements OnInit {
         date: this.selectedReservation.date
       }
     };
-    
+
     const feeInfo = this.getPlayerFeeInfo(mockPayment);
     return (feeInfo.memberCount * feeInfo.memberFee) + (feeInfo.nonMemberCount * feeInfo.nonMemberFee);
   }

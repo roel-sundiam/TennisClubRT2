@@ -31,6 +31,7 @@ import seedingRoutes from './routes/seedingRoutes';
 import matchRoutes from './routes/matchRoutes';
 import notificationRoutes from './routes/notifications';
 import chatRoutes from './routes/chat';
+import manualCourtUsageRoutes from './routes/manualCourtUsageRoutes';
 
 dotenv.config();
 
@@ -202,6 +203,7 @@ app.use('/api/seeding', authenticateToken, seedingRoutes);
 app.use('/api/matches', authenticateToken, matchRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/manual-court-usage', manualCourtUsageRoutes);
 console.log('📥 All routes registered');
 
 // 404 handler
