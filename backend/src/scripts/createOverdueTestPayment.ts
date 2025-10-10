@@ -47,7 +47,7 @@ async function createOverduePayment() {
     console.log('   - Amount: ₱' + overduePayment.amount);
     console.log('   - Due Date:', overduePayment.dueDate.toISOString());
     console.log('   - Days Overdue:', Math.ceil((Date.now() - overduePayment.dueDate.getTime()) / (1000 * 60 * 60 * 24)));
-    console.log('   - Payment ID:', overduePayment._id.toString());
+    console.log('   - Payment ID:', (overduePayment._id as mongoose.Types.ObjectId).toString());
 
     await mongoose.disconnect();
     console.log('✅ Done!');
