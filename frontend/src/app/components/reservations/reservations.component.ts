@@ -695,12 +695,12 @@ export class ReservationsComponent implements OnInit, OnDestroy {
         // Set the selected times AFTER time slots are loaded
         setTimeout(() => {
           this.selectedStartTime = reservation.timeSlot;
-          this.selectedEndTime = reservation.timeSlot + 1;
+          this.selectedEndTime = reservation.endTimeSlot || (reservation.timeSlot + (reservation.duration || 1));
 
           // Update form values
           this.reservationForm.patchValue({
             startTime: reservation.timeSlot,
-            endTime: reservation.timeSlot + 1,
+            endTime: this.selectedEndTime,
           });
 
           // Update available end times
@@ -710,14 +710,37 @@ export class ReservationsComponent implements OnInit, OnDestroy {
           this.calculateFee();
         }, 100);
 
-        // Clear existing players and set from reservation
+        // Clear existing players and custom players
         const playersArray = this.playersArray;
         playersArray.clear();
+        this.customPlayerNames = [];
 
-        // Add players from the reservation
-        reservation.players.forEach((playerName: string, index: number) => {
-          playersArray.push(this.fb.control(playerName, Validators.required));
-        });
+        // December 2025: Handle both old (string[]) and new (object[]) player formats
+        const players = reservation.players;
+        console.log('🔍 Players data:', players);
+
+        // Check if new format (objects with name property)
+        const isNewFormat = players.length > 0 && typeof players[0] === 'object' && 'name' in players[0];
+
+        if (isNewFormat) {
+          // December 2025 format: separate members and guests
+          players.forEach((player: any) => {
+            if (player.isMember) {
+              // Add to member players array
+              playersArray.push(this.fb.control(player.name, Validators.required));
+            } else if (player.isGuest) {
+              // Add to custom players (guests)
+              this.customPlayerNames.push(player.name);
+            }
+          });
+          console.log('🔍 Loaded members:', playersArray.length, 'guests:', this.customPlayerNames.length);
+        } else {
+          // Legacy format: all players are strings, treat as members
+          players.forEach((playerName: string) => {
+            playersArray.push(this.fb.control(playerName, Validators.required));
+          });
+          console.log('🔍 Loaded players (legacy format):', playersArray.length);
+        }
 
         this.showSuccess(
           'Edit Mode',
