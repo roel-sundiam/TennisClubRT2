@@ -683,6 +683,9 @@ export class ReservationsComponent implements OnInit, OnDestroy {
         const reservation = response.data;
         console.log('🔍 Loading reservation for edit:', reservation);
 
+        // Store reservation data for later use after time slots are loaded
+        (this as any).pendingEditReservation = reservation;
+
         // Convert date to YYYY-MM-DD format for the date input
         const reservationDate = new Date(reservation.date);
         const dateString = reservationDate.toISOString().split('T')[0];
@@ -690,25 +693,10 @@ export class ReservationsComponent implements OnInit, OnDestroy {
         // Set date first and trigger date change to load time slots
         this.reservationForm.get('date')?.setValue(dateString);
         this.selectedDate = reservationDate;
-        this.onDateChangeInternal(reservationDate);
 
-        // Set the selected times AFTER time slots are loaded
-        setTimeout(() => {
-          this.selectedStartTime = reservation.timeSlot;
-          this.selectedEndTime = reservation.endTimeSlot || (reservation.timeSlot + (reservation.duration || 1));
-
-          // Update form values
-          this.reservationForm.patchValue({
-            startTime: reservation.timeSlot,
-            endTime: this.selectedEndTime,
-          });
-
-          // Update available end times
-          this.updateAvailableEndTimes();
-
-          // Trigger fee calculation
-          this.calculateFee();
-        }, 100);
+        // Load reservations for the date - this will populate time slots
+        // The actual time selection will happen in the callback
+        this.loadReservationsForDateWithEditCallback(reservation);
 
         // Clear existing players and custom players
         const playersArray = this.playersArray;
@@ -753,6 +741,73 @@ export class ReservationsComponent implements OnInit, OnDestroy {
         // Exit edit mode on error
         this.isEditMode = false;
         this.editingReservationId = null;
+      },
+    });
+  }
+
+  loadReservationsForDateWithEditCallback(reservation: any): void {
+    if (!this.selectedDate) return;
+
+    // Format date as YYYY-MM-DD in Philippine timezone
+    const year = this.selectedDate.getFullYear();
+    const month = String(this.selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(this.selectedDate.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    console.log('🔍 Loading reservations for date (edit mode):', dateStr);
+
+    this.http.get<any>(`${this.apiUrl}/reservations/date/${dateStr}`).subscribe({
+      next: (response) => {
+        console.log('🔍 API response for date', dateStr, ':', response);
+        this.existingReservations = response.data?.reservations || [];
+        console.log('🔍 Existing reservations loaded:', this.existingReservations.length);
+
+        // Use backend time slots data
+        if (response.data?.timeSlots) {
+          console.log('✅ Backend provided timeSlots data');
+
+          // Store ALL time slots (including hour 22) for end time calculations
+          this.allTimeSlots = response.data.timeSlots.map((backendSlot: any) => ({
+            hour: backendSlot.hour,
+            display: `${backendSlot.hour}:00 - ${backendSlot.hour + 1}:00`,
+            available: backendSlot.available,
+            availableAsEndTime: backendSlot.availableAsEndTime,
+            isPeak: this.peakHours.includes(backendSlot.hour),
+            blockedByOpenPlay: backendSlot.blockedByOpenPlay || false,
+            openPlayEvent: backendSlot.openPlayEvent || null
+          }));
+
+          // For START times: filter out hour 22
+          this.timeSlots = this.allTimeSlots.filter((slot: any) => slot.hour <= 21);
+        } else {
+          console.log('❌ No timeSlots in backend response');
+          this.updateTimeSlotAvailability();
+        }
+
+        // NOW set the selected times after time slots are loaded
+        console.log('🔍 Setting selected times in edit mode');
+        this.selectedStartTime = reservation.timeSlot;
+        this.selectedEndTime = reservation.endTimeSlot || (reservation.timeSlot + (reservation.duration || 1));
+
+        console.log('🔍 Selected start time:', this.selectedStartTime);
+        console.log('🔍 Selected end time:', this.selectedEndTime);
+
+        // Update form values
+        this.reservationForm.patchValue({
+          startTime: reservation.timeSlot,
+          endTime: this.selectedEndTime,
+        });
+
+        // Update available end times
+        this.updateAvailableEndTimes();
+
+        // Trigger fee calculation
+        this.calculateFee();
+      },
+      error: (error) => {
+        console.error('Error loading reservations:', error);
+        this.existingReservations = [];
+        this.updateTimeSlotAvailability();
       },
     });
   }
