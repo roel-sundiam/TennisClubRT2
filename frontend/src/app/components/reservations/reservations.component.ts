@@ -794,8 +794,13 @@ export class ReservationsComponent implements OnInit, OnDestroy {
     const dateStr = `${year}-${month}-${day}`;
 
     console.log('🔍 Loading reservations for date (edit mode):', dateStr);
+    console.log('🔍 Excluding reservation ID:', this.editingReservationId);
 
-    this.http.get<any>(`${this.apiUrl}/reservations/date/${dateStr}`).subscribe({
+    // CRITICAL: Pass excludeId parameter so backend excludes current reservation from availability checks
+    const url = `${this.apiUrl}/reservations/date/${dateStr}?excludeId=${this.editingReservationId}`;
+    console.log('🔍 Request URL:', url);
+
+    this.http.get<any>(url).subscribe({
       next: (response) => {
         console.log('🔍 API response for date', dateStr, ':', response);
         this.existingReservations = response.data?.reservations || [];
