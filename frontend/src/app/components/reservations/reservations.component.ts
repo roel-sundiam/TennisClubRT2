@@ -380,38 +380,26 @@ interface Reservation {
                 >
               </div>
 
+              <!-- December 2025: New Fee Breakdown -->
               <div class="fee-breakdown" *ngIf="getMemberCount() > 0 || getNonMemberCount() > 0">
-                <div class="fee-row" *ngIf="getRateType() === 'Peak Hours'">
-                  <span>Peak Hours (₱100 per hour):</span>
-                  <span>₱{{ getPeakHoursFee() }}</span>
+                <!-- Base Fee Calculation -->
+                <div class="fee-row">
+                  <span>Base Fee ({{ getRateType() }}):</span>
+                  <span>₱{{ getBaseFeeTotal() }}</span>
                 </div>
-                <div class="fee-row" *ngIf="getRateType() === 'Off-Peak'">
-                  <div class="off-peak-breakdown">
-                    <div class="fee-row" *ngIf="getMemberCount() > 0">
-                      <span>Members (₱20 each):</span>
-                      <span>₱{{ getMemberCount() * 20 }}</span>
-                    </div>
-                    <div class="fee-row" *ngIf="getNonMemberCount() > 0">
-                      <span>Non-members (₱50 each):</span>
-                      <span>₱{{ getNonMemberCount() * 50 }}</span>
-                    </div>
-                  </div>
+                <!-- Guest Fee (if any) -->
+                <div class="fee-row" *ngIf="getNonMemberCount() > 0">
+                  <span>Guest Fee ({{ getNonMemberCount() }} {{ getNonMemberCount() === 1 ? 'guest' : 'guests' }} × ₱70):</span>
+                  <span>₱{{ getGuestFeeTotal() }}</span>
                 </div>
-                <div class="fee-row" *ngIf="getRateType() === 'Mixed'">
-                  <div class="mixed-breakdown">
-                    <div class="fee-row">
-                      <span>Peak Hours:</span>
-                      <span>₱{{ getPeakHoursFee() }}</span>
-                    </div>
-                    <div class="fee-row" *ngIf="getMemberCount() > 0">
-                      <span>Off-peak Members:</span>
-                      <span>₱{{ getOffPeakMembersFee() }}</span>
-                    </div>
-                    <div class="fee-row" *ngIf="getNonMemberCount() > 0">
-                      <span>Off-peak Non-members:</span>
-                      <span>₱{{ getOffPeakNonMembersFee() }}</span>
-                    </div>
-                  </div>
+                <!-- Payment Distribution Note -->
+                <div class="fee-note" *ngIf="getMemberCount() > 0">
+                  <small>
+                    • Base fee split among {{ getMemberCount() }} {{ getMemberCount() === 1 ? 'member' : 'members' }}
+                    <span *ngIf="getNonMemberCount() > 0"> (₱{{ Math.round((getBaseFeeTotal() / getMemberCount()) * 100) / 100 }} each)</span>
+                    <br *ngIf="getNonMemberCount() > 0">
+                    <span *ngIf="getNonMemberCount() > 0">• Guest fees added to reserver's payment</span>
+                  </small>
                 </div>
               </div>
               <div class="fee-row total">
@@ -583,6 +571,9 @@ export class ReservationsComponent implements OnInit, OnDestroy {
   selectedEndTime: number | null = null;
   availableEndTimes: TimeSlot[] = [];
   calculatedFee = 0;
+
+  // Expose Math for template use
+  Math = Math;
 
   // Credit system properties
   userCreditBalance = 0;
@@ -1413,6 +1404,31 @@ export class ReservationsComponent implements OnInit, OnDestroy {
       slots.push(hour);
     }
     return slots;
+  }
+
+  // December 2025: Calculate base fee total (sum of hourly base fees)
+  getBaseFeeTotal(): number {
+    if (!this.selectedStartTime || !this.selectedEndTime) return 0;
+
+    const PEAK_BASE_FEE = 150;
+    const NON_PEAK_BASE_FEE = 100;
+
+    let totalBaseFee = 0;
+    for (let hour = this.selectedStartTime; hour < this.selectedEndTime; hour++) {
+      const baseFee = this.isPeakHour(hour) ? PEAK_BASE_FEE : NON_PEAK_BASE_FEE;
+      totalBaseFee += baseFee;
+    }
+
+    return totalBaseFee;
+  }
+
+  // December 2025: Calculate guest fee total (guests × ₱70 × hours)
+  getGuestFeeTotal(): number {
+    const guestCount = this.getNonMemberCount();
+    const hours = this.getDurationHours();
+    const GUEST_FEE = 70;
+
+    return guestCount * GUEST_FEE * hours;
   }
 
   getStatusColor(status: string): string {
