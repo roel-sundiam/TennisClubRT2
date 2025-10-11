@@ -392,14 +392,29 @@ interface Reservation {
                   <span>Guest Fee ({{ getNonMemberCount() }} {{ getNonMemberCount() === 1 ? 'guest' : 'guests' }} × ₱70):</span>
                   <span>₱{{ getGuestFeeTotal() }}</span>
                 </div>
-                <!-- Payment Distribution Note -->
-                <div class="fee-note" *ngIf="getMemberCount() > 0">
-                  <small>
-                    • Base fee split among {{ getMemberCount() }} {{ getMemberCount() === 1 ? 'member' : 'members' }}
-                    <span *ngIf="getNonMemberCount() > 0"> (₱{{ Math.round((getBaseFeeTotal() / getMemberCount()) * 100) / 100 }} each)</span>
-                    <br *ngIf="getNonMemberCount() > 0">
-                    <span *ngIf="getNonMemberCount() > 0">• Guest fees added to reserver's payment</span>
-                  </small>
+                <!-- Payment Distribution per Player -->
+                <div class="player-payments" *ngIf="getMemberCount() > 0">
+                  <div class="fee-row player-payment-header">
+                    <span><strong>Payment per Player:</strong></span>
+                  </div>
+                  <div class="player-payment-item" *ngFor="let player of getPlayerPaymentBreakdown()">
+                    <div class="fee-row player-detail">
+                      <span>
+                        {{ player.name }}
+                        <span class="player-badge" *ngIf="player.isReserver">(Reserver)</span>
+                        <span class="player-badge" *ngIf="player.isGuest">(Guest)</span>
+                      </span>
+                      <span class="player-amount">
+                        <span *ngIf="!player.isGuest">₱{{ player.amount }}</span>
+                        <span *ngIf="player.isGuest" style="color: #666;">No payment</span>
+                      </span>
+                    </div>
+                    <div class="fee-breakdown-detail" *ngIf="!player.isGuest && player.breakdown">
+                      <small style="color: #666; padding-left: 20px;">
+                        {{ player.breakdown }}
+                      </small>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div class="fee-row total">
@@ -1429,6 +1444,72 @@ export class ReservationsComponent implements OnInit, OnDestroy {
     const GUEST_FEE = 70;
 
     return guestCount * GUEST_FEE * hours;
+  }
+
+  // December 2025: Get payment breakdown per player
+  getPlayerPaymentBreakdown(): Array<{
+    name: string;
+    amount: number;
+    isReserver: boolean;
+    isGuest: boolean;
+    breakdown?: string;
+  }> {
+    const result: Array<{
+      name: string;
+      amount: number;
+      isReserver: boolean;
+      isGuest: boolean;
+      breakdown?: string;
+    }> = [];
+
+    const memberCount = this.getMemberCount();
+    const guestCount = this.getNonMemberCount();
+
+    if (memberCount === 0) return result;
+
+    const baseFeeTotal = this.getBaseFeeTotal();
+    const guestFeeTotal = this.getGuestFeeTotal();
+    const baseFeePerMember = Math.round((baseFeeTotal / memberCount) * 100) / 100;
+
+    // Add member players
+    let memberIndex = 0;
+    this.playersArray.controls.forEach((control) => {
+      const playerName = control.value?.trim();
+      if (playerName) {
+        const isReserver = memberIndex === 0;
+        const amount = isReserver
+          ? Math.round((baseFeePerMember + guestFeeTotal) * 100) / 100
+          : baseFeePerMember;
+
+        let breakdown = `Base share: ₱${baseFeePerMember}`;
+        if (isReserver && guestFeeTotal > 0) {
+          breakdown += ` + Guest fees: ₱${guestFeeTotal}`;
+        }
+
+        result.push({
+          name: playerName,
+          amount: amount,
+          isReserver: isReserver,
+          isGuest: false,
+          breakdown: breakdown,
+        });
+        memberIndex++;
+      }
+    });
+
+    // Add guest players
+    this.customPlayerNames.forEach((guestName) => {
+      if (guestName && guestName.trim()) {
+        result.push({
+          name: guestName.trim(),
+          amount: 0,
+          isReserver: false,
+          isGuest: true,
+        });
+      }
+    });
+
+    return result;
   }
 
   getStatusColor(status: string): string {
