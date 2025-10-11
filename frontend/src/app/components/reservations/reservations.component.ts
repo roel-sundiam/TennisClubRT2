@@ -1264,43 +1264,40 @@ export class ReservationsComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Calculate base player fees per hour
-    let playerFeePerHour = 0;
+    // December 2025 pricing constants
+    const PEAK_BASE_FEE = 150;
+    const NON_PEAK_BASE_FEE = 100;
+    const GUEST_FEE = 70;
 
     // Count member players
     let memberCount = 0;
     this.playersArray.controls.forEach((control) => {
       if (control.value && control.value.trim()) {
-        playerFeePerHour += 20; // Member: ₱20 per player per hour
         memberCount++;
       }
     });
 
-    // Count custom (non-member) players
-    let customCount = 0;
+    // Count custom (non-member/guest) players
+    let guestCount = 0;
     this.customPlayerNames.forEach((name) => {
       console.log('🔍 Checking custom name:', `"${name}"`);
       if (name && name.trim()) {
-        playerFeePerHour += 50; // Non-member: ₱50 per player per hour
-        customCount++;
-        console.log('✅ Added custom player, count now:', customCount);
+        guestCount++;
+        console.log('✅ Added guest player, count now:', guestCount);
       }
     });
 
-    console.log('🔍 Final counts - Members:', memberCount, 'Custom:', customCount);
-    console.log('🔍 playerFeePerHour:', playerFeePerHour);
+    console.log('🔍 Final counts - Members:', memberCount, 'Guests:', guestCount);
 
     // Calculate total fee for all hours in the range
+    // December 2025: Base rate (₱100 or ₱150) + ₱70 per guest
     let totalFee = 0;
     for (let hour = this.selectedStartTime!; hour < this.selectedEndTime!; hour++) {
-      let hourlyFee = playerFeePerHour;
-
-      if (this.isPeakHour(hour)) {
-        // Peak hours: whichever is higher - ₱100 minimum OR calculated player total
-        hourlyFee = Math.max(hourlyFee, 100);
-      }
-
+      const baseFee = this.isPeakHour(hour) ? PEAK_BASE_FEE : NON_PEAK_BASE_FEE;
+      const hourlyFee = baseFee + (guestCount * GUEST_FEE);
       totalFee += hourlyFee;
+
+      console.log(`🔍 Hour ${hour}: Base=₱${baseFee}, Guests=${guestCount}×₱${GUEST_FEE}, Total=₱${hourlyFee}`);
     }
 
     this.calculatedFee = totalFee;
