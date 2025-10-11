@@ -82,6 +82,45 @@ interface Reservation {
         <h1>Reserve a Court</h1>
       </div>
 
+      <!-- Debug Panel (Edit Mode Only) -->
+      <div *ngIf="isEditMode" style="background: #fff3cd; border: 2px solid #ffc107; padding: 15px; margin: 20px; border-radius: 8px; font-family: monospace; font-size: 14px;">
+        <h3 style="margin-top: 0; color: #856404;">🔍 Debug Info (Edit Mode)</h3>
+        <div style="display: grid; grid-template-columns: 200px 1fr; gap: 8px;">
+          <div><strong>Edit Mode:</strong></div>
+          <div>{{ isEditMode ? 'YES' : 'NO' }}</div>
+
+          <div><strong>Editing ID:</strong></div>
+          <div>{{ editingReservationId }}</div>
+
+          <div><strong>Selected Date:</strong></div>
+          <div>{{ selectedDate | date:'yyyy-MM-dd' }}</div>
+
+          <div><strong>Selected Start Time:</strong></div>
+          <div>{{ selectedStartTime !== null ? selectedStartTime + ':00' : 'NOT SET' }}</div>
+
+          <div><strong>Selected End Time:</strong></div>
+          <div>{{ selectedEndTime !== null ? selectedEndTime + ':00' : 'NOT SET' }}</div>
+
+          <div><strong>Form Start Value:</strong></div>
+          <div>{{ reservationForm.get('startTime')?.value || 'EMPTY' }}</div>
+
+          <div><strong>Form End Value:</strong></div>
+          <div>{{ reservationForm.get('endTime')?.value || 'EMPTY' }}</div>
+
+          <div><strong>Time Slots Loaded:</strong></div>
+          <div>{{ timeSlots.length }} slots (hours: {{ getDebugTimeSlotHours() }})</div>
+
+          <div><strong>Available End Times:</strong></div>
+          <div>{{ getDebugAvailableEndTimes() }}</div>
+
+          <div><strong>Member Players:</strong></div>
+          <div>{{ playersArray.length }} ({{ getDebugMemberPlayers() }})</div>
+
+          <div><strong>Guest Players:</strong></div>
+          <div>{{ customPlayerNames.length }} ({{ getDebugGuestPlayers() }})</div>
+        </div>
+      </div>
+
       <div class="form-container">
         <form [formGroup]="reservationForm" (ngSubmit)="onSubmit()" class="reservation-form">
           <!-- Date Selection -->
@@ -2015,6 +2054,26 @@ export class ReservationsComponent implements OnInit, OnDestroy {
     this.router.navigate(['/payments'], {
       queryParams: { tab: 'pending' }
     });
+  }
+
+  // Debug helper methods for edit mode panel
+  getDebugTimeSlotHours(): string {
+    return this.timeSlots.map(s => s.hour).join(', ');
+  }
+
+  getDebugAvailableEndTimes(): string {
+    if (this.availableEndTimes.length === 0) return 'NONE';
+    return this.availableEndTimes.map(t => t.hour + ':00').join(', ');
+  }
+
+  getDebugMemberPlayers(): string {
+    const values = this.playersArray.value.filter((v: any) => v && v.trim());
+    return values.length > 0 ? values.join(', ') : 'NONE';
+  }
+
+  getDebugGuestPlayers(): string {
+    const guests = this.customPlayerNames.filter(n => n && n.trim());
+    return guests.length > 0 ? guests.join(', ') : 'NONE';
   }
 }
 
