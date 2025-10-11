@@ -510,7 +510,7 @@ interface Reservation {
               <div class="reservation-time">
                 {{ reservation.timeSlotDisplay }}
               </div>
-              <div class="reservation-players">Players: {{ reservation.players.join(', ') }}</div>
+              <div class="reservation-players">Players: {{ formatPlayerNames(reservation.players) }}</div>
               <div class="reservation-status status-{{ reservation.status }}">
                 {{ reservation.status | titlecase }}
               </div>
@@ -1510,6 +1510,19 @@ export class ReservationsComponent implements OnInit, OnDestroy {
     });
 
     return result;
+  }
+
+  // December 2025: Format player names from either old (string[]) or new (object[]) format
+  formatPlayerNames(players: any[]): string {
+    if (!players || players.length === 0) return '';
+
+    // Check if new format (objects with name property)
+    if (typeof players[0] === 'object' && 'name' in players[0]) {
+      return players.map((p: any) => p.name).join(', ');
+    }
+
+    // Old format (strings)
+    return players.join(', ');
   }
 
   getStatusColor(status: string): string {
