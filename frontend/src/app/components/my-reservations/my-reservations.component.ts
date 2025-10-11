@@ -122,7 +122,7 @@ interface Reservation {
                       </div>
                       <div class="players-info">
                         <mat-icon class="inline-icon">people</mat-icon>
-                        <span class="players-text">{{getFilteredPlayers(reservation).join(', ')}}</span>
+                        <span class="players-text">{{formatPlayerNames(getFilteredPlayers(reservation))}}</span>
                       </div>
                     </div>
                   </div>
@@ -193,7 +193,7 @@ interface Reservation {
                       <div class="time-slot">{{reservation.timeSlotDisplay}}</div>
                       <div class="players-info">
                         <mat-icon class="inline-icon">people</mat-icon>
-                        <span class="players-text">{{reservation.players.join(', ')}}</span>
+                        <span class="players-text">{{formatPlayerNames(reservation.players)}}</span>
                       </div>
                     </div>
                   </div>
@@ -262,7 +262,7 @@ interface Reservation {
                       <div class="time-slot">{{reservation.timeSlotDisplay}}</div>
                       <div class="players-info">
                         <mat-icon class="inline-icon">people</mat-icon>
-                        <span class="players-text">{{reservation.players.join(', ')}}</span>
+                        <span class="players-text">{{formatPlayerNames(reservation.players)}}</span>
                       </div>
                     </div>
                   </div>
@@ -360,7 +360,7 @@ interface Reservation {
                       </div>
                       <div class="players-info">
                         <mat-icon class="inline-icon">people</mat-icon>
-                        <span class="players-text">{{getFilteredPlayers(reservation).join(', ')}}</span>
+                        <span class="players-text">{{formatPlayerNames(getFilteredPlayers(reservation))}}</span>
                       </div>
                     </div>
                   </div>
@@ -406,7 +406,7 @@ interface Reservation {
           <div class="reservation-details" *ngIf="reservationToCancel">
             <strong>Date:</strong> {{reservationToCancel.date | date:'fullDate'}}<br>
             <strong>Time:</strong> {{reservationToCancel.timeSlotDisplay}}<br>
-            <strong>Players:</strong> {{reservationToCancel.players.join(', ')}}
+            <strong>Players:</strong> {{formatPlayerNames(reservationToCancel.players)}}
           </div>
           <p class="warning-text">This action cannot be undone.</p>
         </div>
@@ -1235,13 +1235,35 @@ click "Try Again" below to reconnect.
   }
 
   // Filter out the reservation creator from players list to avoid duplication
-  getFilteredPlayers(reservation: any): string[] {
+  getFilteredPlayers(reservation: any): any[] {
     if (!reservation.players || !reservation.userId) {
       return reservation.players || [];
     }
-    
+
     const creatorName = reservation.userId.fullName;
-    return reservation.players.filter((player: string) => player !== creatorName);
+
+    // December 2025: Handle both old (string[]) and new (object[]) formats
+    return reservation.players.filter((player: any) => {
+      if (typeof player === 'string') {
+        return player !== creatorName;
+      } else if (typeof player === 'object' && 'name' in player) {
+        return player.name !== creatorName;
+      }
+      return true;
+    });
+  }
+
+  // December 2025: Format player names from either old (string[]) or new (object[]) format
+  formatPlayerNames(players: any[]): string {
+    if (!players || players.length === 0) return '';
+
+    // Check if new format (objects with name property)
+    if (typeof players[0] === 'object' && 'name' in players[0]) {
+      return players.map((p: any) => p.name).join(', ');
+    }
+
+    // Old format (strings)
+    return players.join(', ');
   }
 
   getTimeUntil(date: Date | string): string {
