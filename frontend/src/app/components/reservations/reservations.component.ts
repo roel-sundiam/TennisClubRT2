@@ -779,30 +779,46 @@ export class ReservationsComponent implements OnInit, OnDestroy {
 
           // For START times: filter out hour 22
           this.timeSlots = this.allTimeSlots.filter((slot: any) => slot.hour <= 21);
+
+          console.log('🔍 All time slots loaded:', this.allTimeSlots.length);
+          console.log('🔍 Start time slots:', this.timeSlots.length);
         } else {
           console.log('❌ No timeSlots in backend response');
           this.updateTimeSlotAvailability();
         }
 
-        // NOW set the selected times after time slots are loaded
-        console.log('🔍 Setting selected times in edit mode');
-        this.selectedStartTime = reservation.timeSlot;
-        this.selectedEndTime = reservation.endTimeSlot || (reservation.timeSlot + (reservation.duration || 1));
+        // Use setTimeout to ensure Angular change detection picks up the changes
+        setTimeout(() => {
+          // NOW set the selected times after time slots are loaded
+          console.log('🔍 Setting selected times in edit mode');
+          const startTime = reservation.timeSlot;
+          const endTime = reservation.endTimeSlot || (reservation.timeSlot + (reservation.duration || 1));
 
-        console.log('🔍 Selected start time:', this.selectedStartTime);
-        console.log('🔍 Selected end time:', this.selectedEndTime);
+          this.selectedStartTime = startTime;
+          this.selectedEndTime = endTime;
 
-        // Update form values
-        this.reservationForm.patchValue({
-          startTime: reservation.timeSlot,
-          endTime: this.selectedEndTime,
-        });
+          console.log('🔍 Selected start time:', this.selectedStartTime);
+          console.log('🔍 Selected end time:', this.selectedEndTime);
+          console.log('🔍 Checking if start time slot exists:', this.timeSlots.find(s => s.hour === startTime));
 
-        // Update available end times
-        this.updateAvailableEndTimes();
+          // Update form values
+          this.reservationForm.patchValue({
+            startTime: startTime,
+            endTime: endTime,
+          });
 
-        // Trigger fee calculation
-        this.calculateFee();
+          console.log('🔍 Form values after patch:', {
+            startTime: this.reservationForm.get('startTime')?.value,
+            endTime: this.reservationForm.get('endTime')?.value
+          });
+
+          // Update available end times
+          this.updateAvailableEndTimes();
+          console.log('🔍 Available end times after update:', this.availableEndTimes.map(t => t.hour));
+
+          // Trigger fee calculation
+          this.calculateFee();
+        }, 0);
       },
       error: (error) => {
         console.error('Error loading reservations:', error);
