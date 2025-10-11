@@ -47,6 +47,47 @@ function calculateStringSimilarity(str1: string, str2: string): number {
   return (maxLength - distance) / maxLength;
 }
 
+// Helper function to convert player names to ReservationPlayer objects (December 2025)
+async function convertPlayersToObjects(playerNames: string[]): Promise<any[]> {
+  // Get all members for matching
+  const allMembers = await User.find({ isApproved: true, role: { $in: ['member', 'admin', 'superadmin'] } });
+  const memberNames = allMembers.map(m => m.fullName.toLowerCase().trim());
+  const memberMap = new Map(allMembers.map(m => [m.fullName.toLowerCase().trim(), m._id.toString()]));
+
+  const players: any[] = [];
+
+  for (const playerName of playerNames) {
+    const cleanName = playerName.toLowerCase().trim();
+    let isMember = false;
+    let userId: string | null = null;
+
+    // Exact match first
+    if (memberNames.includes(cleanName)) {
+      isMember = true;
+      userId = memberMap.get(cleanName) || null;
+    } else {
+      // Fuzzy matching
+      for (const memberName of memberNames) {
+        const similarity = calculateStringSimilarity(cleanName, memberName);
+        if (similarity > 0.8) {
+          isMember = true;
+          userId = memberMap.get(memberName) || null;
+          break;
+        }
+      }
+    }
+
+    players.push({
+      name: playerName.trim(),
+      userId: userId,
+      isMember: isMember,
+      isGuest: !isMember
+    });
+  }
+
+  return players;
+}
+
 // Get all reservations with filtering and pagination
 export const getReservations = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const page = parseInt(req.query.page as string) || 1;
@@ -652,22 +693,94 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
     }
   }
 
-  // Create reservation
+  // Convert players to ReservationPlayer objects for December 2025 pricing
+  const playerObjects = await convertPlayersToObjects(trimmedPlayers);
+
+  // Create reservation with new player format
   const reservation = new Reservation({
     userId: req.user._id,
     date: reservationDate,
     timeSlot,
     duration,
-    players: trimmedPlayers,
+    players: playerObjects,
     status: 'pending',
     paymentStatus,
     tournamentTier,
     totalFee: finalTotalFee,
-    weatherForecast
+    weatherForecast,
+    paymentIds: [] // Will be populated with payment IDs
   });
 
   await reservation.save();
   await reservation.populate('userId', 'username fullName email');
+
+  // December 2025: Create individual payments for each member
+  const paymentIds: string[] = [];
+  const members = playerObjects.filter(p => p.isMember);
+  const guests = playerObjects.filter(p => p.isGuest);
+  const peakHours = (process.env.PEAK_HOURS || '5,18,19,21').split(',').map(h => parseInt(h));
+
+  if (members.length > 0) {
+    // Calculate payment amounts
+    const PEAK_BASE_FEE = 150;
+    const NON_PEAK_BASE_FEE = 100;
+    const GUEST_FEE = 70;
+
+    // Calculate base fee for one hour (will multiply by duration later)
+    const calculatedEndTimeSlot = reservation.endTimeSlot || (reservation.timeSlot + reservation.duration);
+    let totalBaseFee = 0;
+    let totalGuestFee = 0;
+
+    for (let hour = reservation.timeSlot; hour < calculatedEndTimeSlot; hour++) {
+      const isPeakHour = peakHours.includes(hour);
+      totalBaseFee += isPeakHour ? PEAK_BASE_FEE : NON_PEAK_BASE_FEE;
+      totalGuestFee += guests.length * GUEST_FEE;
+    }
+
+    // Each member pays their share of the base fee
+    const memberShare = totalBaseFee / members.length;
+
+    // Reserver pays their share + all guest fees
+    const reserverId = req.user._id.toString();
+
+    for (const member of members) {
+      const isReserver = member.userId === reserverId;
+      const paymentAmount = isReserver ? (memberShare + totalGuestFee) : memberShare;
+
+      // Set due date to the day after reservation (payment enabled after playing)
+      const paymentDueDate = new Date(reservationDate);
+      paymentDueDate.setDate(paymentDueDate.getDate() + 1);
+      paymentDueDate.setHours(23, 59, 59, 999);
+
+      const payment = new Payment({
+        userId: member.userId,
+        reservationId: reservation._id,
+        amount: Math.round(paymentAmount * 100) / 100, // Round to 2 decimal places
+        currency: 'PHP',
+        paymentMethod: 'cash', // Default, can be changed when paid
+        status: 'pending',
+        dueDate: paymentDueDate,
+        description: `Court reservation ${isReserver ? '(Reserver)' : ''} - ${reservation.date.toDateString()} ${reservation.timeSlot}:00-${calculatedEndTimeSlot}:00`,
+        metadata: {
+          timeSlot: reservation.timeSlot,
+          date: reservation.date,
+          playerCount: playerObjects.length,
+          memberCount: members.length,
+          guestCount: guests.length,
+          isReserver: isReserver,
+          memberShare: Math.round(memberShare * 100) / 100,
+          guestFees: isReserver ? Math.round(totalGuestFee * 100) / 100 : 0
+        }
+      });
+
+      await payment.save();
+      paymentIds.push(payment._id.toString());
+    }
+
+    // Update reservation with payment IDs
+    reservation.paymentIds = paymentIds;
+    await reservation.save({ validateBeforeSave: false });
+  }
 
   // Update the reservation with credit transaction reference if credit was used
   if (creditUsed && creditTransactionId) {
@@ -675,16 +788,17 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
     await reservation.save({ validateBeforeSave: false });
   }
 
-  const message = creditUsed 
+  const message = creditUsed
     ? `Reservation created successfully. ₱${finalTotalFee} automatically deducted from your credit balance. ${coinsRequired} coins deducted.`
-    : `Reservation created successfully. Payment of ₱${finalTotalFee} is pending. ${coinsRequired} coins deducted.`;
+    : `Reservation created successfully. ${members.length} payment(s) created for members. Payments can be made after the reservation time. ${coinsRequired} coins deducted.`;
 
   res.status(201).json({
     success: true,
     data: {
       ...reservation.toJSON(),
       creditUsed,
-      creditBalance: user.creditBalance - (creditUsed ? finalTotalFee : 0)
+      creditBalance: user.creditBalance - (creditUsed ? finalTotalFee : 0),
+      paymentsCreated: paymentIds.length
     },
     message
   });
