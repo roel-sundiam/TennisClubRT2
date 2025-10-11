@@ -774,7 +774,7 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
       });
 
       await payment.save();
-      paymentIds.push(payment._id.toString());
+      paymentIds.push((payment._id as any).toString());
     }
 
     // Update reservation with payment IDs
@@ -856,6 +856,9 @@ export const updateReservation = asyncHandler(async (req: AuthenticatedRequest, 
     const newTimeSlot = timeSlot || reservation.timeSlot;
 
     // Validate new date is not in the past
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     if (newDate < today) {
       res.status(400).json({
         success: false,
@@ -980,7 +983,7 @@ export const updateReservation = asyncHandler(async (req: AuthenticatedRequest, 
         });
 
         await payment.save();
-        paymentIds.push(payment._id.toString());
+        paymentIds.push((payment._id as any).toString());
       }
 
       reservation.paymentIds = paymentIds;
