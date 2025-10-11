@@ -828,14 +828,15 @@ export const updateReservation = asyncHandler(async (req: AuthenticatedRequest, 
     return;
   }
 
-  // Cannot edit past reservations
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  if (reservation.date < today) {
+  // Cannot edit past reservations or reservations that have already started
+  const now = new Date();
+  const reservationDateTime = new Date(reservation.date);
+  reservationDateTime.setHours(reservation.timeSlot, 0, 0, 0);
+
+  if (reservationDateTime <= now) {
     res.status(400).json({
       success: false,
-      error: 'Cannot edit past reservations'
+      error: 'Cannot edit reservations that have already started or passed. Payments can be made after the reservation time.'
     });
     return;
   }
@@ -904,10 +905,93 @@ export const updateReservation = asyncHandler(async (req: AuthenticatedRequest, 
       return;
     }
 
-    reservation.players = players.map(p => p.trim());
+    // December 2025: Cancel old payments and create new ones when players change
+    if (reservation.paymentIds && reservation.paymentIds.length > 0) {
+      // Cancel all existing pending payments
+      await Payment.updateMany(
+        { _id: { $in: reservation.paymentIds }, status: 'pending' },
+        { $set: { status: 'cancelled' } }
+      );
+      console.log(`📝 Cancelled ${reservation.paymentIds.length} pending payments for reservation ${id}`);
+    }
+
+    // Convert new players to objects
+    const trimmedPlayers = players.map(p => p.trim());
+    const playerObjects = await convertPlayersToObjects(trimmedPlayers);
+    reservation.players = playerObjects;
+
+    // Recalculate total fee (will be done by pre-save hook)
+    reservation.totalFee = 0;
+
+    // Save with recalculated fee
+    await reservation.save();
+
+    // Create new payments for members
+    const paymentIds: string[] = [];
+    const members = playerObjects.filter((p: any) => p.isMember);
+    const guests = playerObjects.filter((p: any) => p.isGuest);
+    const peakHours = (process.env.PEAK_HOURS || '5,18,19,21').split(',').map(h => parseInt(h));
+
+    if (members.length > 0) {
+      const PEAK_BASE_FEE = 150;
+      const NON_PEAK_BASE_FEE = 100;
+      const GUEST_FEE = 70;
+
+      const calculatedEndTimeSlot = reservation.endTimeSlot || (reservation.timeSlot + reservation.duration);
+      let totalBaseFee = 0;
+      let totalGuestFee = 0;
+
+      for (let hour = reservation.timeSlot; hour < calculatedEndTimeSlot; hour++) {
+        const isPeakHour = peakHours.includes(hour);
+        totalBaseFee += isPeakHour ? PEAK_BASE_FEE : NON_PEAK_BASE_FEE;
+        totalGuestFee += guests.length * GUEST_FEE;
+      }
+
+      const memberShare = totalBaseFee / members.length;
+      const reserverId = reservation.userId.toString();
+
+      for (const member of members) {
+        const isReserver = member.userId === reserverId;
+        const paymentAmount = isReserver ? (memberShare + totalGuestFee) : memberShare;
+
+        const paymentDueDate = new Date(reservation.date);
+        paymentDueDate.setDate(paymentDueDate.getDate() + 1);
+        paymentDueDate.setHours(23, 59, 59, 999);
+
+        const payment = new Payment({
+          userId: member.userId,
+          reservationId: reservation._id,
+          amount: Math.round(paymentAmount * 100) / 100,
+          currency: 'PHP',
+          paymentMethod: 'cash',
+          status: 'pending',
+          dueDate: paymentDueDate,
+          description: `Court reservation ${isReserver ? '(Reserver)' : ''} - ${reservation.date.toDateString()} ${reservation.timeSlot}:00-${calculatedEndTimeSlot}:00`,
+          metadata: {
+            timeSlot: reservation.timeSlot,
+            date: reservation.date,
+            playerCount: playerObjects.length,
+            memberCount: members.length,
+            guestCount: guests.length,
+            isReserver: isReserver,
+            memberShare: Math.round(memberShare * 100) / 100,
+            guestFees: isReserver ? Math.round(totalGuestFee * 100) / 100 : 0
+          }
+        });
+
+        await payment.save();
+        paymentIds.push(payment._id.toString());
+      }
+
+      reservation.paymentIds = paymentIds;
+      await reservation.save({ validateBeforeSave: false });
+      console.log(`✅ Created ${paymentIds.length} new payments for reservation ${id}`);
+    }
+  } else if (!players) {
+    // No player changes, just save other modifications
+    await reservation.save({ validateBeforeSave: false });
   }
 
-  await reservation.save({ validateBeforeSave: false });
   await reservation.populate('userId', 'username fullName email');
 
   res.status(200).json({
