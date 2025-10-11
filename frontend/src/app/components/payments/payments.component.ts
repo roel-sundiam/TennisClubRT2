@@ -612,12 +612,14 @@ interface Notification {
                 <div class="payment-actions">
                   <!-- For synthetic payments (unpaid reservations), show Pay Now and Cancel buttons -->
                   <ng-container *ngIf="payment.isSynthetic && payment.reservationId">
-                    <button 
+                    <button
                       class="pay-btn"
-                      (click)="payForGroupedReservation(payment)">
+                      (click)="payForGroupedReservation(payment)"
+                      [disabled]="!canMakePayment(payment)"
+                      [title]="!canMakePayment(payment) ? getPaymentDisabledMessage(payment) : ''">
                       Pay Now
                     </button>
-                    <button 
+                    <button
                       class="cancel-reservation-btn"
                       (click)="cancelReservationDirectly(convertPaymentToReservation(payment))"
                       [disabled]="processing.includes(payment.reservationId._id) || !canCancel(payment)">
@@ -650,7 +652,8 @@ interface Notification {
                         class="pay-btn"
                         (click)="processPayment(payment._id)"
                         *ngIf="payment.reservationId && payment.paymentMethod === 'cash'"
-                        [disabled]="processing.includes(payment._id)">
+                        [disabled]="processing.includes(payment._id) || !canMakePayment(payment)"
+                        [title]="!canMakePayment(payment) ? getPaymentDisabledMessage(payment) : ''">
                         {{processing.includes(payment._id) ? 'Processing...' : 'Mark as Paid'}}
                       </button>
 
@@ -658,7 +661,9 @@ interface Notification {
                       <button
                         class="pay-btn"
                         (click)="payForExistingPayment(payment)"
-                        *ngIf="payment.reservationId && payment.paymentMethod !== 'cash'">
+                        *ngIf="payment.reservationId && payment.paymentMethod !== 'cash'"
+                        [disabled]="!canMakePayment(payment)"
+                        [title]="!canMakePayment(payment) ? getPaymentDisabledMessage(payment) : ''">
                         Pay Now
                       </button>
                     </div>
@@ -1178,9 +1183,39 @@ export class PaymentsComponent implements OnInit {
         status: payment.status
       }) && payment.status !== 'refunded';
     }
-    
+
     // For non-reservation payments (like polls), allow cancellation if not refunded
     return payment.status !== 'refunded';
+  }
+
+  // December 2025: Check if payment can be made (reservation time must have passed)
+  canMakePayment(payment: Payment): boolean {
+    // Only apply timing restriction to court reservations
+    if (!payment.reservationId || !payment.metadata?.date || !payment.metadata?.timeSlot) {
+      // For non-reservation payments (Open Play, Manual), allow payment anytime
+      return true;
+    }
+
+    // Get reservation date and time
+    const reservationDate = new Date(payment.metadata.date);
+    const timeSlot = payment.metadata.timeSlot;
+
+    // Create reservation datetime (date + time slot hour)
+    const reservationDateTime = new Date(reservationDate);
+    reservationDateTime.setHours(timeSlot, 0, 0, 0);
+
+    // Payment can only be made after the reservation time has passed
+    const now = new Date();
+    return now >= reservationDateTime;
+  }
+
+  // Get message explaining why payment is disabled
+  getPaymentDisabledMessage(payment: Payment): string {
+    if (!payment.reservationId) {
+      return '';
+    }
+
+    return 'Payment will be available after the reservation time passes';
   }
 
   cancelPayment(paymentId: string): void {
