@@ -517,8 +517,21 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
     // Categorize players as members or non-members
     let memberCount = 0;
     let nonMemberCount = 0;
-    
-    reservation!.players.forEach(playerName => {
+
+    reservation!.players.forEach(player => {
+      // December 2025: Check if player is new format (object) or old format (string)
+      if (typeof player === 'object' && 'isMember' in player) {
+        // New format: player is {name, userId, isMember, isGuest}
+        if (player.isMember) {
+          memberCount++;
+        } else {
+          nonMemberCount++;
+        }
+        return;
+      }
+
+      // Old format: player is a string, use fuzzy matching
+      const playerName = player as string;
       const cleanPlayerName = playerName.toLowerCase().trim();
       const isFoundInMembers = memberNames.includes(cleanPlayerName);
       
