@@ -75,8 +75,14 @@ pending registration → admin approval → membership fee payment → active me
 #### Court Reservation System
 
 - **Operating Hours**: 5 AM - 10 PM (timeSlot: 5-22)
-- **Peak Hours**: 5AM, 6PM, 7PM, 9PM (₱100 fixed)
-- **Off-Peak**: ₱20 per player
+- **Peak Hours**: 5AM, 6PM, 7PM, 9PM
+- **Pricing (December 2025+)**:
+  - Peak: ₱150 base + ₱70 per guest
+  - Non-Peak: ₱100 base + ₱70 per guest
+  - Base fee split equally among members
+  - Guest fees added to reserver's payment
+- **Payment System**: One payment per member (guests don't pay)
+- **Payment Timing**: Pay button enabled after reservation time passes ("play first, pay after")
 - **Conflict Prevention**: Unique compound index on (date, timeSlot) for active reservations
 
 #### Coin Economy
