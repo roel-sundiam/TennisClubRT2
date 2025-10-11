@@ -29,11 +29,13 @@ const reservationSchema = new Schema<IReservationDocument>({
     max: [22, 'Court operates until 10 PM']
   },
   players: [{
-    type: String,
-    required: true,
-    trim: true,
-    maxlength: [50, 'Player name cannot exceed 50 characters']
+    type: Schema.Types.Mixed, // Support both String (old format) and Object (new format with member/guest tracking)
+    required: true
   }],
+  paymentIds: [{
+    type: String,
+    ref: 'Payment'
+  }], // December 2025: Track multiple payment IDs (one per member)
   status: {
     type: String,
     enum: {
@@ -158,47 +160,80 @@ reservationSchema.pre('save', function(next) {
   }
   
   // Calculate total fee for multi-hour reservations if not explicitly provided
-  if ((reservation.isNew || reservation.isModified('timeSlot') || reservation.isModified('players') || reservation.isModified('duration')) && 
+  if ((reservation.isNew || reservation.isModified('timeSlot') || reservation.isModified('players') || reservation.isModified('duration')) &&
       (!reservation.totalFee || reservation.totalFee === 0)) {
     const peakHours = (process.env.PEAK_HOURS || '5,18,19,21').split(',').map(h => parseInt(h));
-    const peakHourFee = parseInt(process.env.PEAK_HOUR_FEE || '100');
-    const offPeakFeePerMember = parseInt(process.env.OFF_PEAK_FEE_PER_MEMBER || '20');
-    const offPeakFeePerNonMember = parseInt(process.env.OFF_PEAK_FEE_PER_NON_MEMBER || '50');
-    
+
+    // Check if players use new format (objects with isMember/isGuest)
+    const hasNewPlayerFormat = reservation.players.length > 0 &&
+      typeof reservation.players[0] === 'object' &&
+      'isMember' in (reservation.players[0] as any);
+
     let totalFee = 0;
-    
-    // Calculate fee for each hour in the duration
-    const calculatedEndTimeSlot = reservation.endTimeSlot || (reservation.timeSlot + reservation.duration);
-    for (let hour = reservation.timeSlot; hour < calculatedEndTimeSlot; hour++) {
-      let hourFee = 0;
-      
-      if (peakHours.includes(hour)) {
-        // Peak hours: 100 pesos fixed fee per hour
-        hourFee = peakHourFee;
-      } else {
-        // Off-peak hours: use proper member/non-member calculation if frontend didn't provide
-        // This is a fallback - the frontend should handle proper categorization
-        try {
-          // Simple heuristic: assume 2/3 are members, 1/3 are non-members for mixed groups
-          const totalPlayers = reservation.players.length;
-          if (totalPlayers <= 2) {
-            // Small groups: assume all members
-            hourFee = totalPlayers * offPeakFeePerMember;
-          } else {
-            // Larger groups: use heuristic for mixed member/non-member pricing
-            const estimatedMembers = Math.ceil(totalPlayers * 0.67); // 67% members
-            const estimatedNonMembers = totalPlayers - estimatedMembers;
-            hourFee = (estimatedMembers * offPeakFeePerMember) + (estimatedNonMembers * offPeakFeePerNonMember);
-          }
-        } catch (error) {
-          // Ultimate fallback: treat all as members
-          hourFee = reservation.players.length * offPeakFeePerMember;
-        }
+
+    if (hasNewPlayerFormat) {
+      // December 2025+ pricing: Base rate + guest fees
+      const PEAK_BASE_FEE = 150;
+      const NON_PEAK_BASE_FEE = 100;
+      const GUEST_FEE = 70;
+
+      // Count members and guests
+      let memberCount = 0;
+      let guestCount = 0;
+
+      for (const player of reservation.players) {
+        const p = player as any;
+        if (p.isMember) memberCount++;
+        if (p.isGuest) guestCount++;
       }
-      
-      totalFee += hourFee;
+
+      // Calculate fee for each hour in the duration
+      const calculatedEndTimeSlot = reservation.endTimeSlot || (reservation.timeSlot + reservation.duration);
+      for (let hour = reservation.timeSlot; hour < calculatedEndTimeSlot; hour++) {
+        const isPeakHour = peakHours.includes(hour);
+        const baseFee = isPeakHour ? PEAK_BASE_FEE : NON_PEAK_BASE_FEE;
+        const hourFee = baseFee + (guestCount * GUEST_FEE);
+        totalFee += hourFee;
+      }
+    } else {
+      // Legacy pricing (pre-December 2025)
+      const peakHourFee = parseInt(process.env.PEAK_HOUR_FEE || '100');
+      const offPeakFeePerMember = parseInt(process.env.OFF_PEAK_FEE_PER_MEMBER || '20');
+      const offPeakFeePerNonMember = parseInt(process.env.OFF_PEAK_FEE_PER_NON_MEMBER || '50');
+
+      // Calculate fee for each hour in the duration
+      const calculatedEndTimeSlot = reservation.endTimeSlot || (reservation.timeSlot + reservation.duration);
+      for (let hour = reservation.timeSlot; hour < calculatedEndTimeSlot; hour++) {
+        let hourFee = 0;
+
+        if (peakHours.includes(hour)) {
+          // Peak hours: 100 pesos fixed fee per hour
+          hourFee = peakHourFee;
+        } else {
+          // Off-peak hours: use proper member/non-member calculation if frontend didn't provide
+          // This is a fallback - the frontend should handle proper categorization
+          try {
+            // Simple heuristic: assume 2/3 are members, 1/3 are non-members for mixed groups
+            const totalPlayers = reservation.players.length;
+            if (totalPlayers <= 2) {
+              // Small groups: assume all members
+              hourFee = totalPlayers * offPeakFeePerMember;
+            } else {
+              // Larger groups: use heuristic for mixed member/non-member pricing
+              const estimatedMembers = Math.ceil(totalPlayers * 0.67); // 67% members
+              const estimatedNonMembers = totalPlayers - estimatedMembers;
+              hourFee = (estimatedMembers * offPeakFeePerMember) + (estimatedNonMembers * offPeakFeePerNonMember);
+            }
+          } catch (error) {
+            // Ultimate fallback: treat all as members
+            hourFee = reservation.players.length * offPeakFeePerMember;
+          }
+        }
+
+        totalFee += hourFee;
+      }
     }
-    
+
     reservation.totalFee = totalFee;
   }
   
