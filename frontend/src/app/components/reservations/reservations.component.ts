@@ -214,8 +214,8 @@ interface Reservation {
               <div *ngFor="let player of playersArray.controls; let i = index" class="player-input">
                 <div class="field">
                   <label>
-                    <span *ngIf="i === 0">Player 1 (You) - Member (₱20)</span>
-                    <span *ngIf="i > 0">Player {{ i + 1 }} - Member (₱20)</span>
+                    <span *ngIf="i === 0">Player 1 (You) - Member</span>
+                    <span *ngIf="i > 0">Player {{ i + 1 }} - Member</span>
                   </label>
                   <div class="player-row">
                     <!-- Modern Custom Dropdown -->
