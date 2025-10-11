@@ -2408,36 +2408,59 @@ export class PaymentsComponent implements OnInit {
     const reservation = payment.reservationId;
     const players = reservation.players;
     const timeSlot = reservation.timeSlot;
-    const feeBreakdown = this.getPlayerFeeInfo(payment);
-    
+
     // Determine if it's peak hour for context
     const peakHours = [5, 18, 19, 21];
     const isPeakHour = peakHours.includes(timeSlot);
     const timeContext = isPeakHour ? ' (Peak)' : ' (Off-Peak)';
-    
-    // Build fee description
+
+    // Check if this is a December 2025 reservation (new player format)
+    const isNewFormat = players.length > 0 && typeof players[0] === 'object' && 'isMember' in players[0];
+
     let feeDescription = '';
-    if (feeBreakdown.memberCount > 0 && feeBreakdown.nonMemberCount > 0) {
-      // Mixed members and non-members
-      feeDescription = `${feeBreakdown.memberCount} members @ ₱${feeBreakdown.memberFee}, ${feeBreakdown.nonMemberCount} non-members @ ₱${feeBreakdown.nonMemberFee}`;
-    } else if (feeBreakdown.memberCount > 0) {
-      // Only members
-      const fee = feeBreakdown.memberFee;
-      feeDescription = `${feeBreakdown.memberCount} ${feeBreakdown.memberCount === 1 ? 'member' : 'members'} @ ₱${fee} each`;
-    } else if (feeBreakdown.nonMemberCount > 0) {
-      // Only non-members  
-      const fee = feeBreakdown.nonMemberFee;
-      feeDescription = `${feeBreakdown.nonMemberCount} non-${feeBreakdown.nonMemberCount === 1 ? 'member' : 'members'} @ ₱${fee} each`;
+    let playerNames: string[] = [];
+
+    if (isNewFormat) {
+      // December 2025 format: players are objects with {name, isMember, isGuest}
+      const memberCount = players.filter((p: any) => p.isMember).length;
+      const guestCount = players.filter((p: any) => p.isGuest).length;
+      playerNames = players.map((p: any) => p.name);
+
+      // Calculate December 2025 pricing
+      const PEAK_BASE = 150;
+      const NON_PEAK_BASE = 100;
+      const GUEST_FEE = 70;
+
+      const baseFee = isPeakHour ? PEAK_BASE : NON_PEAK_BASE;
+      const totalGuestFee = guestCount * GUEST_FEE;
+
+      if (guestCount > 0) {
+        feeDescription = `${memberCount} ${memberCount === 1 ? 'member' : 'members'}, ${guestCount} ${guestCount === 1 ? 'guest' : 'guests'} (Base: ₱${baseFee} + Guests: ₱${totalGuestFee})`;
+      } else {
+        feeDescription = `${memberCount} ${memberCount === 1 ? 'member' : 'members'} (Base: ₱${baseFee})`;
+      }
+    } else {
+      // Legacy format: players are strings, use old pricing logic
+      const feeBreakdown = this.getPlayerFeeInfo(payment);
+      playerNames = players;
+
+      if (feeBreakdown.memberCount > 0 && feeBreakdown.nonMemberCount > 0) {
+        feeDescription = `${feeBreakdown.memberCount} members @ ₱${feeBreakdown.memberFee}, ${feeBreakdown.nonMemberCount} non-members @ ₱${feeBreakdown.nonMemberFee}`;
+      } else if (feeBreakdown.memberCount > 0) {
+        feeDescription = `${feeBreakdown.memberCount} ${feeBreakdown.memberCount === 1 ? 'member' : 'members'} @ ₱${feeBreakdown.memberFee} each`;
+      } else if (feeBreakdown.nonMemberCount > 0) {
+        feeDescription = `${feeBreakdown.nonMemberCount} non-${feeBreakdown.nonMemberCount === 1 ? 'member' : 'members'} @ ₱${feeBreakdown.nonMemberFee} each`;
+      }
     }
-    
-    const playerCount = players.length;
-    
+
+    const playerCount = playerNames.length;
+
     if (playerCount <= 2) {
       // For 1-2 players, show names with fees
-      return `${players.join(', ')} • ${feeDescription}${timeContext}`;
+      return `${playerNames.join(', ')} • ${feeDescription}${timeContext}`;
     } else {
       // For 3+ players, show fee breakdown and names
-      return `${feeDescription}${timeContext}: ${players.join(', ')}`;
+      return `${feeDescription}${timeContext}: ${playerNames.join(', ')}`;
     }
   }
 
