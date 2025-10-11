@@ -168,7 +168,8 @@ export const getReservations = asyncHandler(async (req: AuthenticatedRequest, re
 // Get reservations for a specific date
 export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { date } = req.params;
-  
+  const { excludeId } = req.query; // Get excludeId from query params (for edit mode)
+
   if (!date) {
     res.status(400).json({
       success: false,
@@ -179,7 +180,18 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
 
   const queryDate = new Date(date);
   console.log(`🔍 QUERY DEBUG: Requested date: ${date}, Parsed queryDate: ${queryDate.toISOString()}`);
-  const reservations = await (Reservation as any).getReservationsForDate(queryDate);
+  if (excludeId) {
+    console.log(`🔍 EDIT MODE: Excluding reservation ID ${excludeId} from availability checks`);
+  }
+
+  let reservations = await (Reservation as any).getReservationsForDate(queryDate);
+
+  // Filter out the excluded reservation if in edit mode
+  if (excludeId) {
+    reservations = reservations.filter((r: any) => r._id.toString() !== excludeId);
+    console.log(`🔍 EDIT MODE: After excluding ${excludeId}, ${reservations.length} reservations remain`);
+  }
+
   console.log(`🔍 QUERY DEBUG: Found ${reservations.length} reservations for date ${date}`);
 
   // Check for Open Play blocked slots
