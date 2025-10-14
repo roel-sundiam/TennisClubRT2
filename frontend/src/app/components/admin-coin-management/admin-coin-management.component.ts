@@ -17,7 +17,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatChipsModule } from '@angular/material/chips';
 import { Router } from '@angular/router';
-import { CoinService, CoinTransaction, CoinStats, AdminCoinAction } from '../../services/coin.service';
+import { CoinService, CoinTransaction, CoinStats, AdminCoinAction, CoinPurchaseReport } from '../../services/coin.service';
 import { AuthService } from '../../services/auth.service';
 import { MemberService, Member } from '../../services/member.service';
 
@@ -510,6 +510,233 @@ interface User {
             </mat-card>
           </div>
         </mat-tab>
+
+        <!-- Coin Purchases Report Tab -->
+        <mat-tab label="Coin Purchases Report">
+          <div class="tab-content">
+            <!-- Summary Statistics -->
+            <div class="stats-grid" *ngIf="purchaseReport">
+              <mat-card class="stat-card">
+                <mat-card-header>
+                  <mat-icon mat-card-avatar>shopping_cart</mat-icon>
+                  <mat-card-title>Total Purchases</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="stat-value">{{purchaseReport.summary.totalPurchases | number}}</div>
+                  <div class="stat-label">All Time</div>
+                </mat-card-content>
+              </mat-card>
+
+              <mat-card class="stat-card">
+                <mat-card-header>
+                  <mat-icon mat-card-avatar>monetization_on</mat-icon>
+                  <mat-card-title>Total Coins</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="stat-value">{{purchaseReport.summary.totalCoins | number}}</div>
+                  <div class="stat-label">Coins Purchased</div>
+                </mat-card-content>
+              </mat-card>
+
+              <mat-card class="stat-card">
+                <mat-card-header>
+                  <mat-icon mat-card-avatar>payments</mat-icon>
+                  <mat-card-title>Total Revenue</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="stat-value">₱{{purchaseReport.summary.totalCostPHP | number:'1.2-2'}}</div>
+                  <div class="stat-label">Total Cost (PHP)</div>
+                </mat-card-content>
+              </mat-card>
+            </div>
+
+            <!-- Status Breakdown -->
+            <mat-card class="breakdown-card" *ngIf="purchaseReport && purchaseReport.statusBreakdown.length > 0">
+              <mat-card-header>
+                <mat-icon mat-card-avatar>assessment</mat-icon>
+                <mat-card-title>Status Breakdown</mat-card-title>
+              </mat-card-header>
+              <mat-card-content>
+                <div class="breakdown-grid">
+                  <div class="breakdown-item" *ngFor="let item of purchaseReport.statusBreakdown">
+                    <div class="breakdown-header">
+                      <mat-chip [class]="getStatusBadgeClass(item.status)">
+                        {{item.status | titlecase}}
+                      </mat-chip>
+                      <span class="breakdown-count">{{item.count}} purchases</span>
+                    </div>
+                    <div class="breakdown-stats">
+                      <div class="breakdown-stat">
+                        <span class="stat-label">Coins:</span>
+                        <span class="stat-value">{{item.totalCoins | number}}</span>
+                      </div>
+                      <div class="breakdown-stat">
+                        <span class="stat-label">Cost:</span>
+                        <span class="stat-value">₱{{item.totalCostPHP | number:'1.2-2'}}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+
+            <!-- Payment Method Breakdown -->
+            <mat-card class="breakdown-card" *ngIf="purchaseReport && purchaseReport.paymentMethodBreakdown.length > 0">
+              <mat-card-header>
+                <mat-icon mat-card-avatar>payment</mat-icon>
+                <mat-card-title>Payment Method Breakdown</mat-card-title>
+              </mat-card-header>
+              <mat-card-content>
+                <div class="breakdown-grid">
+                  <div class="breakdown-item" *ngFor="let item of purchaseReport.paymentMethodBreakdown">
+                    <div class="breakdown-header">
+                      <strong>{{item.paymentMethod | titlecase}}</strong>
+                      <span class="breakdown-count">{{item.count}} purchases</span>
+                    </div>
+                    <div class="breakdown-stats">
+                      <div class="breakdown-stat">
+                        <span class="stat-label">Coins:</span>
+                        <span class="stat-value">{{item.totalCoins | number}}</span>
+                      </div>
+                      <div class="breakdown-stat">
+                        <span class="stat-label">Cost:</span>
+                        <span class="stat-value">₱{{item.totalCostPHP | number:'1.2-2'}}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+
+            <!-- Filters -->
+            <mat-card class="filter-card">
+              <mat-card-header>
+                <mat-icon mat-card-avatar>filter_list</mat-icon>
+                <mat-card-title>Filters</mat-card-title>
+              </mat-card-header>
+              <mat-card-content>
+                <form [formGroup]="purchaseReportFilterForm" class="filter-form">
+                  <div class="filter-row">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Start Date</mat-label>
+                      <input matInput [matDatepicker]="startPicker" formControlName="startDate">
+                      <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+                      <mat-datepicker #startPicker></mat-datepicker>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>End Date</mat-label>
+                      <input matInput [matDatepicker]="endPicker" formControlName="endDate">
+                      <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+                      <mat-datepicker #endPicker></mat-datepicker>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>Status</mat-label>
+                      <mat-select formControlName="status">
+                        <mat-option value="all">All</mat-option>
+                        <mat-option value="pending">Pending</mat-option>
+                        <mat-option value="completed">Completed</mat-option>
+                        <mat-option value="failed">Failed/Rejected</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                  </div>
+
+                  <div class="filter-actions">
+                    <button mat-raised-button color="primary" (click)="applyPurchaseReportFilters()">
+                      <mat-icon>search</mat-icon>
+                      Apply Filters
+                    </button>
+                    <button mat-button (click)="clearPurchaseReportFilters()">
+                      <mat-icon>clear</mat-icon>
+                      Clear
+                    </button>
+                  </div>
+                </form>
+              </mat-card-content>
+            </mat-card>
+
+            <!-- Purchase List Table -->
+            <mat-card class="purchase-list-card" *ngIf="purchaseReport">
+              <mat-card-header>
+                <mat-icon mat-card-avatar>list</mat-icon>
+                <mat-card-title>Purchase Transactions</mat-card-title>
+                <mat-card-subtitle>{{purchaseReportTotal}} total purchases</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <div class="table-container">
+                  <table mat-table [dataSource]="purchaseReport.purchases" class="purchase-table">
+                    <ng-container matColumnDef="date">
+                      <th mat-header-cell *matHeaderCellDef>Date</th>
+                      <td mat-cell *matCellDef="let purchase">
+                        {{purchase.createdAt | date:'short'}}
+                      </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="user">
+                      <th mat-header-cell *matHeaderCellDef>User</th>
+                      <td mat-cell *matCellDef="let purchase">
+                        <div class="user-info">
+                          <strong>{{purchase.userId?.fullName ? purchase.userId.fullName : 'Unknown'}}</strong>
+                          <small>@{{purchase.userId?.username ? purchase.userId.username : 'unknown'}}</small>
+                        </div>
+                      </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="amount">
+                      <th mat-header-cell *matHeaderCellDef>Coins</th>
+                      <td mat-cell *matCellDef="let purchase">
+                        <span class="coin-amount">{{purchase.amount | number}} coins</span>
+                      </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="cost">
+                      <th mat-header-cell *matHeaderCellDef>Cost (PHP)</th>
+                      <td mat-cell *matCellDef="let purchase">
+                        <span class="cost-amount">₱{{(purchase.metadata?.costInPHP ? purchase.metadata.costInPHP : purchase.amount) | number:'1.2-2'}}</span>
+                      </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="paymentMethod">
+                      <th mat-header-cell *matHeaderCellDef>Payment Method</th>
+                      <td mat-cell *matCellDef="let purchase">
+                        {{purchase.metadata?.paymentMethod ? (purchase.metadata.paymentMethod | titlecase) : 'N/A'}}
+                      </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="reference">
+                      <th mat-header-cell *matHeaderCellDef>Reference</th>
+                      <td mat-cell *matCellDef="let purchase">
+                        <small>{{purchase.referenceId ? purchase.referenceId : 'N/A'}}</small>
+                      </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="status">
+                      <th mat-header-cell *matHeaderCellDef>Status</th>
+                      <td mat-cell *matCellDef="let purchase">
+                        <mat-chip [class]="getStatusBadgeClass(purchase.status ? purchase.status : 'unknown')">
+                          {{purchase.status | titlecase}}
+                        </mat-chip>
+                      </td>
+                    </ng-container>
+
+                    <tr mat-header-row *matHeaderRowDef="purchaseReportColumns"></tr>
+                    <tr mat-row *matRowDef="let row; columns: purchaseReportColumns;"></tr>
+                  </table>
+                </div>
+
+                <mat-paginator
+                  [length]="purchaseReportTotal"
+                  [pageSize]="purchaseReportPageSize"
+                  [pageIndex]="purchaseReportPage"
+                  [pageSizeOptions]="[10, 25, 50, 100]"
+                  (page)="onPurchaseReportPageChange($event)"
+                  showFirstLastButtons>
+                </mat-paginator>
+              </mat-card-content>
+            </mat-card>
+          </div>
+        </mat-tab>
       </mat-tab-group>
     </div>
   `,
@@ -800,17 +1027,166 @@ interface User {
       color: white;
     }
 
+    /* Purchase Report Styles */
+    .breakdown-card {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    .breakdown-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .breakdown-item {
+      padding: 16px;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      background: #f9f9f9;
+      transition: box-shadow 0.3s ease;
+    }
+
+    .breakdown-item:hover {
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .breakdown-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .breakdown-count {
+      color: #666;
+      font-size: 0.9em;
+    }
+
+    .breakdown-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .breakdown-stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .breakdown-stat .stat-label {
+      color: #666;
+      font-size: 0.9em;
+    }
+
+    .breakdown-stat .stat-value {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .filter-card {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    .filter-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .filter-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .filter-row mat-form-field {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .filter-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    .purchase-list-card {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    .purchase-table {
+      width: 100%;
+      min-width: 900px;
+    }
+
+    .coin-amount {
+      font-weight: 600;
+      color: #667eea;
+    }
+
+    .cost-amount {
+      font-weight: 600;
+      color: #4caf50;
+    }
+
+    .status-completed {
+      background: #4caf50;
+      color: white;
+    }
+
+    .status-pending {
+      background: #ff9800;
+      color: white;
+    }
+
+    .status-failed {
+      background: #f44336;
+      color: white;
+    }
+
+    .status-unknown {
+      background: #9e9e9e;
+      color: white;
+    }
+
     @media (max-width: 768px) {
       .admin-coin-container {
         padding: 16px;
       }
-      
+
       .stats-grid {
         grid-template-columns: 1fr;
       }
-      
+
       .distribution-grid {
         grid-template-columns: 1fr;
+      }
+
+      .breakdown-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .filter-row {
+        flex-direction: column;
+      }
+
+      .filter-row mat-form-field {
+        width: 100%;
+      }
+
+      .filter-actions {
+        flex-direction: column;
+      }
+
+      .filter-actions button {
+        width: 100%;
       }
 
       .purchase-header {
@@ -864,6 +1240,14 @@ export class AdminCoinManagementComponent implements OnInit {
   memberPageSize = 25;
   memberTotal = 0;
 
+  // Purchase Report
+  purchaseReport: CoinPurchaseReport | null = null;
+  purchaseReportColumns = ['date', 'user', 'amount', 'cost', 'paymentMethod', 'reference', 'status'];
+  purchaseReportPage = 0;
+  purchaseReportPageSize = 10;
+  purchaseReportTotal = 0;
+  purchaseReportFilterForm: FormGroup;
+
   constructor(
     private fb: FormBuilder,
     private coinService: CoinService,
@@ -885,6 +1269,12 @@ export class AdminCoinManagementComponent implements OnInit {
       amount: [10, [Validators.required, Validators.min(1), Validators.max(1000)]],
       reason: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(200)]]
     });
+
+    this.purchaseReportFilterForm = this.fb.group({
+      startDate: [null],
+      endDate: [null],
+      status: ['all']
+    });
   }
 
   ngOnInit(): void {
@@ -905,14 +1295,15 @@ export class AdminCoinManagementComponent implements OnInit {
   private loadInitialData(): void {
     console.log('Loading initial data...');
     this.isLoading = true;
-    
+
     // Load all data in parallel
     Promise.all([
       this.loadCoinStats(),
       this.loadUsers(),
       this.loadMembers(),
       this.loadRecentTransactions(),
-      this.loadPendingPurchases()
+      this.loadPendingPurchases(),
+      this.loadPurchaseReport()
     ]).finally(() => {
       console.log('All initial data loaded');
       console.log('Final users array:', this.users);
@@ -1096,6 +1487,69 @@ export class AdminCoinManagementComponent implements OnInit {
     this.memberPage = event.pageIndex;
     this.memberPageSize = event.pageSize;
     this.loadMembers();
+  }
+
+  private loadPurchaseReport(): Promise<void> {
+    return new Promise((resolve) => {
+      const filters = this.purchaseReportFilterForm.value;
+      const startDate = filters.startDate ? new Date(filters.startDate).toISOString() : undefined;
+      const endDate = filters.endDate ? new Date(filters.endDate).toISOString() : undefined;
+      const status = filters.status !== 'all' ? filters.status : undefined;
+
+      this.coinService.getCoinPurchaseReport(
+        startDate,
+        endDate,
+        status,
+        this.purchaseReportPage + 1,
+        this.purchaseReportPageSize
+      ).subscribe({
+        next: (response) => {
+          if (response.success) {
+            this.purchaseReport = response.data;
+            this.purchaseReportTotal = response.pagination.total;
+          }
+          resolve();
+        },
+        error: (error) => {
+          console.error('Error loading purchase report:', error);
+          resolve();
+        }
+      });
+    });
+  }
+
+  onPurchaseReportPageChange(event: PageEvent): void {
+    this.purchaseReportPage = event.pageIndex;
+    this.purchaseReportPageSize = event.pageSize;
+    this.loadPurchaseReport();
+  }
+
+  applyPurchaseReportFilters(): void {
+    this.purchaseReportPage = 0; // Reset to first page
+    this.loadPurchaseReport();
+  }
+
+  clearPurchaseReportFilters(): void {
+    this.purchaseReportFilterForm.reset({
+      startDate: null,
+      endDate: null,
+      status: 'all'
+    });
+    this.purchaseReportPage = 0;
+    this.loadPurchaseReport();
+  }
+
+  getStatusBadgeClass(status: string): string {
+    switch (status) {
+      case 'completed':
+        return 'status-completed';
+      case 'pending':
+        return 'status-pending';
+      case 'failed':
+        return 'status-failed';
+      default:
+        return 'status-unknown';
+    }
   }
 
   refreshData(): void {
