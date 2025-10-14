@@ -645,20 +645,11 @@ interface Notification {
                         Pay Now
                       </button>
 
-                      <!-- Court reservations can be marked as paid if cash -->
-                      <button
-                        class="pay-btn"
-                        (click)="processPayment(payment._id)"
-                        *ngIf="payment.reservationId && payment.paymentMethod === 'cash'"
-                        [disabled]="processing.includes(payment._id)">
-                        {{processing.includes(payment._id) ? 'Processing...' : 'Mark as Paid'}}
-                      </button>
-
-                      <!-- Other payment methods should show Pay Now -->
+                      <!-- Court reservations - always show Pay Now to enter payment information -->
                       <button
                         class="pay-btn"
                         (click)="payForExistingPayment(payment)"
-                        *ngIf="payment.reservationId && payment.paymentMethod !== 'cash'">
+                        *ngIf="payment.reservationId">
                         Pay Now
                       </button>
                     </div>
