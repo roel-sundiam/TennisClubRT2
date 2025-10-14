@@ -1328,12 +1328,12 @@ export const checkMyOverduePayments = asyncHandler(async (req: AuthenticatedRequ
 
   console.log('🔍 Checking overdue payments for user:', req.user.username);
 
-  // Check for overdue payments (1+ days past due)
+  // Check for overdue payments (1+ days past due) - SIMPLIFIED: Only check Payment records
   const oneDayAgo = new Date();
   oneDayAgo.setDate(oneDayAgo.getDate() - 1);
   oneDayAgo.setHours(23, 59, 59, 999);
 
-  // Check 1: Payment collection for pending overdue payments
+  // Check Payment collection for pending overdue payments
   const overduePayments = await Payment.find({
     userId: req.user._id,
     status: 'pending',
@@ -1342,54 +1342,22 @@ export const checkMyOverduePayments = asyncHandler(async (req: AuthenticatedRequ
 
   console.log(`🔍 Found ${overduePayments.length} overdue Payment records`);
 
-  // Check 2: Reservations with pending payment status where reservation date has passed
-  const overdueReservations = await Reservation.find({
-    userId: req.user._id,
-    paymentStatus: 'pending',
-    date: { $lt: oneDayAgo },
-    status: { $in: ['pending', 'confirmed'] }
-  }).lean();
+  // Format overdue payment details
+  const overdueDetails = overduePayments.map(payment => ({
+    type: 'payment',
+    id: payment._id,
+    amount: payment.amount,
+    dueDate: payment.dueDate,
+    daysOverdue: Math.ceil((new Date().getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24)),
+    description: payment.description || 'Payment'
+  }));
 
-  console.log(`🔍 Found ${overdueReservations.length} overdue Reservations`);
-
-  // Format overdue details
-  const overdueDetails: any[] = [];
-
-  // Add Payment records
-  overduePayments.forEach(payment => {
-    const daysOverdue = Math.ceil((new Date().getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24));
-    overdueDetails.push({
-      type: 'payment',
-      id: payment._id,
-      amount: payment.amount,
-      dueDate: payment.dueDate,
-      daysOverdue: daysOverdue,
-      description: payment.description || 'Payment'
-    });
-  });
-
-  // Add Reservation records
-  overdueReservations.forEach(reservation => {
-    const daysOverdue = Math.ceil((new Date().getTime() - new Date(reservation.date).getTime()) / (1000 * 60 * 60 * 24));
-    const description = `Court reservation for ${new Date(reservation.date).toDateString()} ${reservation.timeSlot}:00-${(reservation.endTimeSlot || reservation.timeSlot + 1)}:00`;
-    overdueDetails.push({
-      type: 'reservation',
-      id: reservation._id,
-      amount: reservation.totalFee || 0,
-      dueDate: reservation.date,
-      daysOverdue: daysOverdue,
-      description: description
-    });
-  });
-
-  const totalOverdue = overdueDetails.length;
-
-  console.log(`🔍 Total overdue items: ${totalOverdue}`);
+  console.log(`🔍 Total overdue payments: ${overdueDetails.length}`);
 
   return res.status(200).json({
     success: true,
-    hasOverdue: totalOverdue > 0,
-    count: totalOverdue,
+    hasOverdue: overdueDetails.length > 0,
+    count: overdueDetails.length,
     overduePayments: overdueDetails
   });
 });

@@ -337,56 +337,29 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
     return;
   }
 
-  // Check for overdue payments (1+ days past due)
+  // Check for overdue payments (1+ days past due) - SIMPLIFIED: Only check Payment records
   const oneDayAgo = new Date();
   oneDayAgo.setDate(oneDayAgo.getDate() - 1);
   oneDayAgo.setHours(23, 59, 59, 999);
 
-  // Check 1: Payment collection for pending overdue payments
+  // Check Payment collection for pending overdue payments
   const overduePayments = await Payment.find({
     userId: req.user._id,
     status: 'pending',
     dueDate: { $lt: oneDayAgo }
   });
 
-  // Check 2: Reservations with pending payment status where reservation date has passed
-  const overdueReservations = await Reservation.find({
-    userId: req.user._id,
-    paymentStatus: 'pending',
-    date: { $lt: oneDayAgo },
-    status: { $in: ['pending', 'confirmed'] }
-  });
+  if (overduePayments.length > 0) {
+    // Format overdue payment details
+    const overdueDetails = overduePayments.map(p => ({
+      id: p._id,
+      amount: p.amount,
+      dueDate: p.dueDate,
+      daysOverdue: Math.ceil((Date.now() - p.dueDate.getTime()) / (1000 * 60 * 60 * 24)),
+      description: p.description
+    }));
 
-  const totalOverdue = overduePayments.length + overdueReservations.length;
-
-  if (totalOverdue > 0) {
-    // Format overdue details
-    const overdueDetails: any[] = [];
-
-    // Add payment records
-    overduePayments.forEach(p => {
-      overdueDetails.push({
-        id: p._id,
-        amount: p.amount,
-        dueDate: p.dueDate,
-        daysOverdue: Math.ceil((Date.now() - p.dueDate.getTime()) / (1000 * 60 * 60 * 24)),
-        description: p.description
-      });
-    });
-
-    // Add reservation records without payment
-    overdueReservations.forEach(r => {
-      const daysOverdue = Math.ceil((Date.now() - r.date.getTime()) / (1000 * 60 * 60 * 24));
-      overdueDetails.push({
-        id: r._id,
-        amount: r.totalFee || 0,
-        dueDate: r.date,
-        daysOverdue: daysOverdue,
-        description: `Court reservation payment for ${r.date.toDateString()} ${r.timeSlot}:00-${(r.endTimeSlot || r.timeSlot + 1)}:00`
-      });
-    });
-
-    console.log(`⚠️ User ${req.user.username} has ${totalOverdue} overdue payment(s) (${overduePayments.length} payments + ${overdueReservations.length} unpaid reservations), blocking reservation`);
+    console.log(`⚠️ User ${req.user.username} has ${overduePayments.length} overdue payment(s), blocking reservation`);
 
     res.status(403).json({
       success: false,
