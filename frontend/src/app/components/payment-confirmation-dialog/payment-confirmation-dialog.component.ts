@@ -5,7 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 
 export interface PaymentConfirmationData {
-  action: 'approve' | 'record';
+  action: 'approve' | 'record' | 'cancel';
   paymentId: string;
   referenceNumber: string;
   memberName: string;
@@ -31,8 +31,11 @@ export interface PaymentConfirmationResult {
   template: `
     <div class="confirmation-dialog">
       <div class="dialog-header">
-        <mat-icon class="action-icon" [class.approve-icon]="data.action === 'approve'" [class.record-icon]="data.action === 'record'">
-          {{data.action === 'approve' ? 'check_circle' : 'verified'}}
+        <mat-icon class="action-icon"
+                  [class.approve-icon]="data.action === 'approve'"
+                  [class.record-icon]="data.action === 'record'"
+                  [class.cancel-icon]="data.action === 'cancel'">
+          {{data.action === 'approve' ? 'check_circle' : (data.action === 'cancel' ? 'cancel' : 'verified')}}
         </mat-icon>
         <h2 mat-dialog-title>{{getActionTitle()}}</h2>
       </div>
@@ -71,6 +74,11 @@ export interface PaymentConfirmationResult {
           <mat-icon>warning</mat-icon>
           <span>This action cannot be undone. The payment will be marked as fully recorded.</span>
         </div>
+
+        <div class="warning-message cancel-warning" *ngIf="data.action === 'cancel'">
+          <mat-icon>warning</mat-icon>
+          <span>This payment will be cancelled and moved to the Archived Payments tab. The reservation payment status will be reverted to pending.</span>
+        </div>
       </div>
 
       <div mat-dialog-actions class="dialog-actions">
@@ -78,12 +86,12 @@ export interface PaymentConfirmationResult {
           <mat-icon>close</mat-icon>
           Cancel
         </button>
-        <button 
-          mat-raised-button 
-          [color]="getConfirmButtonColor()" 
-          (click)="onConfirm()" 
+        <button
+          mat-raised-button
+          [color]="getConfirmButtonColor()"
+          (click)="onConfirm()"
           class="confirm-button">
-          <mat-icon>{{data.action === 'approve' ? 'check' : 'verified'}}</mat-icon>
+          <mat-icon>{{data.action === 'approve' ? 'check' : (data.action === 'cancel' ? 'cancel' : 'verified')}}</mat-icon>
           {{getActionTitle()}}
         </button>
       </div>
@@ -116,6 +124,10 @@ export interface PaymentConfirmationResult {
 
     .record-icon {
       color: #4caf50;
+    }
+
+    .cancel-icon {
+      color: #f44336;
     }
 
     h2 {
@@ -190,6 +202,16 @@ export interface PaymentConfirmationResult {
       height: 20px;
     }
 
+    .cancel-warning {
+      background: #ffebee;
+      border: 1px solid #ef9a9a;
+      color: #c62828;
+    }
+
+    .cancel-warning mat-icon {
+      color: #f44336;
+    }
+
     .dialog-actions {
       display: flex;
       justify-content: flex-end;
@@ -239,19 +261,25 @@ export class PaymentConfirmationDialogComponent {
   ) {}
 
   getActionTitle(): string {
-    return this.data.action === 'approve' ? 'Approve Payment' : 'Record Payment';
+    if (this.data.action === 'approve') return 'Approve Payment';
+    if (this.data.action === 'cancel') return 'Cancel Payment';
+    return 'Record Payment';
   }
 
   getConfirmationMessage(): string {
     if (this.data.action === 'approve') {
       return `Are you sure you want to approve this payment? This will mark the payment as approved and ready to be recorded.`;
+    } else if (this.data.action === 'cancel') {
+      return `Are you sure you want to cancel this payment? This will move the payment to the Archived Payments tab and revert the reservation payment status to pending.`;
     } else {
       return `Are you sure you want to record this payment? This will mark the payment as fully processed and recorded in the system.`;
     }
   }
 
   getConfirmButtonColor(): string {
-    return this.data.action === 'approve' ? 'primary' : 'accent';
+    if (this.data.action === 'approve') return 'primary';
+    if (this.data.action === 'cancel') return 'warn';
+    return 'accent';
   }
 
   formatPaymentMethod(method: string): string {

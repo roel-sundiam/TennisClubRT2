@@ -389,16 +389,45 @@ interface PaymentsReportData {
                 <ng-container matColumnDef="actions">
                   <th mat-header-cell *matHeaderCellDef>Actions</th>
                   <td mat-cell *matCellDef="let payment">
-                    <button 
-                      mat-raised-button 
-                      [color]="getButtonColorForStatus(payment.status)"
-                      [disabled]="isButtonDisabled(payment.status) || processingPaymentId === payment._id"
-                      (click)="onPaymentAction(payment)"
-                      class="action-button">
-                      <mat-icon *ngIf="processingPaymentId === payment._id" class="spinner">hourglass_empty</mat-icon>
-                      <span *ngIf="processingPaymentId !== payment._id">{{getButtonTextForStatus(payment.status)}}</span>
-                      <span *ngIf="processingPaymentId === payment._id">Processing...</span>
-                    </button>
+                    <div class="action-buttons">
+                      <!-- Approve button for pending payments -->
+                      <button
+                        *ngIf="payment.status === 'pending'"
+                        mat-raised-button
+                        color="primary"
+                        [disabled]="processingPaymentId === payment._id || processing.includes(payment._id)"
+                        (click)="approvePayment(payment)"
+                        class="action-button">
+                        <mat-icon *ngIf="processing.includes(payment._id)" class="spinner">hourglass_empty</mat-icon>
+                        <span *ngIf="!processing.includes(payment._id)">Approve</span>
+                        <span *ngIf="processing.includes(payment._id)">Processing...</span>
+                      </button>
+
+                      <!-- Record and Cancel buttons for completed payments -->
+                      <button
+                        *ngIf="payment.status === 'completed'"
+                        mat-raised-button
+                        color="accent"
+                        [disabled]="processingPaymentId === payment._id || processing.includes(payment._id)"
+                        (click)="recordPayment(payment)"
+                        class="action-button"
+                        style="margin-right: 8px;">
+                        <mat-icon *ngIf="processing.includes(payment._id)" class="spinner">hourglass_empty</mat-icon>
+                        <span *ngIf="!processing.includes(payment._id)">Record</span>
+                        <span *ngIf="processing.includes(payment._id)">Processing...</span>
+                      </button>
+
+                      <button
+                        *ngIf="payment.status === 'completed'"
+                        mat-raised-button
+                        color="warn"
+                        [disabled]="processing.includes(payment._id)"
+                        (click)="cancelPayment(payment)"
+                        class="action-button cancel-button">
+                        <mat-icon>cancel</mat-icon>
+                        Cancel
+                      </button>
+                    </div>
                   </td>
                 </ng-container>
 
@@ -410,7 +439,7 @@ interface PaymentsReportData {
                   <div *ngIf="getActivePayments().length === 0" class="no-data">
                     <mat-icon>receipt_long</mat-icon>
                     <h3>No active payments found</h3>
-                    <p>No pending or completed court payments found for the selected date range.</p>
+                    <p>No approved court payments ready to be recorded for the selected date range.</p>
                   </div>
                 </div>
               </mat-tab>
@@ -1979,7 +2008,7 @@ export class CourtReceiptsReportComponent implements OnInit {
     if (!this.reportData || !this.reportData.payments) {
       return [];
     }
-    return this.reportData.payments.filter(payment => 
+    return this.reportData.payments.filter(payment =>
       payment.status === 'completed'
     );
   }
@@ -1988,8 +2017,8 @@ export class CourtReceiptsReportComponent implements OnInit {
     if (!this.reportData || !this.reportData.payments) {
       return [];
     }
-    return this.reportData.payments.filter(payment => 
-      payment.status === 'record'
+    return this.reportData.payments.filter(payment =>
+      payment.status === 'record' || payment.status === 'refunded' || payment.status === 'failed'
     );
   }
 
@@ -1998,8 +2027,8 @@ export class CourtReceiptsReportComponent implements OnInit {
       'pending': 'Pending',
       'completed': 'Approved',
       'record': 'Recorded',
-      'failed': 'Failed',
-      'refunded': 'Refunded'
+      'failed': 'Cancelled',
+      'refunded': 'Cancelled'
     };
     return statusLabels[status] || status;
   }
@@ -2050,8 +2079,8 @@ export class CourtReceiptsReportComponent implements OnInit {
         memberName: payment.memberName,
         amount: payment.amount,
         referenceNumber: payment.referenceNumber,
-        description: payment.reservationDate ? 
-          `${new Date(payment.reservationDate).toLocaleDateString()} - ${payment.timeSlotDisplay}` : 
+        description: payment.reservationDate ?
+          `${new Date(payment.reservationDate).toLocaleDateString()} - ${payment.timeSlotDisplay}` :
           undefined
       } as UnrecordDialogData,
       disableClose: true,
@@ -2067,18 +2096,68 @@ export class CourtReceiptsReportComponent implements OnInit {
         }).subscribe({
           next: (response: any) => {
             this.processing = this.processing.filter(id => id !== paymentId);
-            this.snackBar.open('✅ Payment unrecorded successfully', 'Close', { 
+            this.snackBar.open('✅ Payment unrecorded successfully', 'Close', {
               duration: 4000,
               panelClass: ['success-snack']
             });
-            
+
             // Refresh the report data to show the changes
             this.loadReport();
           },
           error: (error) => {
             this.processing = this.processing.filter(id => id !== paymentId);
             const message = error.error?.error || 'Failed to unrecord payment';
-            this.snackBar.open(`❌ ${message}`, 'Close', { 
+            this.snackBar.open(`❌ ${message}`, 'Close', {
+              duration: 5000,
+              panelClass: ['error-snack']
+            });
+          }
+        });
+      }
+    });
+  }
+
+  cancelPayment(payment: PaymentRecord): void {
+    // Open confirmation dialog
+    const dialogData: PaymentConfirmationData = {
+      action: 'cancel',
+      paymentId: payment._id,
+      referenceNumber: payment.referenceNumber,
+      memberName: payment.memberName,
+      amount: payment.amount,
+      paymentMethod: payment.paymentMethod,
+      reservationDate: this.formatDate(payment.reservationDate),
+      timeSlot: payment.timeSlotDisplay
+    };
+
+    const dialogRef = this.dialog.open(PaymentConfirmationDialogComponent, {
+      width: '500px',
+      maxWidth: '95vw',
+      disableClose: true,
+      data: dialogData
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result && result.confirmed) {
+        this.processing.push(payment._id);
+
+        this.http.put(`${this.baseUrl}/payments/${payment._id}/cancel`, {
+          reason: result.reason || 'Cancelled by admin'
+        }).subscribe({
+          next: (response: any) => {
+            this.processing = this.processing.filter(id => id !== payment._id);
+            this.snackBar.open('✅ Payment cancelled successfully', 'Close', {
+              duration: 4000,
+              panelClass: ['success-snack']
+            });
+
+            // Refresh the report data to show the changes
+            this.loadReport();
+          },
+          error: (error) => {
+            this.processing = this.processing.filter(id => id !== payment._id);
+            const message = error.error?.error || 'Failed to cancel payment';
+            this.snackBar.open(`❌ ${message}`, 'Close', {
               duration: 5000,
               panelClass: ['error-snack']
             });
