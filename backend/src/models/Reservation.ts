@@ -39,8 +39,8 @@ const reservationSchema = new Schema<IReservationDocument>({
   status: {
     type: String,
     enum: {
-      values: ['pending', 'confirmed', 'cancelled', 'completed'],
-      message: 'Status must be pending, confirmed, cancelled, or completed'
+      values: ['pending', 'confirmed', 'cancelled', 'completed', 'no-show'],
+      message: 'Status must be pending, confirmed, cancelled, completed, or no-show'
     },
     default: 'pending',
     index: true

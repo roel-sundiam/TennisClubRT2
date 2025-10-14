@@ -144,6 +144,30 @@ export const getReservations = asyncHandler(async (req: AuthenticatedRequest, re
   console.log('- Final filter:', JSON.stringify(filter));
   console.log('- Will show all users?', req.user?.role !== 'member' || req.query.showAll === 'true');
 
+  // Auto-mark past pending reservations as 'no-show'
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(23, 59, 59, 999);
+
+  try {
+    const updateResult = await Reservation.updateMany(
+      {
+        status: 'pending',
+        date: { $lt: yesterday }
+      },
+      {
+        $set: { status: 'no-show' }
+      }
+    );
+
+    if (updateResult.modifiedCount > 0) {
+      console.log(`🔄 Auto-marked ${updateResult.modifiedCount} past pending reservation(s) as 'no-show'`);
+    }
+  } catch (error) {
+    console.error('Error auto-marking no-show reservations:', error);
+    // Continue with normal flow even if auto-marking fails
+  }
+
   const total = await Reservation.countDocuments(filter);
   const reservations = await Reservation.find(filter)
     .populate('userId', 'username fullName email')
@@ -1172,7 +1196,7 @@ export const updateReservationStatus = asyncHandler(async (req: AuthenticatedReq
   const { id } = req.params;
   const { status } = req.body;
 
-  if (!['pending', 'confirmed', 'cancelled', 'completed'].includes(status)) {
+  if (!['pending', 'confirmed', 'cancelled', 'completed', 'no-show'].includes(status)) {
     res.status(400).json({
       success: false,
       error: 'Invalid status'

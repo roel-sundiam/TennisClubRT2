@@ -720,11 +720,27 @@ $container-padding-mobile: 1rem;
       color: white;
       border: none;
       box-shadow: 0 2px 8px rgba(107, 114, 128, 0.3);
-      
+
       &:hover {
         transform: translateY(-1px) scale(1.02);
         box-shadow: 0 4px 12px rgba(107, 114, 128, 0.4);
-        
+
+        &::before {
+          left: 100%;
+        }
+      }
+    }
+
+    &.status-no-show {
+      background: linear-gradient(135deg, #7f1d1d, #991b1b);
+      color: white;
+      border: none;
+      box-shadow: 0 2px 8px rgba(127, 29, 29, 0.3);
+
+      &:hover {
+        transform: translateY(-1px) scale(1.02);
+        box-shadow: 0 4px 12px rgba(127, 29, 29, 0.4);
+
         &::before {
           left: 100%;
         }
@@ -2077,6 +2093,15 @@ button:focus {
 
       .stat-value {
         color: #388E3C;
+      }
+    }
+
+    &.status-no-show {
+      border-left-color: #7f1d1d;
+      background: linear-gradient(135deg, #ffffff 0%, rgba(127, 29, 29, 0.03) 100%);
+
+      .stat-value {
+        color: #991b1b;
       }
     }
 

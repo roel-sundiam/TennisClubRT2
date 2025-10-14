@@ -127,7 +127,7 @@ export interface CourtReservation {
   date: Date;
   timeSlot: number;
   players: string[] | ReservationPlayer[]; // Support both formats for backward compatibility
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no-show';
   paymentStatus: 'pending' | 'paid' | 'overdue';
   paymentIds?: string[]; // Track multiple payment IDs (December 2025 changes)
   totalFee: number;
