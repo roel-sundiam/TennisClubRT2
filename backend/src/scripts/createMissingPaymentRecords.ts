@@ -52,21 +52,12 @@ async function createMissingPaymentRecords() {
       today.setHours(0, 0, 0, 0);
       reservationDate.setHours(0, 0, 0, 0);
 
-      // Set due date
-      let dueDate = new Date();
-      if (reservationDate.getTime() === today.getTime()) {
-        // Same day - due immediately
-        dueDate.setHours(23, 59, 59, 999);
-      } else {
-        // Future - due 7 days from now or 1 day before reservation, whichever is earlier
-        const sevenDaysFromNow = new Date();
-        sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+      // Set due date - NEW LOGIC: Payment due 1 day after the reservation date
+      const oneDayAfterReservation = new Date(reservationDate);
+      oneDayAfterReservation.setDate(oneDayAfterReservation.getDate() + 1);
+      oneDayAfterReservation.setHours(23, 59, 59, 999);
 
-        const oneDayBeforeReservation = new Date(reservationDate);
-        oneDayBeforeReservation.setDate(oneDayBeforeReservation.getDate() - 1);
-
-        dueDate.setTime(Math.min(sevenDaysFromNow.getTime(), oneDayBeforeReservation.getTime()));
-      }
+      const dueDate = oneDayAfterReservation;
 
       const payment = new Payment({
         userId: (reservation as any).userId,

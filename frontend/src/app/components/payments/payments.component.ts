@@ -1236,21 +1236,20 @@ export class PaymentsComponent implements OnInit {
         next: (response) => {
           this.loading = false;
 
-          // For admin users, auto-complete ALL payment methods since admin is confirming payment
+          // Auto-complete all payment methods since user is confirming payment
+          // When user submits the payment form, they're confirming they've made the payment
+          this.processPayment(existingPaymentId, true);
+
           if (this.isAdmin()) {
-            this.processPayment(existingPaymentId, true);
             this.showSuccess(
               'Payment Completed',
               'Payment has been processed and completed successfully'
             );
           } else {
-            // For regular users, only auto-complete cash payments
-            if (formValue.paymentMethod === 'cash') {
-              this.processPayment(existingPaymentId, true);
-              this.showSuccess('Payment Completed', 'Cash payment has been completed successfully');
-            } else {
-              this.showSuccess('Payment Updated', 'Payment method updated successfully');
-            }
+            this.showSuccess(
+              'Payment Completed',
+              `${formValue.paymentMethod === 'cash' ? 'Cash' : formValue.paymentMethod === 'gcash' ? 'GCash' : 'Bank transfer'} payment has been completed successfully`
+            );
           }
 
           this.resetForm();
@@ -1293,24 +1292,20 @@ export class PaymentsComponent implements OnInit {
       next: (response) => {
         this.loading = false;
 
-        // For admin users, auto-complete ALL payment methods since admin is confirming payment
+        // Auto-complete all payment methods since user is confirming payment
+        // When user submits the payment form, they're confirming they've made the payment
+        this.processPayment(response.data._id, true);
+
         if (this.isAdmin()) {
-          this.processPayment(response.data._id, true);
           this.showSuccess(
             'Payment Completed',
             'Payment has been processed and completed successfully'
           );
         } else {
-          // For regular users, only auto-complete cash payments
-          if (formValue.paymentMethod === 'cash') {
-            this.processPayment(response.data._id, true);
-            this.showSuccess('Payment Completed', 'Cash payment has been completed successfully');
-          } else {
-            this.showSuccess(
-              'Payment Logged',
-              'Payment has been logged and is pending confirmation'
-            );
-          }
+          this.showSuccess(
+            'Payment Completed',
+            `${formValue.paymentMethod === 'cash' ? 'Cash' : formValue.paymentMethod === 'gcash' ? 'GCash' : 'Bank transfer'} payment has been completed successfully`
+          );
         }
 
         this.resetForm();

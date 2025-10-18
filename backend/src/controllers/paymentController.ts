@@ -605,32 +605,20 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
     }
   }
 
-  // Set due date 
+  // Set due date
   let dueDate = new Date();
-  
+
   if (isManualPayment) {
     // Manual payments are due immediately
     dueDate.setHours(23, 59, 59, 999);
   } else {
-    // Set due date (7 days from creation for advance bookings, immediate for same-day)
+    // NEW LOGIC: Payment due 1 day after the reservation date
     const reservationDate = new Date(reservation!.date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    reservationDate.setHours(0, 0, 0, 0);
-    
-    if (reservationDate.getTime() === today.getTime()) {
-      // Same day booking - due immediately
-      dueDate.setHours(23, 59, 59, 999);
-    } else {
-      // Advance booking - due 7 days from now or 1 day before reservation, whichever is earlier
-      const sevenDaysFromNow = new Date();
-      sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-      
-      const oneDayBeforeReservation = new Date(reservationDate);
-      oneDayBeforeReservation.setDate(oneDayBeforeReservation.getDate() - 1);
-      
-      dueDate.setTime(Math.min(sevenDaysFromNow.getTime(), oneDayBeforeReservation.getTime()));
-    }
+    const oneDayAfterReservation = new Date(reservationDate);
+    oneDayAfterReservation.setDate(oneDayAfterReservation.getDate() + 1);
+    oneDayAfterReservation.setHours(23, 59, 59, 999);
+
+    dueDate = oneDayAfterReservation;
   }
 
   // Create payment record

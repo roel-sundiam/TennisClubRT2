@@ -337,16 +337,15 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
     return;
   }
 
-  // Check for overdue payments (1+ days past due) - SIMPLIFIED: Only check Payment records
-  const oneDayAgo = new Date();
-  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-  oneDayAgo.setHours(23, 59, 59, 999);
+  // Check for overdue payments - STRICT: Block if payment is past due date
+  const now = new Date();
+  now.setHours(0, 0, 0, 0); // Start of today
 
   // Check Payment collection for pending overdue payments
   const overduePayments = await Payment.find({
     userId: req.user._id,
     status: 'pending',
-    dueDate: { $lt: oneDayAgo }
+    dueDate: { $lt: now }
   });
 
   if (overduePayments.length > 0) {
@@ -913,7 +912,33 @@ export const cancelReservation = asyncHandler(async (req: AuthenticatedRequest, 
   await reservation.save({ validateBeforeSave: false });
   await reservation.populate('userId', 'username fullName email');
 
-  const message = creditRefundAmount > 0 
+  // Cancel any pending payment for this reservation
+  try {
+    const pendingPayment = await Payment.findOne({
+      reservationId: reservation._id,
+      status: 'pending'
+    });
+
+    if (pendingPayment) {
+      pendingPayment.status = 'failed';
+      pendingPayment.metadata = {
+        ...pendingPayment.metadata,
+        cancellation: {
+          reason: reason || 'Reservation cancelled',
+          cancelledAt: new Date(),
+          cancelledBy: req.user?._id || 'system',
+          previousStatus: 'pending'
+        }
+      };
+      await pendingPayment.save();
+      console.log(`💰 Auto-cancelled pending payment ${pendingPayment._id} for cancelled reservation ${reservation._id}`);
+    }
+  } catch (error) {
+    console.error('Failed to cancel pending payment for cancelled reservation:', error);
+    // Continue with reservation cancellation even if payment update fails
+  }
+
+  const message = creditRefundAmount > 0
     ? `Reservation cancelled successfully. ${coinsToRefund} coins and ₱${creditRefundAmount} credits refunded.`
     : `Reservation cancelled successfully. ${coinsToRefund} coins refunded.`;
 
