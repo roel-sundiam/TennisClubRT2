@@ -591,26 +591,50 @@ $container-padding-mobile: 1rem;
     line-height: 1.2;
   }
   
-  .user-info, .players-info {
+  .user-info, .players-info, .block-info {
     display: flex;
     align-items: center;
     gap: 0.375rem;
     font-size: 0.875rem;
     color: $text-secondary;
     line-height: 1.2;
-    
+
     .inline-icon {
       font-size: 0.9rem;
       width: 0.9rem;
       height: 0.9rem;
       color: #3b82f6;
     }
-    
+
     .user-text, .players-text {
       font-weight: 500;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+  }
+
+  .block-info {
+    padding: 0.25rem 0.5rem;
+    background: rgba(239, 68, 68, 0.08);
+    border-radius: 8px;
+    border-left: 3px solid #ef4444;
+
+    .inline-icon {
+      color: #ef4444;
+      font-size: 1rem;
+      width: 1rem;
+      height: 1rem;
+    }
+
+    .block-text {
+      color: $text-primary;
+      font-weight: 500;
+
+      strong {
+        color: #dc2626;
+        font-weight: 600;
+      }
     }
   }
 }

@@ -180,6 +180,11 @@ import { Subscription } from 'rxjs';
               <span>Coin Management</span>
             </button>
 
+            <button mat-button class="mobile-nav-item admin-item" (click)="navigateAndClose('/admin/block-court')">
+              <mat-icon>block</mat-icon>
+              <span>Block Court</span>
+            </button>
+
             <button mat-button class="mobile-nav-item admin-item" *ngIf="isSuperAdmin" (click)="navigateAndClose('/admin/manual-court-usage')">
               <mat-icon>edit_calendar</mat-icon>
               <span>Manual Court Usage</span>
@@ -298,7 +303,7 @@ export class ToolbarComponent implements OnInit, OnDestroy {
   private getButtonNameForPath(path: string): string {
     const pathMap: Record<string, string> = {
       '/reservations': 'Reserve Court',
-      '/my-reservations': 'My Bookings', 
+      '/my-reservations': 'My Bookings',
       '/members': 'Members',
       '/polls': 'Open Play',
       '/rankings': 'Rankings',
@@ -310,6 +315,7 @@ export class ToolbarComponent implements OnInit, OnDestroy {
       '/admin/reports': 'Reports & Analytics',
       '/admin/polls': 'Poll Management',
       '/admin/coins': 'Admin Coin Management',
+      '/admin/block-court': 'Block Court',
       '/admin/manual-court-usage': 'Manual Court Usage'
     };
     return pathMap[path] || `Navigate to ${path}`;

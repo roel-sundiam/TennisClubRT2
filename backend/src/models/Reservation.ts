@@ -4,10 +4,33 @@ import { CourtReservation as ICourtReservation } from '../types/index';
 export interface IReservationDocument extends Omit<ICourtReservation, '_id'>, Document {}
 
 const reservationSchema = new Schema<IReservationDocument>({
+  reservationType: {
+    type: String,
+    enum: {
+      values: ['regular', 'blocked'],
+      message: 'Reservation type must be regular or blocked'
+    },
+    default: 'regular',
+    index: true
+  },
+  blockReason: {
+    type: String,
+    enum: {
+      values: ['maintenance', 'private_event', 'weather', 'other'],
+      message: 'Block reason must be maintenance, private_event, weather, or other'
+    }
+  },
+  blockNotes: {
+    type: String,
+    trim: true,
+    maxlength: [200, 'Block notes cannot exceed 200 characters']
+  },
   userId: {
     type: String,
     ref: 'User',
-    required: [true, 'User ID is required'],
+    required: function(this: IReservationDocument) {
+      return this.reservationType === 'regular';
+    },
     index: true
   },
   date: {
@@ -30,7 +53,9 @@ const reservationSchema = new Schema<IReservationDocument>({
   },
   players: [{
     type: String,
-    required: true,
+    required: function(this: IReservationDocument) {
+      return this.reservationType === 'regular';
+    },
     trim: true,
     maxlength: [50, 'Player name cannot exceed 50 characters']
   }],
@@ -100,7 +125,7 @@ const reservationSchema = new Schema<IReservationDocument>({
   duration: {
     type: Number,
     min: [1, 'Duration must be at least 1 hour'],
-    max: [4, 'Duration cannot exceed 4 hours'],
+    max: [12, 'Duration cannot exceed 12 hours'],
     default: 1,
     required: true,
     index: true
@@ -145,20 +170,31 @@ reservationSchema.index(
 // Pre-save middleware to calculate derived fields and total fee
 reservationSchema.pre('save', function(next) {
   const reservation = this;
-  
+
+  // For blocked reservations, set defaults and skip fee calculation
+  if (reservation.reservationType === 'blocked') {
+    reservation.status = 'confirmed';
+    reservation.paymentStatus = 'paid';
+    reservation.totalFee = 0;
+    if (!reservation.players || reservation.players.length === 0) {
+      reservation.players = ['BLOCKED'];
+    }
+  }
+
   // Calculate endTimeSlot and isMultiHour
   if (reservation.isNew || reservation.isModified('timeSlot') || reservation.isModified('duration')) {
     reservation.endTimeSlot = reservation.timeSlot + reservation.duration;
     reservation.isMultiHour = reservation.duration > 1;
-    
+
     // Validate that booking doesn't extend beyond court hours
     if (reservation.endTimeSlot > 23) {
       return next(new Error(`Booking extends beyond court hours. Court closes at 10 PM (22:00). Duration: ${reservation.duration} hours from ${reservation.timeSlot}:00 would end at ${reservation.endTimeSlot}:00.`));
     }
   }
-  
-  // Calculate total fee for multi-hour reservations if not explicitly provided
-  if ((reservation.isNew || reservation.isModified('timeSlot') || reservation.isModified('players') || reservation.isModified('duration')) && 
+
+  // Calculate total fee for multi-hour reservations if not explicitly provided (skip for blocked)
+  if (reservation.reservationType !== 'blocked' &&
+      (reservation.isNew || reservation.isModified('timeSlot') || reservation.isModified('players') || reservation.isModified('duration')) &&
       (!reservation.totalFee || reservation.totalFee === 0)) {
     const peakHours = (process.env.PEAK_HOURS || '5,18,19,21').split(',').map(h => parseInt(h));
     const peakHourFee = parseInt(process.env.PEAK_HOUR_FEE || '100');

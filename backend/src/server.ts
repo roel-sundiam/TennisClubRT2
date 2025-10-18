@@ -32,6 +32,7 @@ import matchRoutes from './routes/matchRoutes';
 import notificationRoutes from './routes/notifications';
 import chatRoutes from './routes/chat';
 import manualCourtUsageRoutes from './routes/manualCourtUsageRoutes';
+import fixReservationRoutes from './routes/fix-reservation';
 
 dotenv.config();
 
@@ -204,6 +205,7 @@ app.use('/api/matches', authenticateToken, matchRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/manual-court-usage', manualCourtUsageRoutes);
+app.use('/api/fix-reservation', authenticateToken, fixReservationRoutes);
 console.log('📥 All routes registered');
 
 // 404 handler

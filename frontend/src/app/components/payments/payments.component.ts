@@ -1008,6 +1008,13 @@ export class PaymentsComponent implements OnInit {
       // Convert unpaid reservations to payment-like objects for display
       const syntheticPayments = await Promise.all(
         reservationsNeedingPayments.map(async (reservation: Reservation) => {
+          console.log(`🔍 Creating synthetic payment for reservation ${reservation._id}:`, {
+            timeSlot: reservation.timeSlot,
+            duration: (reservation as any).duration,
+            endTimeSlot: (reservation as any).endTimeSlot,
+            totalFee: reservation.totalFee,
+            timeSlotDisplay: reservation.timeSlotDisplay
+          });
           let amount = reservation.totalFee || 0;
 
           // If amount is 0, try to calculate it from backend
@@ -1039,6 +1046,9 @@ export class PaymentsComponent implements OnInit {
               timeSlot: reservation.timeSlot,
               players: reservation.players,
               timeSlotDisplay: reservation.timeSlotDisplay,
+              duration: (reservation as any).duration || 1,
+              endTimeSlot: (reservation as any).endTimeSlot || (reservation.timeSlot + ((reservation as any).duration || 1)),
+              totalFee: reservation.totalFee || amount,
             },
             userId: { _id: '', username: '', fullName: '' }, // Not needed for display
             amount: amount,
@@ -1965,7 +1975,7 @@ export class PaymentsComponent implements OnInit {
       }
     }
 
-    // Convert to full Reservation object if needed
+    // Convert to full Reservation object if needed, preserving duration and endTimeSlot
     const fullReservation: Reservation = {
       _id: reservation._id,
       date: reservation.date,
@@ -1977,10 +1987,25 @@ export class PaymentsComponent implements OnInit {
       totalFee: 'totalFee' in reservation ? reservation.totalFee : 0,
     };
 
-    // Use override amount if provided, otherwise recalculate the fee
+    // Preserve duration and endTimeSlot if available (for multi-hour reservations)
+    if ('duration' in reservation) {
+      (fullReservation as any).duration = (reservation as any).duration;
+    }
+    if ('endTimeSlot' in reservation) {
+      (fullReservation as any).endTimeSlot = (reservation as any).endTimeSlot;
+    }
+
+    // Use override amount if provided, but STILL recalculate for multi-hour to ensure accuracy
     if (overrideAmount) {
       console.log(`✅ Using override amount: ₱${overrideAmount}`);
-      this.calculateAndSetReservationFee(fullReservation, overrideAmount);
+      // Check if this is a multi-hour reservation
+      const duration = (fullReservation as any).duration || 1;
+      if (duration > 1) {
+        console.log(`🔍 Multi-hour reservation detected (${duration} hours), recalculating instead of using override`);
+        this.calculateAndSetReservationFeeWithMemberData(fullReservation);
+      } else {
+        this.calculateAndSetReservationFee(fullReservation, overrideAmount);
+      }
     } else {
       // Always recalculate the fee based on current member data to ensure accuracy
       this.calculateAndSetReservationFeeWithMemberData(fullReservation);
@@ -2040,34 +2065,56 @@ export class PaymentsComponent implements OnInit {
       reservationId: reservation._id,
       initialTotalFee: reservation.totalFee,
       timeSlot: reservation.timeSlot,
+      duration: (reservation as any).duration,
+      endTimeSlot: (reservation as any).endTimeSlot,
       players: reservation.players,
     });
-    // Calculate fee using current member data instead of backend calculation
-    const mockPayment = {
-      reservationId: {
-        players: reservation.players,
-        timeSlot: reservation.timeSlot,
-        date: reservation.date,
-      },
-    };
 
-    const feeInfo = this.getPlayerFeeInfo(mockPayment);
-    const calculatedFee =
-      feeInfo.memberCount * feeInfo.memberFee + feeInfo.nonMemberCount * feeInfo.nonMemberFee;
+    // Determine the duration and end time slot
+    const duration = (reservation as any).duration || 1;
+    const endTimeSlot = (reservation as any).endTimeSlot || (reservation.timeSlot + duration);
+
+    console.log(`💰 Multi-hour calculation: ${duration} hour(s) from ${reservation.timeSlot}:00 to ${endTimeSlot}:00`);
+
+    // Calculate fee for each hour and sum them up
+    let totalCalculatedFee = 0;
+    const hourlyBreakdown: string[] = [];
+
+    for (let hour = reservation.timeSlot; hour < endTimeSlot; hour++) {
+      // Calculate fee using current member data for this specific hour
+      const mockPayment = {
+        reservationId: {
+          players: reservation.players,
+          timeSlot: hour,  // Calculate for THIS hour
+          date: reservation.date,
+        },
+      };
+
+      const feeInfo = this.getPlayerFeeInfo(mockPayment);
+      const hourFee = feeInfo.memberCount * feeInfo.memberFee + feeInfo.nonMemberCount * feeInfo.nonMemberFee;
+
+      totalCalculatedFee += hourFee;
+
+      const peakHours = [5, 18, 19, 20, 21];
+      const isPeak = peakHours.includes(hour);
+      hourlyBreakdown.push(
+        `Hour ${hour}:00-${hour + 1}:00 (${isPeak ? 'Peak' : 'Off-Peak'}): ₱${hourFee} (${feeInfo.memberCount} members × ₱${feeInfo.memberFee} + ${feeInfo.nonMemberCount} non-members × ₱${feeInfo.nonMemberFee})`
+      );
+    }
 
     console.log(`💰 Setting reservation fee with member data:`);
     console.log(`💰 Players: ${reservation.players.join(', ')}`);
     console.log(`💰 Original stored fee: ₱${reservation.totalFee}`);
-    console.log(
-      `💰 Calculated fee: ₱${calculatedFee} (${feeInfo.memberCount} members × ₱${feeInfo.memberFee} + ${feeInfo.nonMemberCount} non-members × ₱${feeInfo.nonMemberFee})`
-    );
+    console.log(`💰 Hourly breakdown:`);
+    hourlyBreakdown.forEach(line => console.log(`  ${line}`));
+    console.log(`💰 Total calculated fee: ₱${totalCalculatedFee}`);
 
     // Update the reservation with the correctly calculated fee
-    reservation.totalFee = calculatedFee;
+    reservation.totalFee = totalCalculatedFee;
     this.selectedReservation = reservation;
     this.paymentForm.patchValue({
       reservationId: reservation._id,
-      courtFee: calculatedFee,
+      courtFee: totalCalculatedFee,
     });
   }
 
@@ -2378,8 +2425,8 @@ export class PaymentsComponent implements OnInit {
   isPeakHourReservation(): boolean {
     if (!this.selectedReservation) return false;
 
-    // Peak hours: 5AM, 6PM, 7PM, 9PM (5, 18, 19, 21)
-    const peakHours = [5, 18, 19, 21];
+    // Peak hours: 5AM, 6PM, 7PM, 8PM, 9PM (5, 18, 19, 20, 21)
+    const peakHours = [5, 18, 19, 20, 21];
     return peakHours.includes(this.selectedReservation.timeSlot);
   }
 
@@ -2439,8 +2486,8 @@ export class PaymentsComponent implements OnInit {
     const players = reservation.players;
     const timeSlot = reservation.timeSlot;
 
-    // Peak hours: 5AM, 6PM, 7PM, 9PM (5, 18, 19, 21)
-    const peakHours = [5, 18, 19, 21];
+    // Peak hours: 5AM, 6PM, 7PM, 8PM, 9PM (5, 18, 19, 20, 21)
+    const peakHours = [5, 18, 19, 20, 21];
     const isPeakHour = peakHours.includes(timeSlot);
 
     // Try to distinguish members from non-members
@@ -3057,5 +3104,79 @@ export class PaymentsComponent implements OnInit {
 
     // Fallback to original description but make it more compact
     return payment.description || 'Payment';
+  }
+
+  // Debug helper methods for multi-hour fee breakdown
+  getReservationRawData(): string {
+    if (!this.selectedReservation) return 'No reservation selected';
+
+    const raw = {
+      _id: this.selectedReservation._id,
+      timeSlot: this.selectedReservation.timeSlot,
+      timeSlotDisplay: this.selectedReservation.timeSlotDisplay,
+      duration: (this.selectedReservation as any).duration,
+      endTimeSlot: (this.selectedReservation as any).endTimeSlot,
+      isMultiHour: (this.selectedReservation as any).isMultiHour,
+      totalFee: this.selectedReservation.totalFee,
+      players: this.selectedReservation.players,
+      date: this.selectedReservation.date,
+    };
+
+    return JSON.stringify(raw, null, 2);
+  }
+
+  getReservationDuration(): number {
+    if (!this.selectedReservation) return 1;
+    const duration = (this.selectedReservation as any).duration;
+    const endTimeSlot = (this.selectedReservation as any).endTimeSlot;
+
+    if (duration) return duration;
+    if (endTimeSlot) return endTimeSlot - this.selectedReservation.timeSlot;
+    return 1;
+  }
+
+  getReservationDebugInfo(): string | null {
+    if (!this.selectedReservation) return null;
+
+    const duration = this.getReservationDuration();
+    const endTimeSlot = (this.selectedReservation as any).endTimeSlot || (this.selectedReservation.timeSlot + duration);
+
+    // Only show debug for multi-hour or to help troubleshoot
+    if (duration < 1) return null;
+
+    const peakHours = [5, 18, 19, 20, 21];
+    let debugHtml = '<div style="font-family: monospace; font-size: 13px;">';
+    let totalFee = 0;
+
+    for (let hour = this.selectedReservation.timeSlot; hour < endTimeSlot; hour++) {
+      const mockPayment = {
+        reservationId: {
+          players: this.selectedReservation.players,
+          timeSlot: hour,
+          date: this.selectedReservation.date,
+        },
+      };
+
+      const feeInfo = this.getPlayerFeeInfo(mockPayment);
+      const hourFee = feeInfo.memberCount * feeInfo.memberFee + feeInfo.nonMemberCount * feeInfo.nonMemberFee;
+      totalFee += hourFee;
+
+      const isPeak = peakHours.includes(hour);
+      const hourLabel = `${hour}:00-${hour + 1}:00`;
+      const peakLabel = isPeak ? '<strong style="color: #d32f2f;">PEAK</strong>' : '<span style="color: #388e3c;">Off-Peak</span>';
+
+      debugHtml += `<div style="padding: 4px 0; border-bottom: 1px dotted #ccc;">`;
+      debugHtml += `  <strong>${hourLabel}</strong> (${peakLabel}): `;
+      debugHtml += `  <strong style="color: #1976d2;">₱${hourFee}</strong>`;
+      debugHtml += `  <span style="color: #666; font-size: 12px;"> (${feeInfo.memberCount}m × ₱${feeInfo.memberFee} + ${feeInfo.nonMemberCount}nm × ₱${feeInfo.nonMemberFee})</span>`;
+      debugHtml += `</div>`;
+    }
+
+    debugHtml += `<div style="margin-top: 8px; padding-top: 8px; border-top: 2px solid #1976d2; font-size: 14px;">`;
+    debugHtml += `  <strong>TOTAL:</strong> <strong style="color: #1976d2; font-size: 16px;">₱${totalFee.toFixed(2)}</strong>`;
+    debugHtml += `</div>`;
+    debugHtml += '</div>';
+
+    return debugHtml;
   }
 }

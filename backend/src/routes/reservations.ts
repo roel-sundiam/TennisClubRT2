@@ -9,9 +9,14 @@ import {
   updateReservationStatus,
   completeReservation,
   getMyUpcomingReservations,
+  createBlockedReservation,
+  getBlockedReservations,
+  updateBlockedReservation,
+  deleteBlockedReservation,
   createReservationValidation,
   updateReservationValidation,
-  completeReservationValidation
+  completeReservationValidation,
+  createBlockedReservationValidation
 } from '../controllers/reservationController';
 import { requireAdmin, requireApprovedUser, requireMembershipFees, authenticateToken } from '../middleware/auth';
 import { validateRequest } from '../middleware/validation';
@@ -56,11 +61,36 @@ router.delete('/:id', cancelReservation);
 router.patch('/:id/status', requireAdmin, updateReservationStatus);
 
 // Admin only: Complete reservation with match results
-router.patch('/:id/complete', 
+router.patch('/:id/complete',
   requireAdmin,
   completeReservationValidation,
   validateRequest,
   completeReservation
+);
+
+// Admin only: Court blocking endpoints
+router.post('/admin/block',
+  requireAdmin,
+  createBlockedReservationValidation,
+  validateRequest,
+  createBlockedReservation
+);
+
+router.get('/admin/blocks',
+  requireAdmin,
+  getBlockedReservations
+);
+
+router.put('/admin/block/:id',
+  requireAdmin,
+  createBlockedReservationValidation,
+  validateRequest,
+  updateBlockedReservation
+);
+
+router.delete('/admin/block/:id',
+  requireAdmin,
+  deleteBlockedReservation
 );
 
 export default router;

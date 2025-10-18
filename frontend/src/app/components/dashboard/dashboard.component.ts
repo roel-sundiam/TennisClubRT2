@@ -469,7 +469,7 @@ import { environment } from '../../../environments/environment';
                 <mat-icon>monetization_on</mat-icon>
               </div>
               <div class="mobile-card-title">Coin Management</div>
-              
+
               <!-- Desktop Content -->
               <mat-card-header>
                 <mat-icon mat-card-avatar class="action-icon admin-icon">monetization_on</mat-icon>
@@ -483,6 +483,31 @@ import { environment } from '../../../environments/environment';
                 <button mat-raised-button class="admin-btn" (click)="navigateTo('/admin/coins')">
                   <mat-icon>monetization_on</mat-icon>
                   Manage Coins
+                </button>
+              </mat-card-actions>
+            </mat-card>
+
+            <!-- Block Court -->
+            <mat-card class="action-card admin-card" data-icon="block" data-title="Block Court" (click)="navigateTo('/admin/block-court')">
+              <!-- Mobile Icon -->
+              <div class="mobile-card-icon">
+                <mat-icon>block</mat-icon>
+              </div>
+              <div class="mobile-card-title">Block Court</div>
+
+              <!-- Desktop Content -->
+              <mat-card-header>
+                <mat-icon mat-card-avatar class="action-icon admin-icon">block</mat-icon>
+                <mat-card-title>Block Court</mat-card-title>
+                <mat-card-subtitle>Block time slots for maintenance</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <p>Mark court time slots as unavailable for maintenance, events, or weather.</p>
+              </mat-card-content>
+              <mat-card-actions>
+                <button mat-raised-button class="admin-btn" (click)="navigateTo('/admin/block-court')">
+                  <mat-icon>block</mat-icon>
+                  Block Court
                 </button>
               </mat-card-actions>
             </mat-card>

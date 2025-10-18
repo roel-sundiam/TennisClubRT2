@@ -75,8 +75,8 @@ pending registration → admin approval → membership fee payment → active me
 #### Court Reservation System
 
 - **Operating Hours**: 5 AM - 10 PM (timeSlot: 5-22)
-- **Peak Hours**: 5AM, 6PM, 7PM, 9PM (₱100 fixed)
-- **Off-Peak**: ₱20 per player
+- **Peak Hours**: 5AM, 6PM, 7PM, 8PM, 9PM (timeSlots: 5, 18, 19, 20, 21) (₱100 fixed)
+- **Off-Peak**: ₱20 per player (members), ₱50 per player (non-members)
 - **Conflict Prevention**: Unique compound index on (date, timeSlot) for active reservations
 
 #### Coin Economy
@@ -176,9 +176,10 @@ WEATHER_API_KEY=openweather-api-key
 PORT=3000
 
 # Pricing configuration
-PEAK_HOURS=5,18,19,21
+PEAK_HOURS=5,18,19,20,21
 PEAK_HOUR_FEE=100
 OFF_PEAK_FEE_PER_MEMBER=20
+OFF_PEAK_FEE_PER_NON_MEMBER=50
 
 # Coin system
 INITIAL_COIN_BALANCE=100

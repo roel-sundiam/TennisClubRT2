@@ -30,6 +30,7 @@ import { AdminMemberManagementComponent } from './components/admin-member-manage
 import { ProfileComponent } from './components/profile/profile.component';
 import { RulesAndRegulationsComponent } from './components/rules-and-regulations/rules-and-regulations.component';
 import { AdminManualCourtUsageComponent } from './components/admin-manual-court-usage/admin-manual-court-usage.component';
+import { AdminBlockCourtComponent } from './components/admin-block-court/admin-block-court.component';
 import { authGuard, loginGuard, adminGuard, superadminGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
@@ -191,5 +192,6 @@ export const routes: Routes = [
   { path: 'admin/suggestions', component: AdminSuggestionsComponent, canActivate: [authGuard, adminGuard] },
   { path: 'admin/analytics', component: AdminAnalyticsComponent, canActivate: [authGuard, adminGuard] },
   { path: 'admin/manual-court-usage', component: AdminManualCourtUsageComponent, canActivate: [authGuard, superadminGuard] },
+  { path: 'admin/block-court', component: AdminBlockCourtComponent, canActivate: [authGuard, adminGuard] },
   { path: '**', redirectTo: '/dashboard' }
 ];

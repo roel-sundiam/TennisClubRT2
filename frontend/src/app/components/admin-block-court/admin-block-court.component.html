@@ -1,0 +1,264 @@
+<!-- Modern page structure following design system -->
+<div class="page-container">
+  <div class="page-content">
+    <!-- Page Header with Action -->
+    <div class="page-header">
+      <div class="page-title-section">
+        <div class="page-title">
+          <mat-icon class="page-icon">block</mat-icon>
+          <h1>Block Court</h1>
+        </div>
+        <p class="page-subtitle">Mark time slots as unavailable for maintenance or events</p>
+      </div>
+      <div class="page-actions">
+        <button mat-button (click)="goBack()">
+          <mat-icon>arrow_back</mat-icon>
+          Back
+        </button>
+      </div>
+    </div>
+
+    <div class="content-wrapper">
+      <!-- Block Form Card -->
+      <mat-card class="form-card">
+        <mat-card-header>
+          <mat-card-title>
+            <mat-icon>{{ editingBlock ? 'edit' : 'add_circle' }}</mat-icon>
+            {{ editingBlock ? 'Edit Court Block' : 'Create Court Block' }}
+          </mat-card-title>
+          <button *ngIf="editingBlock" mat-button color="accent" (click)="cancelEdit()" class="cancel-edit-btn">
+            <mat-icon>close</mat-icon>
+            Cancel Edit
+          </button>
+        </mat-card-header>
+        <mat-card-content>
+          <form [formGroup]="blockForm" (ngSubmit)="submitBlock()" class="block-form">
+            <div class="form-row">
+              <!-- Date Picker -->
+              <mat-form-field appearance="outline" class="form-field">
+                <mat-label>Date</mat-label>
+                <input matInput [matDatepicker]="picker" formControlName="date" required>
+                <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+                <mat-datepicker #picker></mat-datepicker>
+                <mat-error>Date is required</mat-error>
+              </mat-form-field>
+
+              <!-- Time Slot -->
+              <mat-form-field appearance="outline" class="form-field">
+                <mat-label>Start Time</mat-label>
+                <mat-select formControlName="timeSlot" required>
+                  <mat-option *ngFor="let slot of timeSlots" [value]="slot.value">
+                    {{ slot.label }}
+                  </mat-option>
+                </mat-select>
+                <mat-error>Start time is required</mat-error>
+              </mat-form-field>
+
+              <!-- Duration -->
+              <mat-form-field appearance="outline" class="form-field">
+                <mat-label>Duration</mat-label>
+                <mat-select formControlName="duration" required>
+                  <mat-option *ngFor="let d of durations" [value]="d.value">
+                    {{ d.label }}
+                  </mat-option>
+                </mat-select>
+                <mat-error>Duration is required</mat-error>
+              </mat-form-field>
+            </div>
+
+            <div class="form-row">
+              <!-- Block Reason -->
+              <mat-form-field appearance="outline" class="form-field full-width">
+                <mat-label>Reason</mat-label>
+                <mat-select formControlName="blockReason" required>
+                  <mat-option *ngFor="let reason of blockReasons" [value]="reason.value">
+                    <mat-icon>{{ reason.icon }}</mat-icon>
+                    {{ reason.label }}
+                  </mat-option>
+                </mat-select>
+                <mat-error>Reason is required</mat-error>
+              </mat-form-field>
+            </div>
+
+            <div class="form-row">
+              <!-- Optional Notes -->
+              <mat-form-field appearance="outline" class="form-field full-width">
+                <mat-label>Notes (Optional)</mat-label>
+                <textarea matInput formControlName="blockNotes" rows="3" maxlength="200"></textarea>
+                <mat-hint align="end">{{ blockForm.get('blockNotes')?.value?.length || 0 }}/200</mat-hint>
+              </mat-form-field>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="form-actions">
+              <button mat-raised-button color="warn" type="submit" [disabled]="!blockForm.valid || submitting">
+                <mat-spinner *ngIf="submitting" diameter="20" class="button-spinner"></mat-spinner>
+                <mat-icon *ngIf="!submitting">{{ editingBlock ? 'save' : 'block' }}</mat-icon>
+                {{ submitting ? (editingBlock ? 'Updating...' : 'Blocking...') : (editingBlock ? 'Update Block' : 'Block Court') }}
+              </button>
+              <button mat-button type="button" (click)="resetForm()" [disabled]="submitting">
+                {{ editingBlock ? 'Cancel' : 'Reset' }}
+              </button>
+            </div>
+          </form>
+        </mat-card-content>
+      </mat-card>
+
+      <!-- Active Blocks Table -->
+      <mat-card class="table-card">
+        <mat-card-header>
+          <mat-card-title>
+            <mat-icon>list</mat-icon>
+            Active Court Blocks
+          </mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <div *ngIf="loading" class="loading-container">
+            <mat-spinner diameter="50"></mat-spinner>
+            <p>Loading blocked reservations...</p>
+          </div>
+
+          <div *ngIf="!loading && blockedReservations.length === 0" class="no-data">
+            <mat-icon class="large-icon">check_circle</mat-icon>
+            <h3>No Active Blocks</h3>
+            <p>There are no blocked time slots at the moment.</p>
+          </div>
+
+          <div *ngIf="!loading && blockedReservations.length > 0" class="table-wrapper">
+            <table mat-table [dataSource]="blockedReservations" class="blocks-table">
+              <!-- Date Column -->
+              <ng-container matColumnDef="date">
+                <th mat-header-cell *matHeaderCellDef>Date</th>
+                <td mat-cell *matCellDef="let block">
+                  <div class="date-cell">
+                    <mat-icon class="cell-icon">calendar_today</mat-icon>
+                    {{ formatDate(block.date) }}
+                  </div>
+                </td>
+              </ng-container>
+
+              <!-- Time Column -->
+              <ng-container matColumnDef="time">
+                <th mat-header-cell *matHeaderCellDef>Time</th>
+                <td mat-cell *matCellDef="let block">
+                  <div class="time-cell">
+                    <mat-icon class="cell-icon">schedule</mat-icon>
+                    {{ formatTimeRange(block.timeSlot, block.duration) }}
+                  </div>
+                </td>
+              </ng-container>
+
+              <!-- Duration Column -->
+              <ng-container matColumnDef="duration">
+                <th mat-header-cell *matHeaderCellDef>Duration</th>
+                <td mat-cell *matCellDef="let block">
+                  <mat-chip class="duration-chip">
+                    {{ block.duration }} hour{{ block.duration > 1 ? 's' : '' }}
+                  </mat-chip>
+                </td>
+              </ng-container>
+
+              <!-- Reason Column -->
+              <ng-container matColumnDef="reason">
+                <th mat-header-cell *matHeaderCellDef>Reason</th>
+                <td mat-cell *matCellDef="let block">
+                  <div class="reason-cell">
+                    <mat-icon class="cell-icon">{{ getReasonIcon(block.blockReason) }}</mat-icon>
+                    {{ getReasonLabel(block.blockReason) }}
+                  </div>
+                </td>
+              </ng-container>
+
+              <!-- Notes Column -->
+              <ng-container matColumnDef="notes">
+                <th mat-header-cell *matHeaderCellDef>Notes</th>
+                <td mat-cell *matCellDef="let block">
+                  <span class="notes-text" [matTooltip]="block.blockNotes || 'No notes'">
+                    {{ block.blockNotes || '—' }}
+                  </span>
+                </td>
+              </ng-container>
+
+              <!-- Created By Column -->
+              <ng-container matColumnDef="createdBy">
+                <th mat-header-cell *matHeaderCellDef>Created By</th>
+                <td mat-cell *matCellDef="let block">
+                  <div class="user-cell" *ngIf="block.userId">
+                    <mat-icon class="cell-icon">person</mat-icon>
+                    {{ block.userId.fullName }}
+                  </div>
+                  <span *ngIf="!block.userId">—</span>
+                </td>
+              </ng-container>
+
+              <!-- Actions Column -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef>Actions</th>
+                <td mat-cell *matCellDef="let block">
+                  <div class="action-buttons">
+                    <button mat-icon-button color="primary" (click)="editBlock(block)" matTooltip="Edit Block">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button mat-icon-button color="warn" (click)="deleteBlock(block)" matTooltip="Remove Block">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </div>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+            </table>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal-overlay" *ngIf="showDeleteModal" (click)="closeDeleteModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Remove Court Block</h2>
+      <button class="modal-close" (click)="closeDeleteModal()" aria-label="Close">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="warning-icon">
+        <mat-icon>warning</mat-icon>
+      </div>
+      <p class="modal-message">Are you sure you want to remove this court block?</p>
+      <div class="block-details" *ngIf="blockToDelete">
+        <div class="detail-row">
+          <mat-icon>calendar_today</mat-icon>
+          <span><strong>Date:</strong> {{ formatDate(blockToDelete.date) }}</span>
+        </div>
+        <div class="detail-row">
+          <mat-icon>schedule</mat-icon>
+          <span><strong>Time:</strong> {{ formatTimeRange(blockToDelete.timeSlot, blockToDelete.duration) }}</span>
+        </div>
+        <div class="detail-row">
+          <mat-icon>{{ getReasonIcon(blockToDelete.blockReason) }}</mat-icon>
+          <span><strong>Reason:</strong> {{ getReasonLabel(blockToDelete.blockReason) }}</span>
+        </div>
+        <div class="detail-row" *ngIf="blockToDelete.blockNotes">
+          <mat-icon>notes</mat-icon>
+          <span><strong>Notes:</strong> {{ blockToDelete.blockNotes }}</span>
+        </div>
+      </div>
+      <p class="warning-text">This action cannot be undone. The time slot will become available for reservations.</p>
+    </div>
+    <div class="modal-actions">
+      <button mat-button class="btn-secondary" (click)="closeDeleteModal()">
+        <mat-icon>close</mat-icon>
+        Cancel
+      </button>
+      <button mat-raised-button color="warn" class="btn-danger" (click)="confirmDeleteBlock()">
+        <mat-icon>delete</mat-icon>
+        Remove Block
+      </button>
+    </div>
+  </div>
+</div>

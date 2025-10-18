@@ -165,11 +165,11 @@ router.put(
   handleValidationErrors,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      // Allow users to process their own payments for certain methods
+      // Allow users to process their own payments
       if (req.user?.role === 'member') {
         const Payment = require('../models/Payment').default;
         const payment = await Payment.findById(req.params.id);
-        
+
         if (!payment) {
           res.status(404).json({
             success: false,
@@ -177,8 +177,8 @@ router.put(
           });
           return;
         }
-        
-        // Members can only process their own payments and only for certain methods
+
+        // Members can only process their own payments
         if (payment.userId.toString() !== req.user._id.toString()) {
           res.status(403).json({
             success: false,
@@ -187,22 +187,10 @@ router.put(
           return;
         }
 
-        // Check if this is a manual payment or open play payment
-        const isManualPayment = payment.metadata?.isManualPayment === true;
-        const isOpenPlayPayment = !!payment.pollId;
-
-        // Members can mark manual court usage and open play payments as completed (any payment method)
-        // because admin will still need to verify and record them
-        // For regular reservations, members can only mark cash payments as completed
-        if (!isManualPayment && !isOpenPlayPayment && payment.paymentMethod !== 'cash') {
-          res.status(403).json({
-            success: false,
-            error: 'Only admins can process non-cash payments'
-          });
-          return;
-        }
+        // Members can process their own payments for all payment methods
+        // Admin verification will happen later during the "record payment" step
       }
-      
+
       next();
     } catch (error) {
       res.status(500).json({

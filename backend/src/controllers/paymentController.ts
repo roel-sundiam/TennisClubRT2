@@ -399,8 +399,8 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
     }
   }
 
-  // Check if user can create payment for this reservation (skip for manual payments)
-  if (!isManualPayment && req.user.role === 'member' && reservation && reservation.userId.toString() !== req.user._id.toString()) {
+  // Check if user can create payment for this reservation (skip for manual payments and blocked reservations)
+  if (!isManualPayment && req.user.role === 'member' && reservation && reservation.userId && reservation.userId.toString() !== req.user._id.toString()) {
     return res.status(403).json({
       success: false,
       error: 'Access denied'

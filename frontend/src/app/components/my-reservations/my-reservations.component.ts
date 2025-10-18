@@ -43,6 +43,9 @@ interface Reservation {
   createdAt: Date;
   updatedAt: Date;
   isHomeownerDay?: boolean; // Flag for Homeowner's Day entries
+  reservationType?: 'regular' | 'blocked'; // Type of reservation
+  blockReason?: string; // Reason for blocking (maintenance, private_event, weather, other)
+  blockNotes?: string; // Optional notes for the block
 }
 
 @Component({
@@ -116,23 +119,50 @@ interface Reservation {
                     </div>
                     <div class="reservation-main show-user-info">
                       <div class="time-slot">{{reservation.timeSlotDisplay}}</div>
-                      <div class="user-info" *ngIf="reservation.userId">
+
+                      <!-- Show block info for blocked reservations -->
+                      <div class="block-info" *ngIf="isBlockedReservation(reservation)">
+                        <mat-icon class="inline-icon">{{getBlockReasonIcon(reservation)}}</mat-icon>
+                        <span class="block-text">
+                          <strong>{{getBlockReasonDisplay(reservation)}}</strong>
+                          <span *ngIf="reservation.blockNotes"> - {{reservation.blockNotes}}</span>
+                        </span>
+                      </div>
+
+                      <!-- Show user/player info for regular reservations -->
+                      <div class="user-info" *ngIf="!isBlockedReservation(reservation) && reservation.userId">
                         <mat-icon class="inline-icon">person</mat-icon>
                         <span class="user-text">{{reservation.userId.fullName}}</span>
                       </div>
-                      <div class="players-info">
+                      <div class="players-info" *ngIf="!isBlockedReservation(reservation)">
                         <mat-icon class="inline-icon">people</mat-icon>
                         <span class="players-text">{{getFilteredPlayers(reservation).join(', ')}}</span>
                       </div>
                     </div>
                   </div>
                   <div class="card-right">
-                    <div class="status-chips">
+                    <!-- For blocked reservations: only show weather, no status chip, no fee -->
+                    <div *ngIf="isBlockedReservation(reservation)" class="status-chips">
+                      <!-- No status chip for blocked reservations -->
+                    </div>
+                    <div *ngIf="isBlockedReservation(reservation)" class="fee-weather">
+                      <!-- No fee display for blocked reservations -->
+                      <span class="weather" *ngIf="reservation.weatherForecast">
+                        <mat-icon class="weather-icon">{{getWeatherIcon(reservation.weatherForecast.icon)}}</mat-icon>
+                        {{reservation.weatherForecast.temperature}}°C
+                        <span class="rain-chance" *ngIf="reservation.weatherForecast.rainChance !== undefined">
+                          {{reservation.weatherForecast.rainChance}}%
+                        </span>
+                      </span>
+                    </div>
+
+                    <!-- For regular reservations: show status and fee -->
+                    <div *ngIf="!isBlockedReservation(reservation)" class="status-chips">
                       <mat-chip *ngIf="reservation.status !== 'pending'" class="status-chip" [ngClass]="'status-' + reservation.status">
                         {{reservation.status | titlecase}}
                       </mat-chip>
                     </div>
-                    <div class="fee-weather">
+                    <div *ngIf="!isBlockedReservation(reservation)" class="fee-weather">
                       <span class="fee">₱{{reservation.totalFee}}</span>
                       <span class="weather" *ngIf="reservation.weatherForecast">
                         <mat-icon class="weather-icon">{{getWeatherIcon(reservation.weatherForecast.icon)}}</mat-icon>
@@ -354,18 +384,45 @@ interface Reservation {
                     </div>
                     <div class="reservation-main show-user-info">
                       <div class="time-slot">{{reservation.timeSlotDisplay}}</div>
-                      <div class="user-info" *ngIf="reservation.userId">
+
+                      <!-- Show block info for blocked reservations -->
+                      <div class="block-info" *ngIf="isBlockedReservation(reservation)">
+                        <mat-icon class="inline-icon">{{getBlockReasonIcon(reservation)}}</mat-icon>
+                        <span class="block-text">
+                          <strong>{{getBlockReasonDisplay(reservation)}}</strong>
+                          <span *ngIf="reservation.blockNotes"> - {{reservation.blockNotes}}</span>
+                        </span>
+                      </div>
+
+                      <!-- Show user/player info for regular reservations -->
+                      <div class="user-info" *ngIf="!isBlockedReservation(reservation) && reservation.userId">
                         <mat-icon class="inline-icon">person</mat-icon>
                         <span class="user-text">{{reservation.userId.fullName}}</span>
                       </div>
-                      <div class="players-info">
+                      <div class="players-info" *ngIf="!isBlockedReservation(reservation)">
                         <mat-icon class="inline-icon">people</mat-icon>
                         <span class="players-text">{{getFilteredPlayers(reservation).join(', ')}}</span>
                       </div>
                     </div>
                   </div>
                   <div class="card-right">
-                    <div class="status-chips">
+                    <!-- For blocked reservations: only show weather, no status chip, no fee -->
+                    <div *ngIf="isBlockedReservation(reservation)" class="status-chips">
+                      <!-- No status chip for blocked reservations -->
+                    </div>
+                    <div *ngIf="isBlockedReservation(reservation)" class="fee-weather">
+                      <!-- No fee display for blocked reservations -->
+                      <span class="weather" *ngIf="reservation.weatherForecast">
+                        <mat-icon class="weather-icon">{{getWeatherIcon(reservation.weatherForecast.icon)}}</mat-icon>
+                        {{reservation.weatherForecast.temperature}}°C
+                        <span class="rain-chance" *ngIf="reservation.weatherForecast.rainChance !== undefined">
+                          {{reservation.weatherForecast.rainChance}}%
+                        </span>
+                      </span>
+                    </div>
+
+                    <!-- For regular reservations: show status, payment, and fee -->
+                    <div *ngIf="!isBlockedReservation(reservation)" class="status-chips">
                       <mat-chip class="status-chip" [ngClass]="'status-' + reservation.status">
                         {{reservation.status | titlecase}}
                       </mat-chip>
@@ -373,7 +430,7 @@ interface Reservation {
                         {{getPaymentStatusText(reservation.paymentStatus)}}
                       </mat-chip>
                     </div>
-                    <div class="fee-weather">
+                    <div *ngIf="!isBlockedReservation(reservation)" class="fee-weather">
                       <span class="fee">₱{{reservation.totalFee}}</span>
                       <span class="weather" *ngIf="reservation.weatherForecast">
                         <mat-icon class="weather-icon">{{getWeatherIcon(reservation.weatherForecast.icon)}}</mat-icon>
@@ -1497,6 +1554,39 @@ click "Try Again" below to reconnect.
     }
     
     return entries;
+  }
+
+  // Check if reservation is a blocked slot
+  isBlockedReservation(reservation: Reservation): boolean {
+    return reservation.reservationType === 'blocked';
+  }
+
+  // Get block reason display text with icon
+  getBlockReasonDisplay(reservation: Reservation): string {
+    if (!reservation.blockReason) return '';
+
+    const reasonMap: { [key: string]: string } = {
+      'maintenance': '🔧 Maintenance',
+      'private_event': '🎉 Private Event',
+      'weather': '🌧️ Weather',
+      'other': '📝 Other'
+    };
+
+    return reasonMap[reservation.blockReason] || reservation.blockReason;
+  }
+
+  // Get block reason icon
+  getBlockReasonIcon(reservation: Reservation): string {
+    if (!reservation.blockReason) return 'block';
+
+    const iconMap: { [key: string]: string } = {
+      'maintenance': 'build',
+      'private_event': 'event',
+      'weather': 'cloud',
+      'other': 'info'
+    };
+
+    return iconMap[reservation.blockReason] || 'block';
   }
 
 }

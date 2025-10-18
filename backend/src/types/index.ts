@@ -114,7 +114,7 @@ export interface AnalyticsStats {
 
 export interface CourtReservation {
   _id: string;
-  userId: string;
+  userId?: string;
   user?: User;
   date: Date;
   timeSlot: number;
@@ -142,6 +142,10 @@ export interface CourtReservation {
   duration: number;
   endTimeSlot?: number; // Calculated automatically
   isMultiHour?: boolean; // Calculated automatically
+  // Court blocking support
+  reservationType?: 'regular' | 'blocked';
+  blockReason?: 'maintenance' | 'private_event' | 'weather' | 'other';
+  blockNotes?: string;
   createdAt: Date;
   updatedAt: Date;
 }

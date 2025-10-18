@@ -677,8 +677,8 @@ export const updateReservation = asyncHandler(async (req: AuthenticatedRequest, 
     return;
   }
 
-  // Check access permissions
-  if (req.user?.role === 'member' && reservation.userId.toString() !== req.user._id.toString()) {
+  // Check access permissions (skip for blocked reservations)
+  if (req.user?.role === 'member' && reservation.userId && reservation.userId.toString() !== req.user._id.toString()) {
     res.status(403).json({
       success: false,
       error: 'Access denied'
@@ -799,8 +799,8 @@ export const cancelReservation = asyncHandler(async (req: AuthenticatedRequest, 
     requestUserId: req.user?._id
   });
 
-  // Check access permissions
-  if (req.user?.role === 'member' && reservation.userId.toString() !== req.user._id.toString()) {
+  // Check access permissions (skip for blocked reservations)
+  if (req.user?.role === 'member' && reservation.userId && reservation.userId.toString() !== req.user._id.toString()) {
     console.log(`🚫 Access denied - User ${req.user._id} trying to cancel reservation owned by ${reservation.userId}`);
     res.status(403).json({
       success: false,
@@ -892,9 +892,9 @@ export const cancelReservation = asyncHandler(async (req: AuthenticatedRequest, 
       creditRefundAmount = creditTransaction.amount;
       try {
         console.log(`💳 Auto-refunding ₱${creditRefundAmount} credits for cancelled reservation`);
-        
+
         await (CreditTransaction as any).refundReservation(
-          reservation.userId.toString(),
+          reservation.userId?.toString() || '',
           (reservation._id as any).toString(),
           creditRefundAmount,
           'reservation_cancelled'
@@ -1138,4 +1138,328 @@ export const completeReservationValidation = [
     .trim()
     .isLength({ max: 50 })
     .withMessage('Score must be a string with max 50 characters')
+];
+
+// Admin: Create blocked reservation (court block)
+export const createBlockedReservation = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { date, timeSlot, duration = 1, blockReason, blockNotes } = req.body;
+
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      error: 'Authentication required'
+    });
+    return;
+  }
+
+  // Validate date is not in the past
+  const reservationDate = new Date(date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (reservationDate < today) {
+    res.status(400).json({
+      success: false,
+      error: 'Cannot block court for past dates'
+    });
+    return;
+  }
+
+  // Validate time slot
+  if (timeSlot < 5 || timeSlot > 21) {
+    res.status(400).json({
+      success: false,
+      error: 'Court operates from 5:00 AM to 10:00 PM'
+    });
+    return;
+  }
+
+  // Validate duration
+  if (duration < 1 || duration > 12) {
+    res.status(400).json({
+      success: false,
+      error: 'Duration must be between 1 and 12 hours'
+    });
+    return;
+  }
+
+  // Validate that block doesn't extend beyond court hours
+  const endTimeSlot = timeSlot + duration;
+  if (endTimeSlot > 23) {
+    res.status(400).json({
+      success: false,
+      error: `Block extends beyond court hours. Court closes at 10 PM (22:00).`
+    });
+    return;
+  }
+
+  // Check if slot range is available
+  const isAvailable = await (Reservation as any).isSlotRangeAvailable(reservationDate, timeSlot, endTimeSlot);
+  if (!isAvailable) {
+    res.status(400).json({
+      success: false,
+      error: 'One or more time slots in this range are already reserved or blocked'
+    });
+    return;
+  }
+
+  // Get weather forecast for the blocked time slot
+  let weatherForecast = null;
+  try {
+    const weather = await weatherService.getWeatherForDateTime(reservationDate, timeSlot);
+    if (weather) {
+      weatherForecast = {
+        temperature: weather.temperature,
+        description: weather.description,
+        humidity: weather.humidity,
+        windSpeed: weather.windSpeed,
+        icon: weather.icon,
+        rainChance: weather.rainChance,
+        timestamp: weather.timestamp
+      };
+    }
+  } catch (error) {
+    console.warn('Failed to fetch weather for blocked reservation:', error);
+  }
+
+  // Create blocked reservation
+  const blockedReservation = new Reservation({
+    reservationType: 'blocked',
+    blockReason: blockReason || 'other',
+    blockNotes: blockNotes || '',
+    date: reservationDate,
+    timeSlot,
+    duration,
+    players: ['BLOCKED'],
+    status: 'confirmed',
+    paymentStatus: 'paid',
+    totalFee: 0,
+    userId: req.user._id, // Store admin who created the block
+    weatherForecast
+  });
+
+  await blockedReservation.save();
+  await blockedReservation.populate('userId', 'username fullName email');
+
+  console.log(`🚫 Admin ${req.user.username} blocked court: ${reservationDate.toISOString().split('T')[0]} ${timeSlot}:00-${endTimeSlot}:00 (${blockReason})`);
+
+  res.status(201).json({
+    success: true,
+    data: blockedReservation,
+    message: `Court successfully blocked for ${duration} hour(s)`
+  });
+});
+
+// Admin: Get all blocked reservations
+export const getBlockedReservations = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 50;
+  const skip = (page - 1) * limit;
+
+  // Filter for future or current day blocks only by default
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const filter: any = {
+    reservationType: 'blocked'
+  };
+
+  // Add date filter if requested
+  if (req.query.includePast !== 'true') {
+    filter.date = { $gte: today };
+  }
+
+  const total = await Reservation.countDocuments(filter);
+  const blocks = await Reservation.find(filter)
+    .populate('userId', 'username fullName email')
+    .sort({ date: 1, timeSlot: 1 })
+    .skip(skip)
+    .limit(limit);
+
+  res.status(200).json({
+    success: true,
+    data: blocks,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit)
+    }
+  });
+});
+
+// Admin: Update blocked reservation
+export const updateBlockedReservation = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { date, timeSlot, duration = 1, blockReason, blockNotes } = req.body;
+
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      error: 'Authentication required'
+    });
+    return;
+  }
+
+  const reservation = await Reservation.findById(id);
+
+  if (!reservation) {
+    res.status(404).json({
+      success: false,
+      error: 'Blocked reservation not found'
+    });
+    return;
+  }
+
+  if (reservation.reservationType !== 'blocked') {
+    res.status(400).json({
+      success: false,
+      error: 'This is not a blocked reservation.'
+    });
+    return;
+  }
+
+  // Validate new date is not in the past
+  const reservationDate = new Date(date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (reservationDate < today) {
+    res.status(400).json({
+      success: false,
+      error: 'Cannot block court for past dates'
+    });
+    return;
+  }
+
+  // Validate time slot
+  if (timeSlot < 5 || timeSlot > 21) {
+    res.status(400).json({
+      success: false,
+      error: 'Court operates from 5:00 AM to 10:00 PM'
+    });
+    return;
+  }
+
+  // Validate duration
+  if (duration < 1 || duration > 12) {
+    res.status(400).json({
+      success: false,
+      error: 'Duration must be between 1 and 12 hours'
+    });
+    return;
+  }
+
+  // Validate that block doesn't extend beyond court hours
+  const endTimeSlot = timeSlot + duration;
+  if (endTimeSlot > 23) {
+    res.status(400).json({
+      success: false,
+      error: `Block extends beyond court hours. Court closes at 10 PM (22:00).`
+    });
+    return;
+  }
+
+  // Check if slot range is available (excluding current block)
+  const isAvailable = await (Reservation as any).isSlotRangeAvailable(reservationDate, timeSlot, endTimeSlot, id);
+  if (!isAvailable) {
+    res.status(400).json({
+      success: false,
+      error: 'One or more time slots in this range are already reserved or blocked'
+    });
+    return;
+  }
+
+  // Get weather forecast for the updated blocked time slot
+  let weatherForecast = null;
+  try {
+    const weather = await weatherService.getWeatherForDateTime(reservationDate, timeSlot);
+    if (weather) {
+      weatherForecast = {
+        temperature: weather.temperature,
+        description: weather.description,
+        humidity: weather.humidity,
+        windSpeed: weather.windSpeed,
+        icon: weather.icon,
+        rainChance: weather.rainChance,
+        timestamp: weather.timestamp
+      };
+    }
+  } catch (error) {
+    console.warn('Failed to fetch weather for updated blocked reservation:', error);
+  }
+
+  // Update the blocked reservation
+  reservation.date = reservationDate;
+  reservation.timeSlot = timeSlot;
+  reservation.duration = duration;
+  reservation.blockReason = blockReason || reservation.blockReason;
+  reservation.blockNotes = blockNotes !== undefined ? blockNotes : reservation.blockNotes;
+  reservation.weatherForecast = weatherForecast || reservation.weatherForecast;
+
+  await reservation.save();
+  await reservation.populate('userId', 'username fullName email');
+
+  console.log(`✏️  Admin ${req.user.username} updated court block: ${reservationDate.toISOString().split('T')[0]} ${timeSlot}:00-${endTimeSlot}:00`);
+
+  res.status(200).json({
+    success: true,
+    data: reservation,
+    message: 'Block updated successfully'
+  });
+});
+
+// Admin: Delete blocked reservation
+export const deleteBlockedReservation = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+
+  const reservation = await Reservation.findById(id);
+
+  if (!reservation) {
+    res.status(404).json({
+      success: false,
+      error: 'Blocked reservation not found'
+    });
+    return;
+  }
+
+  if (reservation.reservationType !== 'blocked') {
+    res.status(400).json({
+      success: false,
+      error: 'This is not a blocked reservation. Use the cancel endpoint for regular reservations.'
+    });
+    return;
+  }
+
+  await Reservation.findByIdAndDelete(id);
+
+  console.log(`✅ Admin ${req.user?.username} removed court block: ${reservation.date.toISOString().split('T')[0]} ${reservation.timeSlot}:00`);
+
+  res.status(200).json({
+    success: true,
+    message: 'Court block removed successfully'
+  });
+});
+
+// Validation rules for blocked reservations
+export const createBlockedReservationValidation = [
+  body('date')
+    .isISO8601()
+    .withMessage('Invalid date format'),
+  body('timeSlot')
+    .isInt({ min: 5, max: 22 })
+    .withMessage('Time slot must be between 5 and 22'),
+  body('duration')
+    .optional()
+    .isInt({ min: 1, max: 12 })
+    .withMessage('Duration must be between 1 and 12 hours'),
+  body('blockReason')
+    .optional()
+    .isIn(['maintenance', 'private_event', 'weather', 'other'])
+    .withMessage('Block reason must be maintenance, private_event, weather, or other'),
+  body('blockNotes')
+    .optional()
+    .trim()
+    .isLength({ max: 200 })
+    .withMessage('Block notes must not exceed 200 characters')
 ];
