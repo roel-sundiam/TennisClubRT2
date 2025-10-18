@@ -926,7 +926,7 @@ export const cancelReservation = asyncHandler(async (req: AuthenticatedRequest, 
         cancellation: {
           reason: reason || 'Reservation cancelled',
           cancelledAt: new Date(),
-          cancelledBy: req.user?._id || 'system',
+          cancelledBy: req.user?._id?.toString() || 'system',
           previousStatus: 'pending'
         }
       };
