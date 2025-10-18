@@ -39,38 +39,11 @@ async function fixMissingDuration() {
 
     for (const res of reservationsWithoutDuration) {
       try {
-        // Parse timeSlotDisplay to determine duration
-        // Format examples: "5PM-6PM", "17:00 - 18:00", "5PM-7PM" (multi-hour)
-        let calculatedDuration = 1;
-        let calculatedEndTimeSlot = res.timeSlot + 1;
-
-        if (res.timeSlotDisplay) {
-          const display = res.timeSlotDisplay as string;
-
-          // Try to extract end time from display
-          // Match patterns like "5PM-7PM" or "17:00 - 19:00"
-          const pmMatch = display.match(/(\d+)PM-(\d+)PM/);
-          const timeMatch = display.match(/(\d+):00\s*-\s*(\d+):00/);
-
-          if (pmMatch) {
-            const startHour = parseInt(pmMatch[1]) + 12;
-            const endHour = parseInt(pmMatch[2]) + 12;
-            calculatedDuration = endHour - startHour;
-            calculatedEndTimeSlot = endHour;
-          } else if (timeMatch) {
-            const startHour = parseInt(timeMatch[1]);
-            const endHour = parseInt(timeMatch[2]);
-            calculatedDuration = endHour - startHour;
-            calculatedEndTimeSlot = endHour;
-          }
-        }
-
-        // Validate calculated values
-        if (calculatedDuration < 1 || calculatedDuration > 12) {
-          console.warn(`⚠️  Invalid duration ${calculatedDuration} for reservation ${res._id}, using 1`);
-          calculatedDuration = 1;
-          calculatedEndTimeSlot = res.timeSlot + 1;
-        }
+        // Since we can't access virtual fields on lean() results,
+        // we'll just assume 1 hour duration for all old reservations
+        // This is the safest approach for legacy data
+        const calculatedDuration = 1;
+        const calculatedEndTimeSlot = res.timeSlot + 1;
 
         // Update the reservation
         await Reservation.updateOne(
@@ -85,7 +58,7 @@ async function fixMissingDuration() {
         );
 
         fixed++;
-        console.log(`✅ Fixed reservation ${res._id}: ${res.timeSlotDisplay} -> duration=${calculatedDuration}, endTimeSlot=${calculatedEndTimeSlot}`);
+        console.log(`✅ Fixed reservation ${res._id}: duration=${calculatedDuration}, endTimeSlot=${calculatedEndTimeSlot}`);
       } catch (error) {
         errors++;
         console.error(`❌ Error fixing reservation ${res._id}:`, error);
