@@ -175,8 +175,16 @@ export class AdminBlockCourtComponent implements OnInit {
     this.submitting = true;
 
     const formValue = this.blockForm.value;
+
+    // Format date in YYYY-MM-DD using local date components to avoid timezone shift
+    const selectedDate = formValue.date;
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
+
     const payload = {
-      date: formValue.date,
+      date: dateString,
       timeSlot: formValue.timeSlot,
       duration: formValue.duration,
       blockReason: formValue.blockReason,
