@@ -244,9 +244,9 @@ reservationSchema.pre('save', function(next) {
 // Static method to check if a range of slots is available (for multi-hour reservations)
 // Fixed: Normalizes dates to prevent time component mismatches between blocked reservations and user requests
 reservationSchema.statics.isSlotRangeAvailable = async function(date: Date, startTimeSlot: number, endTimeSlot: number, excludeId?: string) {
-  // Normalize date to start/end of day to handle different time components
-  const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+  // Normalize date to start/end of day using UTC to avoid timezone issues
+  const startOfDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const endOfDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1));
 
   // Check for any existing reservations that would conflict with the requested range
   const query: any = {
@@ -300,8 +300,8 @@ reservationSchema.statics.isSlotAvailable = async function(date: Date, timeSlot:
 // Static method to get reservations for a specific date
 reservationSchema.statics.getReservationsForDate = function(date: Date) {
   // Use UTC-based date construction to avoid timezone issues
-  const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+  const startOfDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const endOfDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1));
 
   return this.find({
     date: {
