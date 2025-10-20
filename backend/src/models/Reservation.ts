@@ -299,16 +299,14 @@ reservationSchema.statics.isSlotAvailable = async function(date: Date, timeSlot:
 
 // Static method to get reservations for a specific date
 reservationSchema.statics.getReservationsForDate = function(date: Date) {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
-  
+  // Use UTC-based date construction to avoid timezone issues
+  const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+
   return this.find({
     date: {
       $gte: startOfDay,
-      $lte: endOfDay
+      $lt: endOfDay
     }
   }).populate('userId', 'username fullName').sort({ timeSlot: 1 });
 };
