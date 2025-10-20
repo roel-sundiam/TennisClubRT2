@@ -243,16 +243,23 @@ reservationSchema.pre('save', function(next) {
 
 // Static method to check if a range of slots is available (for multi-hour reservations)
 reservationSchema.statics.isSlotRangeAvailable = async function(date: Date, startTimeSlot: number, endTimeSlot: number, excludeId?: string) {
+  // Normalize date to start/end of day to handle different time components
+  const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+
   // Check for any existing reservations that would conflict with the requested range
   const query: any = {
-    date: date,
+    date: {
+      $gte: startOfDay,
+      $lt: endOfDay
+    },
     status: { $in: ['pending', 'confirmed'] },
     $or: [
       // Case 1: Existing reservation starts within our requested range
       {
         timeSlot: { $gte: startTimeSlot, $lt: endTimeSlot }
       },
-      // Case 2: Existing reservation ends within our requested range  
+      // Case 2: Existing reservation ends within our requested range
       {
         endTimeSlot: { $gt: startTimeSlot, $lte: endTimeSlot }
       },
@@ -263,12 +270,24 @@ reservationSchema.statics.isSlotRangeAvailable = async function(date: Date, star
       }
     ]
   };
-  
+
   if (excludeId) {
     query._id = { $ne: excludeId };
   }
-  
+
+  console.log(`🔍 Checking availability for ${date.toISOString().split('T')[0]} slots ${startTimeSlot}-${endTimeSlot}`);
   const conflictingReservations = await this.find(query);
+  console.log(`🔍 Found ${conflictingReservations.length} conflicting reservation(s)`);
+  if (conflictingReservations.length > 0) {
+    console.log(`🚫 Conflicts:`, conflictingReservations.map((r: any) => ({
+      id: r._id,
+      type: r.reservationType || 'regular',
+      timeSlot: r.timeSlot,
+      endTimeSlot: r.endTimeSlot,
+      status: r.status
+    })));
+  }
+
   return conflictingReservations.length === 0;
 };
 
