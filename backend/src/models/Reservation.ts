@@ -242,6 +242,7 @@ reservationSchema.pre('save', function(next) {
 });
 
 // Static method to check if a range of slots is available (for multi-hour reservations)
+// Fixed: Normalizes dates to prevent time component mismatches between blocked reservations and user requests
 reservationSchema.statics.isSlotRangeAvailable = async function(date: Date, startTimeSlot: number, endTimeSlot: number, excludeId?: string) {
   // Normalize date to start/end of day to handle different time components
   const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
