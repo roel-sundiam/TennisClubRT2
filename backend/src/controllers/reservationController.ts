@@ -57,44 +57,46 @@ export const getReservations = asyncHandler(async (req: AuthenticatedRequest, re
   const filter: any = {};
   
   if (req.query.userId) {
-    filter.userId = req.query.userId;
+    // Handle both ObjectId and String formats for backward compatibility
+    filter.userId = { $in: [req.query.userId.toString(), req.query.userId] };
   }
-  
+
   if (req.query.date) {
     const queryDate = new Date(req.query.date as string);
     const startOfDay = new Date(queryDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(queryDate);
     endOfDay.setHours(23, 59, 59, 999);
-    
+
     filter.date = {
       $gte: startOfDay,
       $lte: endOfDay
     };
   }
-  
+
   if (req.query.dateFrom && req.query.dateTo) {
     const fromDate = new Date(req.query.dateFrom as string);
     const toDate = new Date(req.query.dateTo as string);
     toDate.setHours(23, 59, 59, 999);
-    
+
     filter.date = {
       $gte: fromDate,
       $lte: toDate
     };
   }
-  
+
   if (req.query.status) {
     filter.status = req.query.status;
   }
-  
+
   if (req.query.paymentStatus) {
     filter.paymentStatus = req.query.paymentStatus;
   }
 
   // If not admin/superadmin, only show own reservations unless explicitly requesting all
   if (req.user?.role === 'member' && req.query.showAll !== 'true') {
-    filter.userId = req.user._id.toString();
+    // Handle both ObjectId and String formats for backward compatibility
+    filter.userId = { $in: [req.user._id.toString(), req.user._id] };
   }
 
   console.log('🔍 Reservation Filter Debug:');
@@ -626,7 +628,7 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
 
   // Create reservation
   const reservation = new Reservation({
-    userId: req.user._id,
+    userId: req.user._id.toString(),
     date: reservationDate,
     timeSlot,
     duration,

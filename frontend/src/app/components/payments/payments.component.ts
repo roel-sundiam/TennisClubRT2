@@ -953,10 +953,11 @@ export class PaymentsComponent implements OnInit {
       const cacheBuster = bustCache ? `&_t=${Date.now()}` : '';
 
       // Load both existing pending payments and unpaid reservations
+      // Use a high limit to get all reservations (not just first 10)
       const [paymentsResponse, reservationsResponse] = await Promise.all([
         this.http.get<any>(`${this.apiUrl}/payments/my?status=pending${cacheBuster}`).toPromise(),
         this.http
-          .get<any>(`${this.apiUrl}/reservations?paymentStatus=pending${cacheBuster}`)
+          .get<any>(`${this.apiUrl}/reservations?paymentStatus=pending&limit=100${cacheBuster}`)
           .toPromise(),
       ]);
       const rawExistingPayments = paymentsResponse?.data || [];

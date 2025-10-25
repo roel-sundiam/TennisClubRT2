@@ -623,7 +623,7 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
 
   // Create payment record
   let paymentData: any = {
-    userId: isManualPayment ? req.user._id : reservation!.userId,
+    userId: isManualPayment ? req.user._id.toString() : reservation!.userId?.toString(),
     amount: paymentAmount,
     paymentMethod,
     dueDate,
@@ -692,24 +692,25 @@ export const getPayments = asyncHandler(async (req: AuthenticatedRequest, res: R
 
   // Build filter query
   const filter: any = {};
-  
+
   if (req.query.userId) {
-    filter.userId = req.query.userId;
+    // Handle both ObjectId and String formats for backward compatibility
+    filter.userId = { $in: [req.query.userId.toString(), req.query.userId] };
   }
-  
+
   if (req.query.status) {
     filter.status = req.query.status;
   }
-  
+
   if (req.query.paymentMethod) {
     filter.paymentMethod = req.query.paymentMethod;
   }
-  
+
   if (req.query.startDate && req.query.endDate) {
     const fromDate = new Date(req.query.startDate as string);
     const toDate = new Date(req.query.endDate as string);
     toDate.setHours(23, 59, 59, 999);
-    
+
     filter.createdAt = {
       $gte: fromDate,
       $lte: toDate
@@ -718,7 +719,8 @@ export const getPayments = asyncHandler(async (req: AuthenticatedRequest, res: R
 
   // If regular member, only show own payments
   if (req.user?.role === 'member') {
-    filter.userId = req.user._id.toString();
+    // Handle both ObjectId and String formats for backward compatibility
+    filter.userId = { $in: [req.user._id.toString(), req.user._id] };
   }
 
   console.log('💰 PAYMENT FILTER:', filter);
@@ -1219,12 +1221,13 @@ export const getMyPayments = asyncHandler(async (req: AuthenticatedRequest, res:
   const skip = (page - 1) * limit;
 
   const filter: any = {};
-  
+
   // Admin and superadmin users can see all payments, regular members only see their own
   if (req.user.role === 'member') {
-    filter.userId = req.user._id.toString();
+    // Handle both ObjectId and String formats for backward compatibility
+    filter.userId = { $in: [req.user._id.toString(), req.user._id] };
   }
-  
+
   if (req.query.status) {
     filter.status = req.query.status;
   }
@@ -1239,11 +1242,12 @@ export const getMyPayments = asyncHandler(async (req: AuthenticatedRequest, res:
 
   const total = await Payment.countDocuments(filter);
   console.log('🔍 Total payments found for user:', total);
-  
+
   // Add debug for completed payments specifically
-  const completedFilter = { status: 'completed' };
+  const completedFilter: any = { status: 'completed' };
   if (req.user.role === 'member') {
-    (completedFilter as any).userId = req.user._id.toString();
+    // Handle both ObjectId and String formats for backward compatibility
+    completedFilter.userId = { $in: [req.user._id.toString(), req.user._id] };
   }
   const completedCount = await Payment.countDocuments(completedFilter);
   console.log('🔍 Completed payments for user:', completedCount);
@@ -1322,8 +1326,9 @@ export const checkMyOverduePayments = asyncHandler(async (req: AuthenticatedRequ
   oneDayAgo.setHours(23, 59, 59, 999);
 
   // Check Payment collection for pending overdue payments
+  // Handle both ObjectId and String formats for backward compatibility
   const overduePayments = await Payment.find({
-    userId: req.user._id,
+    userId: { $in: [req.user._id.toString(), req.user._id] },
     status: 'pending',
     dueDate: { $lt: oneDayAgo }
   }).lean();
