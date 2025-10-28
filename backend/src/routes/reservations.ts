@@ -9,14 +9,9 @@ import {
   updateReservationStatus,
   completeReservation,
   getMyUpcomingReservations,
-  createBlockedReservation,
-  getBlockedReservations,
-  updateBlockedReservation,
-  deleteBlockedReservation,
   createReservationValidation,
   updateReservationValidation,
-  completeReservationValidation,
-  createBlockedReservationValidation
+  completeReservationValidation
 } from '../controllers/reservationController';
 import { requireAdmin, requireApprovedUser, requireMembershipFees, authenticateToken } from '../middleware/auth';
 import { validateRequest } from '../middleware/validation';
@@ -68,29 +63,7 @@ router.patch('/:id/complete',
   completeReservation
 );
 
-// Admin only: Court blocking endpoints
-router.post('/admin/block',
-  requireAdmin,
-  createBlockedReservationValidation,
-  validateRequest,
-  createBlockedReservation
-);
-
-router.get('/admin/blocks',
-  requireAdmin,
-  getBlockedReservations
-);
-
-router.put('/admin/block/:id',
-  requireAdmin,
-  createBlockedReservationValidation,
-  validateRequest,
-  updateBlockedReservation
-);
-
-router.delete('/admin/block/:id',
-  requireAdmin,
-  deleteBlockedReservation
-);
+// Note: Court blocking functionality has been removed.
+// It can be re-implemented later if needed.
 
 export default router;
