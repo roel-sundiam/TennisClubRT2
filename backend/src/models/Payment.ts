@@ -4,6 +4,7 @@ export interface IPaymentDocument extends Document {
   reservationId?: string;
   pollId?: string; // For Open Play events
   userId: string;
+  paidBy?: string; // User who actually made the payment (if different from userId)
   amount: number;
   currency: string;
   paymentMethod: 'cash' | 'bank_transfer' | 'gcash' | 'coins';
@@ -48,6 +49,9 @@ export interface IPaymentDocument extends Document {
       cancelledBy: string;
       previousStatus: string;
     };
+    // Pay on behalf metadata
+    paidOnBehalf?: boolean; // Indicates payment was made by someone else
+    originalDebtor?: string; // Name of the person who owes the payment
   };
   createdAt: Date;
   updatedAt: Date;
@@ -68,6 +72,11 @@ const paymentSchema = new Schema<IPaymentDocument>({
     type: String,
     ref: 'User',
     required: [true, 'User ID is required'],
+    index: true
+  },
+  paidBy: {
+    type: String,
+    ref: 'User',
     index: true
   },
   amount: {
@@ -182,7 +191,10 @@ const paymentSchema = new Schema<IPaymentDocument>({
       cancelledAt: { type: Date },
       cancelledBy: { type: String },
       previousStatus: { type: String }
-    }
+    },
+    // Pay on behalf metadata
+    paidOnBehalf: { type: Boolean },
+    originalDebtor: { type: String }
   }
 }, {
   timestamps: true,

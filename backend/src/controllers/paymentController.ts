@@ -458,7 +458,7 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
       Object.assign(existingPayment, updateData);
       await existingPayment.save();
       await existingPayment.populate('userId', 'username fullName email');
-      await existingPayment.populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee');
+      await existingPayment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
       await existingPayment.populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime');
       
       return res.status(200).json({
@@ -687,7 +687,7 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
   await payment.populate('userId', 'username fullName email');
   
   if (!isManualPayment) {
-    await payment.populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee');
+    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
     // Update reservation payment status - since payments are automatically completed, set to paid
     reservation!.paymentStatus = 'paid';
     await reservation!.save({ validateBeforeSave: false });
@@ -829,7 +829,7 @@ export const getPayment = asyncHandler(async (req: AuthenticatedRequest, res: Re
   
   const payment = await Payment.findById(id)
     .populate('userId', 'username fullName email')
-    .populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee')
+    .populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee')
     .populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime');
   
   if (!payment) {
@@ -926,7 +926,7 @@ export const processPayment = asyncHandler(async (req: AuthenticatedRequest, res
 
     // Populate related data for response
     await payment.populate('userId', 'username fullName email');
-    await payment.populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee');
+    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
     await payment.populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime');
 
     console.log('💰 Payment processing completed successfully:', {
@@ -1128,7 +1128,7 @@ export const updatePayment = asyncHandler(async (req: AuthenticatedRequest, res:
   
   try {
     console.log('💰 Populating reservationId...');
-    await payment.populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee');
+    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
     console.log('💰 reservationId populated successfully');
   } catch (error: any) {
     console.error('💰 ERROR during reservationId populate:', error);
@@ -1218,7 +1218,7 @@ export const cancelPayment = asyncHandler(async (req: AuthenticatedRequest, res:
   }
 
   await payment.populate('userId', 'username fullName email');
-  await payment.populate('reservationId', 'date timeSlot players status totalFee');
+  await payment.populate('reservationId', 'userId date timeSlot players status totalFee');
   await payment.populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime');
 
   return res.status(200).json({
@@ -1276,7 +1276,7 @@ export const getMyPayments = asyncHandler(async (req: AuthenticatedRequest, res:
   try {
     const payments = await Payment.find(filter)
       .populate('userId', 'username fullName email')
-      .populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee')
+      .populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee')
       .populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -1509,7 +1509,7 @@ export const approvePayment = asyncHandler(async (req: AuthenticatedRequest, res
 
     // Populate related data for response
     await payment.populate('userId', 'username fullName email');
-    await payment.populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee');
+    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
     await payment.populate('approvedBy', 'username fullName');
 
     console.log('✅ Payment approved successfully:', {
@@ -1590,7 +1590,7 @@ export const recordPayment = asyncHandler(async (req: AuthenticatedRequest, res:
 
     // Populate related data for response
     await payment.populate('userId', 'username fullName email');
-    await payment.populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee');
+    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
     await payment.populate('approvedBy', 'username fullName');
     await payment.populate('recordedBy', 'username fullName');
 
@@ -1701,7 +1701,7 @@ export const unrecordPayment = asyncHandler(async (req: AuthenticatedRequest, re
 
     // Populate related data for response
     await payment.populate('userId', 'username fullName email');
-    await payment.populate('reservationId', 'date timeSlot endTimeSlot duration players status totalFee');
+    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
     await payment.populate('approvedBy', 'username fullName');
 
     console.log('🔄 Payment unrecorded successfully:', {
@@ -1916,4 +1916,253 @@ export const processPaymentValidation = [
     .trim()
     .isLength({ min: 1, max: 50 })
     .withMessage('Reference number must be 1-50 characters')
+];
+
+// Pay on behalf of another member
+export const payOnBehalf = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { reservationId, payForUserId, amount, paymentMethod, transactionId, notes } = req.body;
+
+  console.log('💰 PAY ON BEHALF REQUEST:', {
+    reservationId,
+    payForUserId,
+    amount,
+    paymentMethod,
+    transactionId,
+    notes,
+    payerUsername: req.user?.username,
+    payerId: req.user?._id.toString()
+  });
+
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      error: 'Authentication required'
+    });
+  }
+
+  // Validate required fields
+  if (!reservationId) {
+    return res.status(400).json({
+      success: false,
+      error: 'Reservation ID is required'
+    });
+  }
+
+  if (!payForUserId) {
+    return res.status(400).json({
+      success: false,
+      error: 'User ID to pay for is required'
+    });
+  }
+
+  if (!amount || amount <= 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'Valid payment amount is required'
+    });
+  }
+
+  if (!paymentMethod) {
+    return res.status(400).json({
+      success: false,
+      error: 'Payment method is required'
+    });
+  }
+
+  // Validate payment method
+  const validPaymentMethods = ['cash', 'bank_transfer', 'gcash', 'coins'];
+  if (!validPaymentMethods.includes(paymentMethod)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid payment method'
+    });
+  }
+
+  // Validate reservation exists
+  const reservation = await Reservation.findById(reservationId);
+  if (!reservation) {
+    return res.status(404).json({
+      success: false,
+      error: 'Reservation not found'
+    });
+  }
+
+  // Verify the requester is the reserver
+  if (reservation.userId.toString() !== req.user._id.toString()) {
+    return res.status(403).json({
+      success: false,
+      error: 'Only the reserver can pay for other members'
+    });
+  }
+
+  // Verify the target member exists
+  const targetMember = await User.findById(payForUserId);
+  if (!targetMember) {
+    return res.status(404).json({
+      success: false,
+      error: 'Target member not found'
+    });
+  }
+
+  // Verify target member is in the reservation's player list
+  const isInReservation = reservation.players.some(player => {
+    if (typeof player === 'object' && 'userId' in player) {
+      return player.userId?.toString() === payForUserId;
+    }
+    return false;
+  });
+
+  if (!isInReservation) {
+    return res.status(400).json({
+      success: false,
+      error: 'Target member is not in this reservation'
+    });
+  }
+
+  // Check if payment already exists for this member in this reservation
+  const existingPayment = await Payment.findOne({
+    reservationId,
+    userId: payForUserId,
+    status: { $in: ['pending', 'completed', 'record'] }
+  });
+
+  if (existingPayment) {
+    return res.status(400).json({
+      success: false,
+      error: 'Payment already exists for this member'
+    });
+  }
+
+  // Calculate due date (same as regular payment creation)
+  const reservationDate = new Date(reservation.date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  reservationDate.setHours(0, 0, 0, 0);
+
+  let dueDate = new Date();
+  if (reservationDate.getTime() === today.getTime()) {
+    // Same day booking - due immediately
+    dueDate.setHours(23, 59, 59, 999);
+  } else {
+    // Advance booking - due 7 days from now or 1 day before reservation, whichever is earlier
+    const sevenDaysFromNow = new Date();
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+
+    const oneDayBeforeReservation = new Date(reservationDate);
+    oneDayBeforeReservation.setDate(oneDayBeforeReservation.getDate() - 1);
+
+    dueDate.setTime(Math.min(sevenDaysFromNow.getTime(), oneDayBeforeReservation.getTime()));
+  }
+
+  // Get time slot info for description
+  const timeSlot = reservation.timeSlot;
+  const formattedDate = new Date(reservation.date).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC'
+  });
+
+  // Calculate if peak hour
+  const peakHours = (process.env.PEAK_HOURS || '5,18,19,21').split(',').map(h => parseInt(h));
+  const isPeakHour = peakHours.includes(reservation.timeSlot);
+
+  // Create payment record
+  const payment = new Payment({
+    reservationId,
+    userId: payForUserId,
+    paidBy: req.user._id.toString(),
+    amount: parseFloat(amount),
+    currency: 'PHP',
+    paymentMethod,
+    status: 'completed',
+    transactionId: transactionId || undefined,
+    paymentDate: new Date(),
+    dueDate,
+    description: `Court fee for ${formattedDate} at ${timeSlot}:00 (Paid by ${req.user.fullName})`,
+    notes: notes || `Paid on behalf by ${req.user.fullName}`,
+    metadata: {
+      timeSlot: reservation.timeSlot,
+      date: reservation.date,
+      playerCount: reservation.players.length,
+      isPeakHour: isPeakHour,
+      originalFee: parseFloat(amount),
+      paidOnBehalf: true,
+      originalDebtor: targetMember.fullName
+    }
+  });
+
+  await payment.save();
+
+  console.log('✅ Payment created on behalf:', {
+    paymentId: payment._id,
+    paidBy: req.user.fullName,
+    paidFor: targetMember.fullName,
+    amount: payment.amount
+  });
+
+  // Add payment ID to reservation's paymentIds array
+  if (!reservation.paymentIds) {
+    reservation.paymentIds = [];
+  }
+  reservation.paymentIds.push((payment._id as any).toString());
+
+  // Check if all members have paid
+  const membersInReservation = reservation.players.filter(p => {
+    if (typeof p === 'object' && 'isMember' in p) {
+      return p.isMember;
+    }
+    return false;
+  });
+
+  const paidCount = reservation.paymentIds.length;
+  if (paidCount >= membersInReservation.length) {
+    reservation.paymentStatus = 'paid';
+    console.log('✅ All members have paid, updating reservation status to "paid"');
+  }
+
+  await reservation.save();
+
+  // Populate related data for response
+  await payment.populate('userId', 'username fullName email');
+  await payment.populate('paidBy', 'username fullName email');
+  await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
+
+  return res.status(201).json({
+    success: true,
+    data: payment,
+    message: `Payment created successfully on behalf of ${targetMember.fullName}`
+  });
+});
+
+export const payOnBehalfValidation = [
+  body('reservationId')
+    .notEmpty()
+    .withMessage('Reservation ID is required')
+    .isMongoId()
+    .withMessage('Invalid reservation ID'),
+  body('payForUserId')
+    .notEmpty()
+    .withMessage('User ID to pay for is required')
+    .isMongoId()
+    .withMessage('Invalid user ID'),
+  body('amount')
+    .notEmpty()
+    .withMessage('Amount is required')
+    .isFloat({ min: 0.01 })
+    .withMessage('Amount must be greater than zero'),
+  body('paymentMethod')
+    .notEmpty()
+    .withMessage('Payment method is required')
+    .isIn(['cash', 'bank_transfer', 'gcash', 'coins'])
+    .withMessage('Invalid payment method'),
+  body('transactionId')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Transaction ID cannot exceed 100 characters'),
+  body('notes')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Notes cannot exceed 500 characters')
 ];

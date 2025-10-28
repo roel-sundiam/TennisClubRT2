@@ -15,8 +15,10 @@ import {
   approvePayment,
   recordPayment,
   unrecordPayment,
+  payOnBehalf,
   createPaymentValidation,
-  processPaymentValidation
+  processPaymentValidation,
+  payOnBehalfValidation
 } from '../controllers/paymentController';
 import { authenticateToken, requireRole, AuthenticatedRequest } from '../middleware/auth';
 import { autoFixPaymentsMiddleware } from '../middleware/autoFixPayments';
@@ -56,6 +58,19 @@ router.post(
   handleValidationErrors,
   autoFixPaymentsMiddleware,
   createPayment
+);
+
+/**
+ * @route POST /api/payments/pay-on-behalf
+ * @desc Create payment on behalf of another member (reserver only)
+ * @access Private
+ */
+router.post(
+  '/pay-on-behalf',
+  authenticateToken,
+  payOnBehalfValidation,
+  handleValidationErrors,
+  payOnBehalf
 );
 
 /**

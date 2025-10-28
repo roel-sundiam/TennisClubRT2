@@ -16,6 +16,7 @@ interface Payment {
   _id: string;
   reservationId?: {
     _id: string;
+    userId?: string;
     date: Date;
     timeSlot: number;
     players: string[];
@@ -32,6 +33,11 @@ interface Payment {
     };
   };
   userId: {
+    _id: string;
+    username: string;
+    fullName: string;
+  };
+  paidBy?: {
     _id: string;
     username: string;
     fullName: string;
@@ -81,15 +87,27 @@ interface Payment {
       cancelledBy: string;
       previousStatus: string;
     };
+    // Pay on behalf metadata
+    paidOnBehalf?: boolean;
+    originalDebtor?: string;
   };
   notes?: string;
 }
 
+interface ReservationPlayer {
+  name: string;
+  userId?: string | null;
+  isMember: boolean;
+  isGuest: boolean;
+}
+
 interface Reservation {
   _id: string;
+  userId?: string;
   date: Date;
   timeSlot: number;
-  players: string[];
+  players: (string | ReservationPlayer)[];
+  paymentIds?: string[];
   status: string;
   paymentStatus: string;
   totalFee: number;
@@ -350,6 +368,10 @@ interface Notification {
                   <span>Transaction ID:</span>
                   <span>{{payment.transactionId}}</span>
                 </div>
+                <div class="detail-row paid-on-behalf" *ngIf="payment.paidBy && payment.paidBy._id !== payment.userId._id">
+                  <span>Paid By:</span>
+                  <span class="paid-by-info">{{payment.paidBy.fullName}} (on behalf)</span>
+                </div>
                 
                 <!-- Cancellation Details for Failed/Refunded Payments -->
                 <div *ngIf="payment.metadata?.cancellation || isLegacyCancelledPayment(payment)" class="cancellation-details">
@@ -440,9 +462,76 @@ interface Notification {
       <div class="tab-content" *ngIf="activeTab === 'pending'">
         <div class="pending-container">
           <h2>Pending Payments</h2>
-          
+
+          <!-- Debug Info Panel -->
+          <div class="debug-panel">
+            <button class="debug-toggle-btn" (click)="toggleDebugInfo()">
+              <mat-icon>{{showDebugInfo ? 'visibility_off' : 'bug_report'}}</mat-icon>
+              {{showDebugInfo ? 'Hide Debug Info' : 'Show Debug Info'}}
+            </button>
+
+            <div class="debug-content" *ngIf="showDebugInfo">
+              <h4>Pay for Others - Debug Information</h4>
+              <p class="debug-description">This shows why the "Pay for Others" button appears or not:</p>
+
+              <!-- Warning if reservation IDs are missing -->
+              <div class="debug-warning" *ngIf="hasMissingReservationIds()">
+                <mat-icon>warning</mat-icon>
+                <div>
+                  <strong>⚠️ Missing Reservation Owner IDs detected!</strong>
+                  <p>If you just updated the code, please restart the backend server to populate reservation data correctly.</p>
+                  <p>Run: <code>cd backend && npm run dev</code></p>
+                </div>
+              </div>
+
+              <div class="debug-entries" *ngIf="debugInfo.length > 0">
+                <div class="debug-entry" *ngFor="let entry of debugInfo">
+                  <div class="debug-row">
+                    <span class="debug-label">Payment ID:</span>
+                    <span class="debug-value">{{entry.paymentId}}</span>
+                  </div>
+                  <div class="debug-row">
+                    <span class="debug-label">Reservation Owner ID:</span>
+                    <span class="debug-value" [class.debug-missing]="!entry.reservationUserId">
+                      {{entry.reservationUserId || '❌ Missing'}}
+                    </span>
+                  </div>
+                  <div class="debug-row">
+                    <span class="debug-label">Current User ID:</span>
+                    <span class="debug-value" [class.debug-missing]="!entry.currentUserId">
+                      {{entry.currentUserId || '❌ Missing'}}
+                    </span>
+                  </div>
+                  <div class="debug-row">
+                    <span class="debug-label">Is Reserver:</span>
+                    <span class="debug-value" [class.debug-success]="entry.isReserver" [class.debug-fail]="!entry.isReserver">
+                      {{entry.isReserver ? '✅ Yes - Button shows' : '❌ No - Button hidden'}}
+                    </span>
+                  </div>
+                  <div class="debug-row">
+                    <span class="debug-label">Match Status:</span>
+                    <span class="debug-value"
+                          [class.debug-success]="entry.reservationUserId && entry.reservationUserId === entry.currentUserId"
+                          [class.debug-fail]="!entry.reservationUserId || entry.reservationUserId !== entry.currentUserId">
+                      <ng-container *ngIf="entry.reservationUserId && entry.currentUserId">
+                        {{entry.reservationUserId === entry.currentUserId ? '✅ IDs Match' : '❌ IDs Don\'t Match'}}
+                      </ng-container>
+                      <ng-container *ngIf="!entry.reservationUserId || !entry.currentUserId">
+                        ❌ Cannot compare - Missing data
+                      </ng-container>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="debug-empty" *ngIf="debugInfo.length === 0">
+                <p>No debug entries yet. The debug info will populate when payments are checked.</p>
+              </div>
+            </div>
+          </div>
+
           <!-- Payment Form Section (when reservation selected) -->
-          <div class="payment-form-section" *ngIf="selectedReservation">
+          <div class="payment-form-section" *ngIf="selectedReservation" id="payment-form-section">
             <div class="section-header">
               <div class="payment-icon">
                 <mat-icon>payment</mat-icon>
@@ -468,11 +557,11 @@ interface Notification {
                     </div>
                     <div class="detail-item" *ngIf="!isOpenPlayPayment() && !isManualPayment()">
                       <mat-icon>group</mat-icon>
-                      <span>{{selectedReservation.players.length}} player{{selectedReservation.players.length !== 1 ? 's' : ''}}: {{selectedReservation.players.join(', ')}}</span>
+                      <span>{{selectedReservation.players.length}} player{{selectedReservation.players.length !== 1 ? 's' : ''}}: {{formatPlayerNames(selectedReservation.players)}}</span>
                     </div>
                     <div class="detail-item" *ngIf="isManualPayment()">
                       <mat-icon>group</mat-icon>
-                      <span>Players: {{selectedReservation.players.join(', ')}}</span>
+                      <span>Players: {{formatPlayerNames(selectedReservation.players)}}</span>
                     </div>
                     <div class="detail-item" *ngIf="isOpenPlayPayment()">
                       <mat-icon>sports_tennis</mat-icon>
@@ -620,6 +709,13 @@ interface Notification {
                       Pay Now
                     </button>
                     <button
+                      class="pay-others-btn"
+                      (click)="openPayOnBehalfModal(payment)"
+                      *ngIf="isReserver(payment)"
+                      title="Pay for other members in this reservation">
+                      Pay for Others
+                    </button>
+                    <button
                       class="cancel-reservation-btn"
                       (click)="cancelReservationDirectly(convertPaymentToReservation(payment))"
                       [disabled]="processing.includes(payment.reservationId._id) || !canCancel(payment)">
@@ -647,24 +743,23 @@ interface Notification {
                         Pay Now
                       </button>
 
-                      <!-- Court reservations can be marked as paid if cash -->
-                      <button
-                        class="pay-btn"
-                        (click)="processPayment(payment._id)"
-                        *ngIf="payment.reservationId && payment.paymentMethod === 'cash'"
-                        [disabled]="processing.includes(payment._id) || !canMakePayment(payment)"
-                        [title]="!canMakePayment(payment) ? getPaymentDisabledMessage(payment) : ''">
-                        {{processing.includes(payment._id) ? 'Processing...' : 'Mark as Paid'}}
-                      </button>
-
-                      <!-- Other payment methods should show Pay Now -->
+                      <!-- Court reservations - Pay Now shows payment form -->
                       <button
                         class="pay-btn"
                         (click)="payForExistingPayment(payment)"
-                        *ngIf="payment.reservationId && payment.paymentMethod !== 'cash'"
+                        *ngIf="payment.reservationId"
                         [disabled]="!canMakePayment(payment)"
                         [title]="!canMakePayment(payment) ? getPaymentDisabledMessage(payment) : ''">
                         Pay Now
+                      </button>
+
+                      <!-- Pay for Others button (only for reservers) -->
+                      <button
+                        class="pay-others-btn"
+                        (click)="openPayOnBehalfModal(payment)"
+                        *ngIf="payment.reservationId && isReserver(payment)"
+                        title="Pay for other members in this reservation">
+                        Pay for Others
                       </button>
                     </div>
                     
@@ -730,6 +825,90 @@ interface Notification {
         </div>
       </div>
     </div>
+
+    <!-- Pay on Behalf Modal -->
+    <div class="modal-overlay" *ngIf="showPayOnBehalfModal" (click)="cancelPayOnBehalf()">
+      <div class="modal-content pay-on-behalf-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Pay for Other Members</h2>
+          <button class="close-btn" (click)="cancelPayOnBehalf()">×</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Step 1: Select Member -->
+          <div class="member-selection" *ngIf="!selectedUnpaidMember">
+            <p class="modal-description">Select a member to pay for:</p>
+            <div class="unpaid-members-list">
+              <div
+                *ngFor="let member of unpaidMembers"
+                class="member-card"
+                (click)="selectMemberToPay(member)">
+                <div class="member-info">
+                  <span class="member-name">{{member.fullName}}</span>
+                  <span class="member-amount">₱{{member.amount.toFixed(2)}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: Payment Form -->
+          <div class="payment-form-section" *ngIf="selectedUnpaidMember" [formGroup]="payOnBehalfForm">
+            <div class="selected-member-info">
+              <p><strong>Paying for:</strong> {{selectedUnpaidMember.fullName}}</p>
+              <p><strong>Amount:</strong> ₱{{selectedUnpaidMember.amount.toFixed(2)}}</p>
+            </div>
+
+            <div class="form-group">
+              <label for="payOnBehalfPaymentMethod">Payment Method *</label>
+              <select
+                id="payOnBehalfPaymentMethod"
+                formControlName="paymentMethod"
+                class="form-control">
+                <option value="">Select payment method</option>
+                <option value="cash">Cash</option>
+                <option value="gcash">GCash</option>
+                <option value="bank_transfer">Bank Transfer</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="payOnBehalfTransactionId">Transaction ID (optional)</label>
+              <input
+                type="text"
+                id="payOnBehalfTransactionId"
+                formControlName="transactionId"
+                class="form-control"
+                placeholder="Enter transaction ID">
+            </div>
+
+            <div class="form-group">
+              <label for="payOnBehalfNotes">Notes (optional)</label>
+              <textarea
+                id="payOnBehalfNotes"
+                formControlName="notes"
+                class="form-control"
+                rows="3"
+                placeholder="Enter any additional notes"></textarea>
+            </div>
+
+            <div class="modal-actions">
+              <button
+                class="btn-secondary"
+                (click)="selectedUnpaidMember = null"
+                [disabled]="loadingPayOnBehalf">
+                Back
+              </button>
+              <button
+                class="btn-primary"
+                (click)="submitPayOnBehalf()"
+                [disabled]="payOnBehalfForm.invalid || loadingPayOnBehalf">
+                {{loadingPayOnBehalf ? 'Processing...' : 'Confirm Payment'}}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   `,
   styleUrl: './payments.component.scss'
 })
@@ -761,6 +940,18 @@ export class PaymentsComponent implements OnInit {
   manualPaymentForm: FormGroup;
   loadingManualPayment = false;
 
+  // Pay on behalf properties
+  showPayOnBehalfModal = false;
+  payOnBehalfReservation: Reservation | null = null;
+  unpaidMembers: {userId: string; fullName: string; amount: number}[] = [];
+  selectedUnpaidMember: {userId: string; fullName: string; amount: number} | null = null;
+  payOnBehalfForm: FormGroup;
+  loadingPayOnBehalf = false;
+
+  // Debug info
+  showDebugInfo = false;
+  debugInfo: {paymentId: string; reservationUserId?: string; currentUserId?: string; isReserver: boolean}[] = [];
+
   private apiUrl = environment.apiUrl;
 
   constructor(
@@ -784,6 +975,12 @@ export class PaymentsComponent implements OnInit {
       courtUsageDate: ['', Validators.required],
       paymentMethod: ['', Validators.required],
       amount: ['', [Validators.required, Validators.min(0.01)]],
+      notes: ['']
+    });
+
+    this.payOnBehalfForm = this.fb.group({
+      paymentMethod: ['', Validators.required],
+      transactionId: [''],
       notes: ['']
     });
 
@@ -909,6 +1106,7 @@ export class PaymentsComponent implements OnInit {
           _id: `synthetic-${reservation._id}`,
           reservationId: {
             _id: reservation._id,
+            userId: reservation.userId,
             date: new Date(reservation.date),
             timeSlot: reservation.timeSlot,
             players: reservation.players,
@@ -1190,32 +1388,14 @@ export class PaymentsComponent implements OnInit {
 
   // December 2025: Check if payment can be made (reservation time must have passed)
   canMakePayment(payment: Payment): boolean {
-    // Only apply timing restriction to court reservations
-    if (!payment.reservationId || !payment.metadata?.date || !payment.metadata?.timeSlot) {
-      // For non-reservation payments (Open Play, Manual), allow payment anytime
-      return true;
-    }
-
-    // Get reservation date and time
-    const reservationDate = new Date(payment.metadata.date);
-    const timeSlot = payment.metadata.timeSlot;
-
-    // Create reservation datetime (date + time slot hour)
-    const reservationDateTime = new Date(reservationDate);
-    reservationDateTime.setHours(timeSlot, 0, 0, 0);
-
-    // Payment can only be made after the reservation time has passed
-    const now = new Date();
-    return now >= reservationDateTime;
+    // Allow payment immediately after booking, regardless of reservation time
+    return true;
   }
 
   // Get message explaining why payment is disabled
   getPaymentDisabledMessage(payment: Payment): string {
-    if (!payment.reservationId) {
-      return '';
-    }
-
-    return 'Payment will be available after the reservation time passes';
+    // Payments are now available immediately after booking
+    return '';
   }
 
   cancelPayment(paymentId: string): void {
@@ -1622,6 +1802,22 @@ export class PaymentsComponent implements OnInit {
     });
   }
 
+  // Format player names from array (handles both strings and objects)
+  formatPlayerNames(players: any[]): string {
+    if (!players || players.length === 0) {
+      return '';
+    }
+
+    return players.map(player => {
+      if (typeof player === 'string') {
+        return player;
+      } else if (player && typeof player === 'object') {
+        return player.fullName || player.username || player.name || 'Unknown Player';
+      }
+      return String(player);
+    }).join(', ');
+  }
+
   // Notification methods
   private showNotification(type: 'success' | 'error' | 'warning' | 'info', title: string, message: string, duration = 5000): void {
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
@@ -1855,7 +2051,7 @@ export class PaymentsComponent implements OnInit {
     const calculatedFee = (feeInfo.memberCount * feeInfo.memberFee) + (feeInfo.nonMemberCount * feeInfo.nonMemberFee);
     
     console.log(`💰 Setting reservation fee with member data:`);
-    console.log(`💰 Players: ${reservation.players.join(', ')}`);
+    console.log(`💰 Players: ${this.formatPlayerNames(reservation.players)}`);
     console.log(`💰 Original stored fee: ₱${reservation.totalFee}`);
     console.log(`💰 Calculated fee: ₱${calculatedFee} (${feeInfo.memberCount} members × ₱${feeInfo.memberFee} + ${feeInfo.nonMemberCount} non-members × ₱${feeInfo.nonMemberFee})`);
     
@@ -1964,7 +2160,7 @@ export class PaymentsComponent implements OnInit {
       players: payment.reservationId.players
     });
     
-    // For existing payment records that are not cash, show the payment form
+    // For existing payment records, show the payment form to allow users to select/confirm payment method
     // Convert the payment back to a reservation-like object for the form
     const reservationForForm: Reservation = {
       _id: payment.reservationId._id,
@@ -1988,6 +2184,14 @@ export class PaymentsComponent implements OnInit {
       reservationId: payment.reservationId._id,
       paymentMethod: payment.paymentMethod
     });
+
+    // Scroll to payment form after a brief delay to allow rendering
+    setTimeout(() => {
+      const element = document.getElementById('payment-form-section');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   }
 
   convertPaymentToReservation(payment: Payment): Reservation {
@@ -2326,21 +2530,35 @@ export class PaymentsComponent implements OnInit {
   }
 
   // Try to categorize players as members vs non-members
-  private categorizePlayersForPayment(players: string[]): { memberCount: number, nonMemberCount: number } {
+  private categorizePlayersForPayment(players: any[]): { memberCount: number, nonMemberCount: number } {
     let memberCount = 0;
     let nonMemberCount = 0;
-    
+
     console.log('🔍 === CATEGORIZING PLAYERS ===');
     console.log('🔍 Players to categorize:', players);
     console.log('🔍 Members data loaded:', this.members.length, 'members');
-    
+
+    // Convert players to strings if they're objects
+    const playerNames = players.map(player => {
+      if (typeof player === 'string') {
+        return player;
+      } else if (player && typeof player === 'object' && player.fullName) {
+        return player.fullName;
+      } else if (player && typeof player === 'object' && player.username) {
+        return player.username;
+      }
+      return String(player); // Fallback: convert to string
+    });
+
+    console.log('🔍 Converted player names:', playerNames);
+
     if (this.members && this.members.length > 0) {
       // If we have member data, use it
       const memberNames = this.members.map(m => m.fullName.toLowerCase().trim());
-      
+
       console.log('🔍 Sample member names:', memberNames.slice(0, 5));
-      
-      players.forEach(playerName => {
+
+      playerNames.forEach(playerName => {
         const cleanPlayerName = playerName.toLowerCase().trim();
         console.log(`🔍 Checking player: "${playerName}" (cleaned: "${cleanPlayerName}")`);
         
@@ -2370,10 +2588,10 @@ export class PaymentsComponent implements OnInit {
     } else {
       // Fallback: Use a more realistic heuristic for member vs non-member distribution
       console.log('🔍 Using heuristic approach (no member data available)');
-      
+
       // For the specific case mentioned (₱60 vs ₱90), we need to ensure proper distribution
       // Assuming a typical tennis club scenario: some members, some non-members
-      const totalPlayers = players.length;
+      const totalPlayers = playerNames.length;
       
       if (totalPlayers === 3) {
         // For 3 players: assume 1 member + 2 non-members to get ₱90 (1×20 + 2×50 = 120, but for off-peak could be different)
@@ -2548,6 +2766,198 @@ export class PaymentsComponent implements OnInit {
     return '₱' + totalFee.toFixed(2);
   }
 
+  // Pay on behalf methods
+  async openPayOnBehalfModal(payment: Payment): Promise<void> {
+    if (!payment.reservationId) {
+      console.error('❌ Cannot pay on behalf: No reservation found');
+      return;
+    }
+
+    // Fetch full reservation details
+    this.http.get<any>(`${this.apiUrl}/reservations/${payment.reservationId._id}`).subscribe({
+      next: (response) => {
+        const reservation = response.data;
+        this.payOnBehalfReservation = reservation;
+
+        // Get list of members who haven't paid yet
+        const members: ReservationPlayer[] = reservation.players.filter((p: any) => {
+          if (typeof p === 'object' && p.isMember) {
+            return true;
+          }
+          return false;
+        }) as ReservationPlayer[];
+
+        // Get paid member IDs - check from already loaded pending/completed payments
+        const paidMemberIds = new Set<string>();
+
+        // Check both pendingPayments and paymentHistory for this reservation
+        const allLoadedPayments = [...this.pendingPayments, ...this.paymentHistory];
+        const reservationPayments = allLoadedPayments.filter(p =>
+          p.reservationId && p.reservationId._id === reservation._id
+        );
+
+        reservationPayments.forEach((p: any) => {
+          if (p.status === 'completed' || p.status === 'record') {
+            // Add the userId of whoever this payment is for
+            if (p.userId && p.userId._id) {
+              paidMemberIds.add(p.userId._id);
+            } else if (typeof p.userId === 'string') {
+              paidMemberIds.add(p.userId);
+            }
+          }
+        });
+
+        console.log('🔍 Found paid members:', Array.from(paidMemberIds));
+        console.log('🔍 All members in reservation:', members.map(m => ({name: m.name, userId: m.userId})));
+
+        // Filter unpaid members
+        this.unpaidMembers = members
+          .filter(member => member.userId && !paidMemberIds.has(member.userId))
+          .map(member => ({
+            userId: member.userId!,
+            fullName: member.name,
+            amount: this.calculateMemberAmount(reservation, member)
+          }));
+
+        console.log('🔍 Unpaid members:', this.unpaidMembers);
+
+        if (this.unpaidMembers.length === 0) {
+          this.showNotification('info', 'All Paid', 'All members have already paid for this reservation.');
+          return;
+        }
+
+        this.showPayOnBehalfModal = true;
+      },
+      error: (error) => {
+        console.error('❌ Error fetching reservation:', error);
+        this.showNotification('error', 'Error', 'Failed to load reservation details');
+      }
+    });
+  }
+
+  calculateMemberAmount(reservation: any, member: ReservationPlayer): number {
+    // Calculate based on December 2025 pricing
+    const isPeakHour = reservation.isPeakHour || false;
+    const baseFee = isPeakHour ? 150 : 100;
+    const guestFee = 70;
+
+    const members = reservation.players.filter((p: any) =>
+      typeof p === 'object' && p.isMember
+    );
+    const guests = reservation.players.filter((p: any) =>
+      typeof p === 'object' && p.isGuest
+    );
+
+    const baseFeePerMember = baseFee / members.length;
+
+    // Only the reserver pays guest fees
+    if (member.userId === reservation.userId) {
+      return baseFeePerMember + (guests.length * guestFee);
+    }
+
+    return baseFeePerMember;
+  }
+
+  selectMemberToPay(member: {userId: string; fullName: string; amount: number}): void {
+    this.selectedUnpaidMember = member;
+  }
+
+  cancelPayOnBehalf(): void {
+    this.showPayOnBehalfModal = false;
+    this.payOnBehalfReservation = null;
+    this.unpaidMembers = [];
+    this.selectedUnpaidMember = null;
+    this.payOnBehalfForm.reset();
+  }
+
+  submitPayOnBehalf(): void {
+    if (!this.selectedUnpaidMember || !this.payOnBehalfReservation) {
+      this.showNotification('error', 'Error', 'Please select a member to pay for');
+      return;
+    }
+
+    if (this.payOnBehalfForm.invalid) {
+      this.showNotification('error', 'Validation Error', 'Please fill in all required fields');
+      return;
+    }
+
+    this.loadingPayOnBehalf = true;
+
+    const paymentData = {
+      reservationId: this.payOnBehalfReservation._id,
+      payForUserId: this.selectedUnpaidMember.userId,
+      amount: this.selectedUnpaidMember.amount,
+      paymentMethod: this.payOnBehalfForm.get('paymentMethod')?.value,
+      transactionId: this.payOnBehalfForm.get('transactionId')?.value || undefined,
+      notes: this.payOnBehalfForm.get('notes')?.value || undefined
+    };
+
+    console.log('💰 Submitting pay on behalf:', paymentData);
+
+    this.http.post<any>(`${this.apiUrl}/payments/pay-on-behalf`, paymentData).subscribe({
+      next: (response) => {
+        console.log('✅ Pay on behalf successful:', response);
+        this.showNotification('success', 'Payment Successful',
+          `Successfully paid ₱${this.selectedUnpaidMember!.amount.toFixed(2)} for ${this.selectedUnpaidMember!.fullName}`);
+
+        this.loadingPayOnBehalf = false;
+        this.cancelPayOnBehalf();
+
+        // Reload pending payments
+        this.loadPendingPayments();
+      },
+      error: (error) => {
+        console.error('❌ Pay on behalf error:', error);
+        this.loadingPayOnBehalf = false;
+        this.showNotification('error', 'Payment Failed',
+          error.error?.error || 'Failed to process payment');
+      }
+    });
+  }
+
+  isReserver(payment: Payment): boolean {
+    const debugEntry = {
+      paymentId: payment._id,
+      reservationUserId: payment.reservationId?.userId,
+      currentUserId: this.currentUser?._id,
+      isReserver: false
+    };
+
+    if (!payment.reservationId) {
+      this.updateDebugInfo(debugEntry);
+      return false;
+    }
+
+    if (!payment.reservationId.userId) {
+      this.updateDebugInfo(debugEntry);
+      return false;
+    }
+
+    debugEntry.isReserver = payment.reservationId.userId === this.currentUser?._id;
+    this.updateDebugInfo(debugEntry);
+
+    return debugEntry.isReserver;
+  }
+
+  updateDebugInfo(entry: {paymentId: string; reservationUserId?: string; currentUserId?: string; isReserver: boolean}): void {
+    // Remove existing entry for this payment
+    this.debugInfo = this.debugInfo.filter(d => d.paymentId !== entry.paymentId);
+    // Add new entry
+    this.debugInfo.push(entry);
+    // Keep only last 10 entries
+    if (this.debugInfo.length > 10) {
+      this.debugInfo = this.debugInfo.slice(-10);
+    }
+  }
+
+  toggleDebugInfo(): void {
+    this.showDebugInfo = !this.showDebugInfo;
+  }
+
+  hasMissingReservationIds(): boolean {
+    return this.debugInfo.some(entry => !entry.reservationUserId);
+  }
+
   // Admin detection
   isAdmin(): boolean {
     return this.currentUser?.role === 'admin' || this.currentUser?.role === 'superadmin';
@@ -2598,8 +3008,8 @@ export class PaymentsComponent implements OnInit {
     if (!payment.reservationId || !payment.reservationId.players || payment.reservationId.players.length === 0) {
       return '';
     }
-    
-    return payment.reservationId.players.join(', ');
+
+    return this.formatPlayerNames(payment.reservationId.players);
   }
 
   // Helper function for string similarity calculation
