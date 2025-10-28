@@ -12,6 +12,7 @@ import {
   getPendingPurchases,
   approveCoinPurchase,
   rejectCoinPurchase,
+  getCoinPurchaseReport,
   purchaseCoinsValidation,
   awardCoinsValidation,
   deductCoinsValidation,
@@ -152,6 +153,18 @@ router.get(
   authenticateToken,
   requireRole(['admin', 'superadmin']),
   getPendingPurchases
+);
+
+/**
+ * @route GET /api/coins/purchases/report
+ * @desc Get coin purchase report with statistics
+ * @access Private (Admin/SuperAdmin)
+ */
+router.get(
+  '/purchases/report',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  getCoinPurchaseReport
 );
 
 /**

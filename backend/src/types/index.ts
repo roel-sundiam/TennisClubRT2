@@ -112,15 +112,24 @@ export interface AnalyticsStats {
   browserBreakdown: Record<string, number>;
 }
 
+// December 2025 changes: Player structure for member/guest tracking
+export interface ReservationPlayer {
+  name: string;
+  userId?: string | null;  // MongoDB User ID for members, null for guests
+  isMember: boolean;
+  isGuest: boolean;
+}
+
 export interface CourtReservation {
   _id: string;
-  userId?: string;
+  userId: string;
   user?: User;
   date: Date;
   timeSlot: number;
-  players: string[];
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  players: string[] | ReservationPlayer[]; // Support both formats for backward compatibility
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no-show';
   paymentStatus: 'pending' | 'paid' | 'overdue';
+  paymentIds?: string[]; // Track multiple payment IDs (December 2025 changes)
   totalFee: number;
   weatherForecast?: {
     temperature: number;
@@ -142,10 +151,6 @@ export interface CourtReservation {
   duration: number;
   endTimeSlot?: number; // Calculated automatically
   isMultiHour?: boolean; // Calculated automatically
-  // Court blocking support
-  reservationType?: 'regular' | 'blocked';
-  blockReason?: 'maintenance' | 'private_event' | 'weather' | 'other';
-  blockNotes?: string;
   createdAt: Date;
   updatedAt: Date;
 }

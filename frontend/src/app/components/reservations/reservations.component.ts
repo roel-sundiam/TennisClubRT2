@@ -214,8 +214,8 @@ interface Reservation {
               <div *ngFor="let player of playersArray.controls; let i = index" class="player-input">
                 <div class="field">
                   <label>
-                    <span *ngIf="i === 0">Player 1 (You) - Member (₱20)</span>
-                    <span *ngIf="i > 0">Player {{ i + 1 }} - Member (₱20)</span>
+                    <span *ngIf="i === 0">Player 1 (You) - Member</span>
+                    <span *ngIf="i > 0">Player {{ i + 1 }} - Member</span>
                   </label>
                   <div class="player-row">
                     <!-- Modern Custom Dropdown -->
@@ -380,36 +380,39 @@ interface Reservation {
                 >
               </div>
 
+              <!-- December 2025: New Fee Breakdown -->
               <div class="fee-breakdown" *ngIf="getMemberCount() > 0 || getNonMemberCount() > 0">
-                <div class="fee-row" *ngIf="getRateType() === 'Peak Hours'">
-                  <span>Peak Hours (₱100 per hour):</span>
-                  <span>₱{{ getPeakHoursFee() }}</span>
+                <!-- Base Fee Calculation -->
+                <div class="fee-row">
+                  <span>Base Fee ({{ getRateType() }}):</span>
+                  <span>₱{{ getBaseFeeTotal() }}</span>
                 </div>
-                <div class="fee-row" *ngIf="getRateType() === 'Off-Peak'">
-                  <div class="off-peak-breakdown">
-                    <div class="fee-row" *ngIf="getMemberCount() > 0">
-                      <span>Members (₱20 each):</span>
-                      <span>₱{{ getMemberCount() * 20 }}</span>
-                    </div>
-                    <div class="fee-row" *ngIf="getNonMemberCount() > 0">
-                      <span>Non-members (₱50 each):</span>
-                      <span>₱{{ getNonMemberCount() * 50 }}</span>
-                    </div>
+                <!-- Guest Fee (if any) -->
+                <div class="fee-row" *ngIf="getNonMemberCount() > 0">
+                  <span>Guest Fee ({{ getNonMemberCount() }} {{ getNonMemberCount() === 1 ? 'guest' : 'guests' }} × ₱70):</span>
+                  <span>₱{{ getGuestFeeTotal() }}</span>
+                </div>
+                <!-- Payment Distribution per Player -->
+                <div class="player-payments" *ngIf="getMemberCount() > 0">
+                  <div class="fee-row player-payment-header">
+                    <span><strong>Payment per Player:</strong></span>
                   </div>
-                </div>
-                <div class="fee-row" *ngIf="getRateType() === 'Mixed'">
-                  <div class="mixed-breakdown">
-                    <div class="fee-row">
-                      <span>Peak Hours:</span>
-                      <span>₱{{ getPeakHoursFee() }}</span>
+                  <div class="player-payment-item" *ngFor="let player of getPlayerPaymentBreakdown()">
+                    <div class="fee-row player-detail">
+                      <span>
+                        {{ player.name }}
+                        <span class="player-badge" *ngIf="player.isReserver">(Reserver)</span>
+                        <span class="player-badge" *ngIf="player.isGuest">(Guest)</span>
+                      </span>
+                      <span class="player-amount">
+                        <span *ngIf="!player.isGuest">₱{{ player.amount }}</span>
+                        <span *ngIf="player.isGuest" style="color: #666;">No payment</span>
+                      </span>
                     </div>
-                    <div class="fee-row" *ngIf="getMemberCount() > 0">
-                      <span>Off-peak Members:</span>
-                      <span>₱{{ getOffPeakMembersFee() }}</span>
-                    </div>
-                    <div class="fee-row" *ngIf="getNonMemberCount() > 0">
-                      <span>Off-peak Non-members:</span>
-                      <span>₱{{ getOffPeakNonMembersFee() }}</span>
+                    <div class="fee-breakdown-detail" *ngIf="!player.isGuest && player.breakdown">
+                      <small style="color: #666; padding-left: 20px;">
+                        {{ player.breakdown }}
+                      </small>
                     </div>
                   </div>
                 </div>
@@ -507,7 +510,7 @@ interface Reservation {
               <div class="reservation-time">
                 {{ reservation.timeSlotDisplay }}
               </div>
-              <div class="reservation-players">Players: {{ reservation.players.join(', ') }}</div>
+              <div class="reservation-players">Players: {{ formatPlayerNames(reservation.players) }}</div>
               <div class="reservation-status status-{{ reservation.status }}">
                 {{ reservation.status | titlecase }}
               </div>
@@ -583,6 +586,9 @@ export class ReservationsComponent implements OnInit, OnDestroy {
   selectedEndTime: number | null = null;
   availableEndTimes: TimeSlot[] = [];
   calculatedFee = 0;
+
+  // Expose Math for template use
+  Math = Math;
 
   // Credit system properties
   userCreditBalance = 0;
@@ -677,6 +683,9 @@ export class ReservationsComponent implements OnInit, OnDestroy {
         const reservation = response.data;
         console.log('🔍 Loading reservation for edit:', reservation);
 
+        // Store reservation data for later use after time slots are loaded
+        (this as any).pendingEditReservation = reservation;
+
         // Convert date to YYYY-MM-DD format for the date input
         const reservationDate = new Date(reservation.date);
         const dateString = reservationDate.toISOString().split('T')[0];
@@ -684,34 +693,42 @@ export class ReservationsComponent implements OnInit, OnDestroy {
         // Set date first and trigger date change to load time slots
         this.reservationForm.get('date')?.setValue(dateString);
         this.selectedDate = reservationDate;
-        this.onDateChangeInternal(reservationDate);
 
-        // Set the selected times AFTER time slots are loaded
-        setTimeout(() => {
-          this.selectedStartTime = reservation.timeSlot;
-          this.selectedEndTime = reservation.timeSlot + 1;
+        // Load reservations for the date - this will populate time slots
+        // The actual time selection will happen in the callback
+        this.loadReservationsForDateWithEditCallback(reservation);
 
-          // Update form values
-          this.reservationForm.patchValue({
-            startTime: reservation.timeSlot,
-            endTime: reservation.timeSlot + 1,
-          });
-
-          // Update available end times
-          this.updateAvailableEndTimes();
-
-          // Trigger fee calculation
-          this.calculateFee();
-        }, 100);
-
-        // Clear existing players and set from reservation
+        // Clear existing players and custom players
         const playersArray = this.playersArray;
         playersArray.clear();
+        this.customPlayerNames = [];
 
-        // Add players from the reservation
-        reservation.players.forEach((playerName: string, index: number) => {
-          playersArray.push(this.fb.control(playerName, Validators.required));
-        });
+        // December 2025: Handle both old (string[]) and new (object[]) player formats
+        const players = reservation.players;
+        console.log('🔍 Players data:', players);
+
+        // Check if new format (objects with name property)
+        const isNewFormat = players.length > 0 && typeof players[0] === 'object' && 'name' in players[0];
+
+        if (isNewFormat) {
+          // December 2025 format: separate members and guests
+          players.forEach((player: any) => {
+            if (player.isMember) {
+              // Add to member players array
+              playersArray.push(this.fb.control(player.name, Validators.required));
+            } else if (player.isGuest) {
+              // Add to custom players (guests)
+              this.customPlayerNames.push(player.name);
+            }
+          });
+          console.log('🔍 Loaded members:', playersArray.length, 'guests:', this.customPlayerNames.length);
+        } else {
+          // Legacy format: all players are strings, treat as members
+          players.forEach((playerName: string) => {
+            playersArray.push(this.fb.control(playerName, Validators.required));
+          });
+          console.log('🔍 Loaded players (legacy format):', playersArray.length);
+        }
 
         this.showSuccess(
           'Edit Mode',
@@ -724,6 +741,94 @@ export class ReservationsComponent implements OnInit, OnDestroy {
         // Exit edit mode on error
         this.isEditMode = false;
         this.editingReservationId = null;
+      },
+    });
+  }
+
+  loadReservationsForDateWithEditCallback(reservation: any): void {
+    if (!this.selectedDate) return;
+
+    // Format date as YYYY-MM-DD in Philippine timezone
+    const year = this.selectedDate.getFullYear();
+    const month = String(this.selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(this.selectedDate.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    console.log('🔍 Loading reservations for date (edit mode):', dateStr);
+    console.log('🔍 Excluding reservation ID:', this.editingReservationId);
+
+    // CRITICAL: Pass excludeId parameter so backend excludes current reservation from availability checks
+    const url = `${this.apiUrl}/reservations/date/${dateStr}?excludeId=${this.editingReservationId}`;
+    console.log('🔍 Request URL:', url);
+
+    this.http.get<any>(url).subscribe({
+      next: (response) => {
+        console.log('🔍 API response for date', dateStr, ':', response);
+        this.existingReservations = response.data?.reservations || [];
+        console.log('🔍 Existing reservations loaded:', this.existingReservations.length);
+
+        // Use backend time slots data
+        if (response.data?.timeSlots) {
+          console.log('✅ Backend provided timeSlots data');
+
+          // Store ALL time slots (including hour 22) for end time calculations
+          this.allTimeSlots = response.data.timeSlots.map((backendSlot: any) => ({
+            hour: backendSlot.hour,
+            display: `${backendSlot.hour}:00 - ${backendSlot.hour + 1}:00`,
+            available: backendSlot.available,
+            availableAsEndTime: backendSlot.availableAsEndTime,
+            isPeak: this.peakHours.includes(backendSlot.hour),
+            blockedByOpenPlay: backendSlot.blockedByOpenPlay || false,
+            openPlayEvent: backendSlot.openPlayEvent || null
+          }));
+
+          // For START times: filter out hour 22
+          this.timeSlots = this.allTimeSlots.filter((slot: any) => slot.hour <= 21);
+
+          console.log('🔍 All time slots loaded:', this.allTimeSlots.length);
+          console.log('🔍 Start time slots:', this.timeSlots.length);
+        } else {
+          console.log('❌ No timeSlots in backend response');
+          this.updateTimeSlotAvailability();
+        }
+
+        // Use setTimeout to ensure Angular change detection picks up the changes
+        setTimeout(() => {
+          // NOW set the selected times after time slots are loaded
+          console.log('🔍 Setting selected times in edit mode');
+          const startTime = reservation.timeSlot;
+          const endTime = reservation.endTimeSlot || (reservation.timeSlot + (reservation.duration || 1));
+
+          this.selectedStartTime = startTime;
+          this.selectedEndTime = endTime;
+
+          console.log('🔍 Selected start time:', this.selectedStartTime);
+          console.log('🔍 Selected end time:', this.selectedEndTime);
+          console.log('🔍 Checking if start time slot exists:', this.timeSlots.find(s => s.hour === startTime));
+
+          // Update form values
+          this.reservationForm.patchValue({
+            startTime: startTime,
+            endTime: endTime,
+          });
+
+          console.log('🔍 Form values after patch:', {
+            startTime: this.reservationForm.get('startTime')?.value,
+            endTime: this.reservationForm.get('endTime')?.value
+          });
+
+          // Update available end times
+          this.updateAvailableEndTimes();
+          console.log('🔍 Available end times after update:', this.availableEndTimes.map(t => t.hour));
+
+          // Trigger fee calculation
+          this.calculateFee();
+        }, 0);
+      },
+      error: (error) => {
+        console.error('Error loading reservations:', error);
+        this.existingReservations = [];
+        this.updateTimeSlotAvailability();
       },
     });
   }
@@ -1264,43 +1369,40 @@ export class ReservationsComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Calculate base player fees per hour
-    let playerFeePerHour = 0;
+    // December 2025 pricing constants
+    const PEAK_BASE_FEE = 150;
+    const NON_PEAK_BASE_FEE = 100;
+    const GUEST_FEE = 70;
 
     // Count member players
     let memberCount = 0;
     this.playersArray.controls.forEach((control) => {
       if (control.value && control.value.trim()) {
-        playerFeePerHour += 20; // Member: ₱20 per player per hour
         memberCount++;
       }
     });
 
-    // Count custom (non-member) players
-    let customCount = 0;
+    // Count custom (non-member/guest) players
+    let guestCount = 0;
     this.customPlayerNames.forEach((name) => {
       console.log('🔍 Checking custom name:', `"${name}"`);
       if (name && name.trim()) {
-        playerFeePerHour += 50; // Non-member: ₱50 per player per hour
-        customCount++;
-        console.log('✅ Added custom player, count now:', customCount);
+        guestCount++;
+        console.log('✅ Added guest player, count now:', guestCount);
       }
     });
 
-    console.log('🔍 Final counts - Members:', memberCount, 'Custom:', customCount);
-    console.log('🔍 playerFeePerHour:', playerFeePerHour);
+    console.log('🔍 Final counts - Members:', memberCount, 'Guests:', guestCount);
 
     // Calculate total fee for all hours in the range
+    // December 2025: Base rate (₱100 or ₱150) + ₱70 per guest
     let totalFee = 0;
     for (let hour = this.selectedStartTime!; hour < this.selectedEndTime!; hour++) {
-      let hourlyFee = playerFeePerHour;
-
-      if (this.isPeakHour(hour)) {
-        // Peak hours: whichever is higher - ₱100 minimum OR calculated player total
-        hourlyFee = Math.max(hourlyFee, 100);
-      }
-
+      const baseFee = this.isPeakHour(hour) ? PEAK_BASE_FEE : NON_PEAK_BASE_FEE;
+      const hourlyFee = baseFee + (guestCount * GUEST_FEE);
       totalFee += hourlyFee;
+
+      console.log(`🔍 Hour ${hour}: Base=₱${baseFee}, Guests=${guestCount}×₱${GUEST_FEE}, Total=₱${hourlyFee}`);
     }
 
     this.calculatedFee = totalFee;
@@ -1416,6 +1518,110 @@ export class ReservationsComponent implements OnInit, OnDestroy {
       slots.push(hour);
     }
     return slots;
+  }
+
+  // December 2025: Calculate base fee total (sum of hourly base fees)
+  getBaseFeeTotal(): number {
+    if (!this.selectedStartTime || !this.selectedEndTime) return 0;
+
+    const PEAK_BASE_FEE = 150;
+    const NON_PEAK_BASE_FEE = 100;
+
+    let totalBaseFee = 0;
+    for (let hour = this.selectedStartTime; hour < this.selectedEndTime; hour++) {
+      const baseFee = this.isPeakHour(hour) ? PEAK_BASE_FEE : NON_PEAK_BASE_FEE;
+      totalBaseFee += baseFee;
+    }
+
+    return totalBaseFee;
+  }
+
+  // December 2025: Calculate guest fee total (guests × ₱70 × hours)
+  getGuestFeeTotal(): number {
+    const guestCount = this.getNonMemberCount();
+    const hours = this.getDurationHours();
+    const GUEST_FEE = 70;
+
+    return guestCount * GUEST_FEE * hours;
+  }
+
+  // December 2025: Get payment breakdown per player
+  getPlayerPaymentBreakdown(): Array<{
+    name: string;
+    amount: number;
+    isReserver: boolean;
+    isGuest: boolean;
+    breakdown?: string;
+  }> {
+    const result: Array<{
+      name: string;
+      amount: number;
+      isReserver: boolean;
+      isGuest: boolean;
+      breakdown?: string;
+    }> = [];
+
+    const memberCount = this.getMemberCount();
+    const guestCount = this.getNonMemberCount();
+
+    if (memberCount === 0) return result;
+
+    const baseFeeTotal = this.getBaseFeeTotal();
+    const guestFeeTotal = this.getGuestFeeTotal();
+    const baseFeePerMember = Math.round((baseFeeTotal / memberCount) * 100) / 100;
+
+    // Add member players
+    let memberIndex = 0;
+    this.playersArray.controls.forEach((control) => {
+      const playerName = control.value?.trim();
+      if (playerName) {
+        const isReserver = memberIndex === 0;
+        const amount = isReserver
+          ? Math.round((baseFeePerMember + guestFeeTotal) * 100) / 100
+          : baseFeePerMember;
+
+        let breakdown = `Base share: ₱${baseFeePerMember}`;
+        if (isReserver && guestFeeTotal > 0) {
+          breakdown += ` + Guest fees: ₱${guestFeeTotal}`;
+        }
+
+        result.push({
+          name: playerName,
+          amount: amount,
+          isReserver: isReserver,
+          isGuest: false,
+          breakdown: breakdown,
+        });
+        memberIndex++;
+      }
+    });
+
+    // Add guest players
+    this.customPlayerNames.forEach((guestName) => {
+      if (guestName && guestName.trim()) {
+        result.push({
+          name: guestName.trim(),
+          amount: 0,
+          isReserver: false,
+          isGuest: true,
+        });
+      }
+    });
+
+    return result;
+  }
+
+  // December 2025: Format player names from either old (string[]) or new (object[]) format
+  formatPlayerNames(players: any[]): string {
+    if (!players || players.length === 0) return '';
+
+    // Check if new format (objects with name property)
+    if (typeof players[0] === 'object' && 'name' in players[0]) {
+      return players.map((p: any) => p.name).join(', ');
+    }
+
+    // Old format (strings)
+    return players.join(', ');
   }
 
   getStatusColor(status: string): string {

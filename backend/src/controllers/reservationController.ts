@@ -47,6 +47,47 @@ function calculateStringSimilarity(str1: string, str2: string): number {
   return (maxLength - distance) / maxLength;
 }
 
+// Helper function to convert player names to ReservationPlayer objects (December 2025)
+async function convertPlayersToObjects(playerNames: string[]): Promise<any[]> {
+  // Get all members for matching
+  const allMembers = await User.find({ isApproved: true, role: { $in: ['member', 'admin', 'superadmin'] } });
+  const memberNames = allMembers.map(m => m.fullName.toLowerCase().trim());
+  const memberMap = new Map(allMembers.map(m => [m.fullName.toLowerCase().trim(), m._id.toString()]));
+
+  const players: any[] = [];
+
+  for (const playerName of playerNames) {
+    const cleanName = playerName.toLowerCase().trim();
+    let isMember = false;
+    let userId: string | null = null;
+
+    // Exact match first
+    if (memberNames.includes(cleanName)) {
+      isMember = true;
+      userId = memberMap.get(cleanName) || null;
+    } else {
+      // Fuzzy matching
+      for (const memberName of memberNames) {
+        const similarity = calculateStringSimilarity(cleanName, memberName);
+        if (similarity > 0.8) {
+          isMember = true;
+          userId = memberMap.get(memberName) || null;
+          break;
+        }
+      }
+    }
+
+    players.push({
+      name: playerName.trim(),
+      userId: userId,
+      isMember: isMember,
+      isGuest: !isMember
+    });
+  }
+
+  return players;
+}
+
 // Get all reservations with filtering and pagination
 export const getReservations = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const page = parseInt(req.query.page as string) || 1;
@@ -57,46 +98,44 @@ export const getReservations = asyncHandler(async (req: AuthenticatedRequest, re
   const filter: any = {};
   
   if (req.query.userId) {
-    // Handle both ObjectId and String formats for backward compatibility
-    filter.userId = { $in: [req.query.userId.toString(), req.query.userId] };
+    filter.userId = req.query.userId;
   }
-
+  
   if (req.query.date) {
     const queryDate = new Date(req.query.date as string);
     const startOfDay = new Date(queryDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(queryDate);
     endOfDay.setHours(23, 59, 59, 999);
-
+    
     filter.date = {
       $gte: startOfDay,
       $lte: endOfDay
     };
   }
-
+  
   if (req.query.dateFrom && req.query.dateTo) {
     const fromDate = new Date(req.query.dateFrom as string);
     const toDate = new Date(req.query.dateTo as string);
     toDate.setHours(23, 59, 59, 999);
-
+    
     filter.date = {
       $gte: fromDate,
       $lte: toDate
     };
   }
-
+  
   if (req.query.status) {
     filter.status = req.query.status;
   }
-
+  
   if (req.query.paymentStatus) {
     filter.paymentStatus = req.query.paymentStatus;
   }
 
   // If not admin/superadmin, only show own reservations unless explicitly requesting all
   if (req.user?.role === 'member' && req.query.showAll !== 'true') {
-    // Handle both ObjectId and String formats for backward compatibility
-    filter.userId = { $in: [req.user._id.toString(), req.user._id] };
+    filter.userId = req.user._id.toString();
   }
 
   console.log('🔍 Reservation Filter Debug:');
@@ -104,6 +143,30 @@ export const getReservations = asyncHandler(async (req: AuthenticatedRequest, re
   console.log('- showAll query:', req.query.showAll);
   console.log('- Final filter:', JSON.stringify(filter));
   console.log('- Will show all users?', req.user?.role !== 'member' || req.query.showAll === 'true');
+
+  // Auto-mark past pending reservations as 'no-show'
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(23, 59, 59, 999);
+
+  try {
+    const updateResult = await Reservation.updateMany(
+      {
+        status: 'pending',
+        date: { $lt: yesterday }
+      },
+      {
+        $set: { status: 'no-show' }
+      }
+    );
+
+    if (updateResult.modifiedCount > 0) {
+      console.log(`🔄 Auto-marked ${updateResult.modifiedCount} past pending reservation(s) as 'no-show'`);
+    }
+  } catch (error) {
+    console.error('Error auto-marking no-show reservations:', error);
+    // Continue with normal flow even if auto-marking fails
+  }
 
   const total = await Reservation.countDocuments(filter);
   const reservations = await Reservation.find(filter)
@@ -129,7 +192,8 @@ export const getReservations = asyncHandler(async (req: AuthenticatedRequest, re
 // Get reservations for a specific date
 export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { date } = req.params;
-  
+  const { excludeId } = req.query; // Get excludeId from query params (for edit mode)
+
   if (!date) {
     res.status(400).json({
       success: false,
@@ -140,7 +204,18 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
 
   const queryDate = new Date(date);
   console.log(`🔍 QUERY DEBUG: Requested date: ${date}, Parsed queryDate: ${queryDate.toISOString()}`);
-  const reservations = await (Reservation as any).getReservationsForDate(queryDate);
+  if (excludeId) {
+    console.log(`🔍 EDIT MODE: Excluding reservation ID ${excludeId} from availability checks`);
+  }
+
+  let reservations = await (Reservation as any).getReservationsForDate(queryDate);
+
+  // Filter out the excluded reservation if in edit mode
+  if (excludeId) {
+    reservations = reservations.filter((r: any) => r._id.toString() !== excludeId);
+    console.log(`🔍 EDIT MODE: After excluding ${excludeId}, ${reservations.length} reservations remain`);
+  }
+
   console.log(`🔍 QUERY DEBUG: Found ${reservations.length} reservations for date ${date}`);
 
   // Check for Open Play blocked slots
@@ -339,28 +414,56 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
     return;
   }
 
-  // Check for overdue payments - STRICT: Block if payment is past due date
-  const now = new Date();
-  now.setHours(0, 0, 0, 0); // Start of today
+  // Check for overdue payments (1+ days past due)
+  const oneDayAgo = new Date();
+  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+  oneDayAgo.setHours(23, 59, 59, 999);
 
-  // Check Payment collection for pending overdue payments
+  // Check 1: Payment collection for pending overdue payments
   const overduePayments = await Payment.find({
     userId: req.user._id,
     status: 'pending',
-    dueDate: { $lt: now }
+    dueDate: { $lt: oneDayAgo }
   });
 
-  if (overduePayments.length > 0) {
-    // Format overdue payment details
-    const overdueDetails = overduePayments.map(p => ({
-      id: p._id,
-      amount: p.amount,
-      dueDate: p.dueDate,
-      daysOverdue: Math.ceil((Date.now() - p.dueDate.getTime()) / (1000 * 60 * 60 * 24)),
-      description: p.description
-    }));
+  // Check 2: Reservations with pending payment status where reservation date has passed
+  const overdueReservations = await Reservation.find({
+    userId: req.user._id,
+    paymentStatus: 'pending',
+    date: { $lt: oneDayAgo },
+    status: { $in: ['pending', 'confirmed'] }
+  });
 
-    console.log(`⚠️ User ${req.user.username} has ${overduePayments.length} overdue payment(s), blocking reservation`);
+  const totalOverdue = overduePayments.length + overdueReservations.length;
+
+  if (totalOverdue > 0) {
+    // Format overdue details
+    const overdueDetails: any[] = [];
+
+    // Add payment records
+    overduePayments.forEach(p => {
+      overdueDetails.push({
+        id: p._id,
+        amount: p.amount,
+        dueDate: p.dueDate,
+        daysOverdue: Math.ceil((Date.now() - p.dueDate.getTime()) / (1000 * 60 * 60 * 24)),
+        description: p.description
+      });
+    });
+
+    // Add reservation records without payment
+    overdueReservations.forEach(r => {
+      const daysOverdue = Math.ceil((Date.now() - r.date.getTime()) / (1000 * 60 * 60 * 24));
+      overdueDetails.push({
+        id: r._id,
+        amount: r.totalFee || 0,
+        dueDate: r.date,
+        daysOverdue: daysOverdue,
+        description: `Court reservation payment for ${r.date.toDateString()} ${r.timeSlot}:00-${(r.endTimeSlot || r.timeSlot + 1)}:00`
+      });
+    });
+
+    console.log(`⚠️ User ${req.user.username} has ${totalOverdue} overdue payment(s) (${overduePayments.length} payments + ${overdueReservations.length} unpaid reservations), blocking reservation`);
 
     res.status(403).json({
       success: false,
@@ -626,22 +729,94 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
     }
   }
 
-  // Create reservation
+  // Convert players to ReservationPlayer objects for December 2025 pricing
+  const playerObjects = await convertPlayersToObjects(trimmedPlayers);
+
+  // Create reservation with new player format
   const reservation = new Reservation({
-    userId: req.user._id.toString(),
+    userId: req.user._id,
     date: reservationDate,
     timeSlot,
     duration,
-    players: trimmedPlayers,
+    players: playerObjects,
     status: 'pending',
     paymentStatus,
     tournamentTier,
     totalFee: finalTotalFee,
-    weatherForecast
+    weatherForecast,
+    paymentIds: [] // Will be populated with payment IDs
   });
 
   await reservation.save();
   await reservation.populate('userId', 'username fullName email');
+
+  // December 2025: Create individual payments for each member
+  const paymentIds: string[] = [];
+  const members = playerObjects.filter(p => p.isMember);
+  const guests = playerObjects.filter(p => p.isGuest);
+  const peakHours = (process.env.PEAK_HOURS || '5,18,19,21').split(',').map(h => parseInt(h));
+
+  if (members.length > 0) {
+    // Calculate payment amounts
+    const PEAK_BASE_FEE = 150;
+    const NON_PEAK_BASE_FEE = 100;
+    const GUEST_FEE = 70;
+
+    // Calculate base fee for one hour (will multiply by duration later)
+    const calculatedEndTimeSlot = reservation.endTimeSlot || (reservation.timeSlot + reservation.duration);
+    let totalBaseFee = 0;
+    let totalGuestFee = 0;
+
+    for (let hour = reservation.timeSlot; hour < calculatedEndTimeSlot; hour++) {
+      const isPeakHour = peakHours.includes(hour);
+      totalBaseFee += isPeakHour ? PEAK_BASE_FEE : NON_PEAK_BASE_FEE;
+      totalGuestFee += guests.length * GUEST_FEE;
+    }
+
+    // Each member pays their share of the base fee
+    const memberShare = totalBaseFee / members.length;
+
+    // Reserver pays their share + all guest fees
+    const reserverId = req.user._id.toString();
+
+    for (const member of members) {
+      const isReserver = member.userId === reserverId;
+      const paymentAmount = isReserver ? (memberShare + totalGuestFee) : memberShare;
+
+      // Set due date to the day after reservation (payment enabled after playing)
+      const paymentDueDate = new Date(reservationDate);
+      paymentDueDate.setDate(paymentDueDate.getDate() + 1);
+      paymentDueDate.setHours(23, 59, 59, 999);
+
+      const payment = new Payment({
+        userId: member.userId,
+        reservationId: reservation._id,
+        amount: Math.round(paymentAmount * 100) / 100, // Round to 2 decimal places
+        currency: 'PHP',
+        paymentMethod: 'cash', // Default, can be changed when paid
+        status: 'pending',
+        dueDate: paymentDueDate,
+        description: `Court reservation ${isReserver ? '(Reserver)' : ''} - ${reservation.date.toDateString()} ${reservation.timeSlot}:00-${calculatedEndTimeSlot}:00`,
+        metadata: {
+          timeSlot: reservation.timeSlot,
+          date: reservation.date,
+          playerCount: playerObjects.length,
+          memberCount: members.length,
+          guestCount: guests.length,
+          isReserver: isReserver,
+          memberShare: Math.round(memberShare * 100) / 100,
+          guestFees: isReserver ? Math.round(totalGuestFee * 100) / 100 : 0
+        }
+      });
+
+      await payment.save();
+      paymentIds.push((payment._id as any).toString());
+    }
+
+    // Update reservation with payment IDs
+    reservation.paymentIds = paymentIds;
+    await reservation.save({ validateBeforeSave: false });
+  }
 
   // Update the reservation with credit transaction reference if credit was used
   if (creditUsed && creditTransactionId) {
@@ -649,16 +824,17 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
     await reservation.save({ validateBeforeSave: false });
   }
 
-  const message = creditUsed 
+  const message = creditUsed
     ? `Reservation created successfully. ₱${finalTotalFee} automatically deducted from your credit balance. ${coinsRequired} coins deducted.`
-    : `Reservation created successfully. Payment of ₱${finalTotalFee} is pending. ${coinsRequired} coins deducted.`;
+    : `Reservation created successfully. ${members.length} payment(s) created for members. Payments can be made after the reservation time. ${coinsRequired} coins deducted.`;
 
   res.status(201).json({
     success: true,
     data: {
       ...reservation.toJSON(),
       creditUsed,
-      creditBalance: user.creditBalance - (creditUsed ? finalTotalFee : 0)
+      creditBalance: user.creditBalance - (creditUsed ? finalTotalFee : 0),
+      paymentsCreated: paymentIds.length
     },
     message
   });
@@ -679,8 +855,8 @@ export const updateReservation = asyncHandler(async (req: AuthenticatedRequest, 
     return;
   }
 
-  // Check access permissions (skip for blocked reservations)
-  if (req.user?.role === 'member' && reservation.userId && reservation.userId.toString() !== req.user._id.toString()) {
+  // Check access permissions
+  if (req.user?.role === 'member' && reservation.userId.toString() !== req.user._id.toString()) {
     res.status(403).json({
       success: false,
       error: 'Access denied'
@@ -688,14 +864,15 @@ export const updateReservation = asyncHandler(async (req: AuthenticatedRequest, 
     return;
   }
 
-  // Cannot edit past reservations
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  if (reservation.date < today) {
+  // Cannot edit past reservations or reservations that have already started
+  const now = new Date();
+  const reservationDateTime = new Date(reservation.date);
+  reservationDateTime.setHours(reservation.timeSlot, 0, 0, 0);
+
+  if (reservationDateTime <= now) {
     res.status(400).json({
       success: false,
-      error: 'Cannot edit past reservations'
+      error: 'Cannot edit reservations that have already started or passed. Payments can be made after the reservation time.'
     });
     return;
   }
@@ -715,6 +892,9 @@ export const updateReservation = asyncHandler(async (req: AuthenticatedRequest, 
     const newTimeSlot = timeSlot || reservation.timeSlot;
 
     // Validate new date is not in the past
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     if (newDate < today) {
       res.status(400).json({
         success: false,
@@ -764,10 +944,93 @@ export const updateReservation = asyncHandler(async (req: AuthenticatedRequest, 
       return;
     }
 
-    reservation.players = players.map(p => p.trim());
+    // December 2025: Cancel old payments and create new ones when players change
+    if (reservation.paymentIds && reservation.paymentIds.length > 0) {
+      // Cancel all existing pending payments
+      await Payment.updateMany(
+        { _id: { $in: reservation.paymentIds }, status: 'pending' },
+        { $set: { status: 'cancelled' } }
+      );
+      console.log(`📝 Cancelled ${reservation.paymentIds.length} pending payments for reservation ${id}`);
+    }
+
+    // Convert new players to objects
+    const trimmedPlayers = players.map(p => p.trim());
+    const playerObjects = await convertPlayersToObjects(trimmedPlayers);
+    reservation.players = playerObjects;
+
+    // Recalculate total fee (will be done by pre-save hook)
+    reservation.totalFee = 0;
+
+    // Save with recalculated fee
+    await reservation.save();
+
+    // Create new payments for members
+    const paymentIds: string[] = [];
+    const members = playerObjects.filter((p: any) => p.isMember);
+    const guests = playerObjects.filter((p: any) => p.isGuest);
+    const peakHours = (process.env.PEAK_HOURS || '5,18,19,21').split(',').map(h => parseInt(h));
+
+    if (members.length > 0) {
+      const PEAK_BASE_FEE = 150;
+      const NON_PEAK_BASE_FEE = 100;
+      const GUEST_FEE = 70;
+
+      const calculatedEndTimeSlot = reservation.endTimeSlot || (reservation.timeSlot + reservation.duration);
+      let totalBaseFee = 0;
+      let totalGuestFee = 0;
+
+      for (let hour = reservation.timeSlot; hour < calculatedEndTimeSlot; hour++) {
+        const isPeakHour = peakHours.includes(hour);
+        totalBaseFee += isPeakHour ? PEAK_BASE_FEE : NON_PEAK_BASE_FEE;
+        totalGuestFee += guests.length * GUEST_FEE;
+      }
+
+      const memberShare = totalBaseFee / members.length;
+      const reserverId = reservation.userId.toString();
+
+      for (const member of members) {
+        const isReserver = member.userId === reserverId;
+        const paymentAmount = isReserver ? (memberShare + totalGuestFee) : memberShare;
+
+        const paymentDueDate = new Date(reservation.date);
+        paymentDueDate.setDate(paymentDueDate.getDate() + 1);
+        paymentDueDate.setHours(23, 59, 59, 999);
+
+        const payment = new Payment({
+          userId: member.userId,
+          reservationId: reservation._id,
+          amount: Math.round(paymentAmount * 100) / 100,
+          currency: 'PHP',
+          paymentMethod: 'cash',
+          status: 'pending',
+          dueDate: paymentDueDate,
+          description: `Court reservation ${isReserver ? '(Reserver)' : ''} - ${reservation.date.toDateString()} ${reservation.timeSlot}:00-${calculatedEndTimeSlot}:00`,
+          metadata: {
+            timeSlot: reservation.timeSlot,
+            date: reservation.date,
+            playerCount: playerObjects.length,
+            memberCount: members.length,
+            guestCount: guests.length,
+            isReserver: isReserver,
+            memberShare: Math.round(memberShare * 100) / 100,
+            guestFees: isReserver ? Math.round(totalGuestFee * 100) / 100 : 0
+          }
+        });
+
+        await payment.save();
+        paymentIds.push((payment._id as any).toString());
+      }
+
+      reservation.paymentIds = paymentIds;
+      await reservation.save({ validateBeforeSave: false });
+      console.log(`✅ Created ${paymentIds.length} new payments for reservation ${id}`);
+    }
+  } else if (!players) {
+    // No player changes, just save other modifications
+    await reservation.save({ validateBeforeSave: false });
   }
 
-  await reservation.save({ validateBeforeSave: false });
   await reservation.populate('userId', 'username fullName email');
 
   res.status(200).json({
@@ -801,8 +1064,8 @@ export const cancelReservation = asyncHandler(async (req: AuthenticatedRequest, 
     requestUserId: req.user?._id
   });
 
-  // Check access permissions (skip for blocked reservations)
-  if (req.user?.role === 'member' && reservation.userId && reservation.userId.toString() !== req.user._id.toString()) {
+  // Check access permissions
+  if (req.user?.role === 'member' && reservation.userId.toString() !== req.user._id.toString()) {
     console.log(`🚫 Access denied - User ${req.user._id} trying to cancel reservation owned by ${reservation.userId}`);
     res.status(403).json({
       success: false,
@@ -894,9 +1157,9 @@ export const cancelReservation = asyncHandler(async (req: AuthenticatedRequest, 
       creditRefundAmount = creditTransaction.amount;
       try {
         console.log(`💳 Auto-refunding ₱${creditRefundAmount} credits for cancelled reservation`);
-
+        
         await (CreditTransaction as any).refundReservation(
-          reservation.userId?.toString() || '',
+          reservation.userId.toString(),
           (reservation._id as any).toString(),
           creditRefundAmount,
           'reservation_cancelled'
@@ -914,33 +1177,7 @@ export const cancelReservation = asyncHandler(async (req: AuthenticatedRequest, 
   await reservation.save({ validateBeforeSave: false });
   await reservation.populate('userId', 'username fullName email');
 
-  // Cancel any pending payment for this reservation
-  try {
-    const pendingPayment = await Payment.findOne({
-      reservationId: reservation._id,
-      status: 'pending'
-    });
-
-    if (pendingPayment) {
-      pendingPayment.status = 'failed';
-      pendingPayment.metadata = {
-        ...pendingPayment.metadata,
-        cancellation: {
-          reason: reason || 'Reservation cancelled',
-          cancelledAt: new Date(),
-          cancelledBy: req.user?._id?.toString() || 'system',
-          previousStatus: 'pending'
-        }
-      };
-      await pendingPayment.save();
-      console.log(`💰 Auto-cancelled pending payment ${pendingPayment._id} for cancelled reservation ${reservation._id}`);
-    }
-  } catch (error) {
-    console.error('Failed to cancel pending payment for cancelled reservation:', error);
-    // Continue with reservation cancellation even if payment update fails
-  }
-
-  const message = creditRefundAmount > 0
+  const message = creditRefundAmount > 0 
     ? `Reservation cancelled successfully. ${coinsToRefund} coins and ₱${creditRefundAmount} credits refunded.`
     : `Reservation cancelled successfully. ${coinsToRefund} coins refunded.`;
 
@@ -959,7 +1196,7 @@ export const updateReservationStatus = asyncHandler(async (req: AuthenticatedReq
   const { id } = req.params;
   const { status } = req.body;
 
-  if (!['pending', 'confirmed', 'cancelled', 'completed'].includes(status)) {
+  if (!['pending', 'confirmed', 'cancelled', 'completed', 'no-show'].includes(status)) {
     res.status(400).json({
       success: false,
       error: 'Invalid status'
@@ -1140,328 +1377,4 @@ export const completeReservationValidation = [
     .trim()
     .isLength({ max: 50 })
     .withMessage('Score must be a string with max 50 characters')
-];
-
-// Admin: Create blocked reservation (court block)
-export const createBlockedReservation = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { date, timeSlot, duration = 1, blockReason, blockNotes } = req.body;
-
-  if (!req.user) {
-    res.status(401).json({
-      success: false,
-      error: 'Authentication required'
-    });
-    return;
-  }
-
-  // Validate date is not in the past
-  const reservationDate = new Date(date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  if (reservationDate < today) {
-    res.status(400).json({
-      success: false,
-      error: 'Cannot block court for past dates'
-    });
-    return;
-  }
-
-  // Validate time slot
-  if (timeSlot < 5 || timeSlot > 21) {
-    res.status(400).json({
-      success: false,
-      error: 'Court operates from 5:00 AM to 10:00 PM'
-    });
-    return;
-  }
-
-  // Validate duration
-  if (duration < 1 || duration > 12) {
-    res.status(400).json({
-      success: false,
-      error: 'Duration must be between 1 and 12 hours'
-    });
-    return;
-  }
-
-  // Validate that block doesn't extend beyond court hours
-  const endTimeSlot = timeSlot + duration;
-  if (endTimeSlot > 23) {
-    res.status(400).json({
-      success: false,
-      error: `Block extends beyond court hours. Court closes at 10 PM (22:00).`
-    });
-    return;
-  }
-
-  // Check if slot range is available
-  const isAvailable = await (Reservation as any).isSlotRangeAvailable(reservationDate, timeSlot, endTimeSlot);
-  if (!isAvailable) {
-    res.status(400).json({
-      success: false,
-      error: 'One or more time slots in this range are already reserved or blocked'
-    });
-    return;
-  }
-
-  // Get weather forecast for the blocked time slot
-  let weatherForecast = null;
-  try {
-    const weather = await weatherService.getWeatherForDateTime(reservationDate, timeSlot);
-    if (weather) {
-      weatherForecast = {
-        temperature: weather.temperature,
-        description: weather.description,
-        humidity: weather.humidity,
-        windSpeed: weather.windSpeed,
-        icon: weather.icon,
-        rainChance: weather.rainChance,
-        timestamp: weather.timestamp
-      };
-    }
-  } catch (error) {
-    console.warn('Failed to fetch weather for blocked reservation:', error);
-  }
-
-  // Create blocked reservation
-  const blockedReservation = new Reservation({
-    reservationType: 'blocked',
-    blockReason: blockReason || 'other',
-    blockNotes: blockNotes || '',
-    date: reservationDate,
-    timeSlot,
-    duration,
-    players: ['BLOCKED'],
-    status: 'confirmed',
-    paymentStatus: 'paid',
-    totalFee: 0,
-    userId: req.user._id, // Store admin who created the block
-    weatherForecast
-  });
-
-  await blockedReservation.save();
-  await blockedReservation.populate('userId', 'username fullName email');
-
-  console.log(`🚫 Admin ${req.user.username} blocked court: ${reservationDate.toISOString().split('T')[0]} ${timeSlot}:00-${endTimeSlot}:00 (${blockReason})`);
-
-  res.status(201).json({
-    success: true,
-    data: blockedReservation,
-    message: `Court successfully blocked for ${duration} hour(s)`
-  });
-});
-
-// Admin: Get all blocked reservations
-export const getBlockedReservations = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 50;
-  const skip = (page - 1) * limit;
-
-  // Filter for future or current day blocks only by default
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const filter: any = {
-    reservationType: 'blocked'
-  };
-
-  // Add date filter if requested
-  if (req.query.includePast !== 'true') {
-    filter.date = { $gte: today };
-  }
-
-  const total = await Reservation.countDocuments(filter);
-  const blocks = await Reservation.find(filter)
-    .populate('userId', 'username fullName email')
-    .sort({ date: 1, timeSlot: 1 })
-    .skip(skip)
-    .limit(limit);
-
-  res.status(200).json({
-    success: true,
-    data: blocks,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit)
-    }
-  });
-});
-
-// Admin: Update blocked reservation
-export const updateBlockedReservation = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { id } = req.params;
-  const { date, timeSlot, duration = 1, blockReason, blockNotes } = req.body;
-
-  if (!req.user) {
-    res.status(401).json({
-      success: false,
-      error: 'Authentication required'
-    });
-    return;
-  }
-
-  const reservation = await Reservation.findById(id);
-
-  if (!reservation) {
-    res.status(404).json({
-      success: false,
-      error: 'Blocked reservation not found'
-    });
-    return;
-  }
-
-  if (reservation.reservationType !== 'blocked') {
-    res.status(400).json({
-      success: false,
-      error: 'This is not a blocked reservation.'
-    });
-    return;
-  }
-
-  // Validate new date is not in the past
-  const reservationDate = new Date(date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  if (reservationDate < today) {
-    res.status(400).json({
-      success: false,
-      error: 'Cannot block court for past dates'
-    });
-    return;
-  }
-
-  // Validate time slot
-  if (timeSlot < 5 || timeSlot > 21) {
-    res.status(400).json({
-      success: false,
-      error: 'Court operates from 5:00 AM to 10:00 PM'
-    });
-    return;
-  }
-
-  // Validate duration
-  if (duration < 1 || duration > 12) {
-    res.status(400).json({
-      success: false,
-      error: 'Duration must be between 1 and 12 hours'
-    });
-    return;
-  }
-
-  // Validate that block doesn't extend beyond court hours
-  const endTimeSlot = timeSlot + duration;
-  if (endTimeSlot > 23) {
-    res.status(400).json({
-      success: false,
-      error: `Block extends beyond court hours. Court closes at 10 PM (22:00).`
-    });
-    return;
-  }
-
-  // Check if slot range is available (excluding current block)
-  const isAvailable = await (Reservation as any).isSlotRangeAvailable(reservationDate, timeSlot, endTimeSlot, id);
-  if (!isAvailable) {
-    res.status(400).json({
-      success: false,
-      error: 'One or more time slots in this range are already reserved or blocked'
-    });
-    return;
-  }
-
-  // Get weather forecast for the updated blocked time slot
-  let weatherForecast = null;
-  try {
-    const weather = await weatherService.getWeatherForDateTime(reservationDate, timeSlot);
-    if (weather) {
-      weatherForecast = {
-        temperature: weather.temperature,
-        description: weather.description,
-        humidity: weather.humidity,
-        windSpeed: weather.windSpeed,
-        icon: weather.icon,
-        rainChance: weather.rainChance,
-        timestamp: weather.timestamp
-      };
-    }
-  } catch (error) {
-    console.warn('Failed to fetch weather for updated blocked reservation:', error);
-  }
-
-  // Update the blocked reservation
-  reservation.date = reservationDate;
-  reservation.timeSlot = timeSlot;
-  reservation.duration = duration;
-  reservation.blockReason = blockReason || reservation.blockReason;
-  reservation.blockNotes = blockNotes !== undefined ? blockNotes : reservation.blockNotes;
-  reservation.weatherForecast = weatherForecast || reservation.weatherForecast;
-
-  await reservation.save();
-  await reservation.populate('userId', 'username fullName email');
-
-  console.log(`✏️  Admin ${req.user.username} updated court block: ${reservationDate.toISOString().split('T')[0]} ${timeSlot}:00-${endTimeSlot}:00`);
-
-  res.status(200).json({
-    success: true,
-    data: reservation,
-    message: 'Block updated successfully'
-  });
-});
-
-// Admin: Delete blocked reservation
-export const deleteBlockedReservation = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { id } = req.params;
-
-  const reservation = await Reservation.findById(id);
-
-  if (!reservation) {
-    res.status(404).json({
-      success: false,
-      error: 'Blocked reservation not found'
-    });
-    return;
-  }
-
-  if (reservation.reservationType !== 'blocked') {
-    res.status(400).json({
-      success: false,
-      error: 'This is not a blocked reservation. Use the cancel endpoint for regular reservations.'
-    });
-    return;
-  }
-
-  await Reservation.findByIdAndDelete(id);
-
-  console.log(`✅ Admin ${req.user?.username} removed court block: ${reservation.date.toISOString().split('T')[0]} ${reservation.timeSlot}:00`);
-
-  res.status(200).json({
-    success: true,
-    message: 'Court block removed successfully'
-  });
-});
-
-// Validation rules for blocked reservations
-export const createBlockedReservationValidation = [
-  body('date')
-    .isISO8601()
-    .withMessage('Invalid date format'),
-  body('timeSlot')
-    .isInt({ min: 5, max: 22 })
-    .withMessage('Time slot must be between 5 and 22'),
-  body('duration')
-    .optional()
-    .isInt({ min: 1, max: 12 })
-    .withMessage('Duration must be between 1 and 12 hours'),
-  body('blockReason')
-    .optional()
-    .isIn(['maintenance', 'private_event', 'weather', 'other'])
-    .withMessage('Block reason must be maintenance, private_event, weather, or other'),
-  body('blockNotes')
-    .optional()
-    .trim()
-    .isLength({ max: 200 })
-    .withMessage('Block notes must not exceed 200 characters')
 ];

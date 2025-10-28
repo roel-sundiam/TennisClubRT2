@@ -399,8 +399,8 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
     }
   }
 
-  // Check if user can create payment for this reservation (skip for manual payments and blocked reservations)
-  if (!isManualPayment && req.user.role === 'member' && reservation && reservation.userId && reservation.userId.toString() !== req.user._id.toString()) {
+  // Check if user can create payment for this reservation (skip for manual payments)
+  if (!isManualPayment && req.user.role === 'member' && reservation && reservation.userId.toString() !== req.user._id.toString()) {
     return res.status(403).json({
       success: false,
       error: 'Access denied'
@@ -517,8 +517,21 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
     // Categorize players as members or non-members
     let memberCount = 0;
     let nonMemberCount = 0;
-    
-    reservation!.players.forEach(playerName => {
+
+    reservation!.players.forEach(player => {
+      // December 2025: Check if player is new format (object) or old format (string)
+      if (typeof player === 'object' && 'isMember' in player) {
+        // New format: player is {name, userId, isMember, isGuest}
+        if (player.isMember) {
+          memberCount++;
+        } else {
+          nonMemberCount++;
+        }
+        return;
+      }
+
+      // Old format: player is a string, use fuzzy matching
+      const playerName = player as string;
       const cleanPlayerName = playerName.toLowerCase().trim();
       const isFoundInMembers = memberNames.includes(cleanPlayerName);
       
@@ -605,25 +618,37 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
     }
   }
 
-  // Set due date
+  // Set due date 
   let dueDate = new Date();
-
+  
   if (isManualPayment) {
     // Manual payments are due immediately
     dueDate.setHours(23, 59, 59, 999);
   } else {
-    // NEW LOGIC: Payment due 1 day after the reservation date
+    // Set due date (7 days from creation for advance bookings, immediate for same-day)
     const reservationDate = new Date(reservation!.date);
-    const oneDayAfterReservation = new Date(reservationDate);
-    oneDayAfterReservation.setDate(oneDayAfterReservation.getDate() + 1);
-    oneDayAfterReservation.setHours(23, 59, 59, 999);
-
-    dueDate = oneDayAfterReservation;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    reservationDate.setHours(0, 0, 0, 0);
+    
+    if (reservationDate.getTime() === today.getTime()) {
+      // Same day booking - due immediately
+      dueDate.setHours(23, 59, 59, 999);
+    } else {
+      // Advance booking - due 7 days from now or 1 day before reservation, whichever is earlier
+      const sevenDaysFromNow = new Date();
+      sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+      
+      const oneDayBeforeReservation = new Date(reservationDate);
+      oneDayBeforeReservation.setDate(oneDayBeforeReservation.getDate() - 1);
+      
+      dueDate.setTime(Math.min(sevenDaysFromNow.getTime(), oneDayBeforeReservation.getTime()));
+    }
   }
 
   // Create payment record
   let paymentData: any = {
-    userId: isManualPayment ? req.user._id.toString() : reservation!.userId?.toString(),
+    userId: isManualPayment ? req.user._id : reservation!.userId,
     amount: paymentAmount,
     paymentMethod,
     dueDate,
@@ -692,25 +717,24 @@ export const getPayments = asyncHandler(async (req: AuthenticatedRequest, res: R
 
   // Build filter query
   const filter: any = {};
-
+  
   if (req.query.userId) {
-    // Handle both ObjectId and String formats for backward compatibility
-    filter.userId = { $in: [req.query.userId.toString(), req.query.userId] };
+    filter.userId = req.query.userId;
   }
-
+  
   if (req.query.status) {
     filter.status = req.query.status;
   }
-
+  
   if (req.query.paymentMethod) {
     filter.paymentMethod = req.query.paymentMethod;
   }
-
+  
   if (req.query.startDate && req.query.endDate) {
     const fromDate = new Date(req.query.startDate as string);
     const toDate = new Date(req.query.endDate as string);
     toDate.setHours(23, 59, 59, 999);
-
+    
     filter.createdAt = {
       $gte: fromDate,
       $lte: toDate
@@ -719,8 +743,7 @@ export const getPayments = asyncHandler(async (req: AuthenticatedRequest, res: R
 
   // If regular member, only show own payments
   if (req.user?.role === 'member') {
-    // Handle both ObjectId and String formats for backward compatibility
-    filter.userId = { $in: [req.user._id.toString(), req.user._id] };
+    filter.userId = req.user._id.toString();
   }
 
   console.log('💰 PAYMENT FILTER:', filter);
@@ -1221,13 +1244,12 @@ export const getMyPayments = asyncHandler(async (req: AuthenticatedRequest, res:
   const skip = (page - 1) * limit;
 
   const filter: any = {};
-
+  
   // Admin and superadmin users can see all payments, regular members only see their own
   if (req.user.role === 'member') {
-    // Handle both ObjectId and String formats for backward compatibility
-    filter.userId = { $in: [req.user._id.toString(), req.user._id] };
+    filter.userId = req.user._id.toString();
   }
-
+  
   if (req.query.status) {
     filter.status = req.query.status;
   }
@@ -1242,12 +1264,11 @@ export const getMyPayments = asyncHandler(async (req: AuthenticatedRequest, res:
 
   const total = await Payment.countDocuments(filter);
   console.log('🔍 Total payments found for user:', total);
-
+  
   // Add debug for completed payments specifically
-  const completedFilter: any = { status: 'completed' };
+  const completedFilter = { status: 'completed' };
   if (req.user.role === 'member') {
-    // Handle both ObjectId and String formats for backward compatibility
-    completedFilter.userId = { $in: [req.user._id.toString(), req.user._id] };
+    (completedFilter as any).userId = req.user._id.toString();
   }
   const completedCount = await Payment.countDocuments(completedFilter);
   console.log('🔍 Completed payments for user:', completedCount);
@@ -1320,37 +1341,68 @@ export const checkMyOverduePayments = asyncHandler(async (req: AuthenticatedRequ
 
   console.log('🔍 Checking overdue payments for user:', req.user.username);
 
-  // Check for overdue payments (1+ days past due) - SIMPLIFIED: Only check Payment records
+  // Check for overdue payments (1+ days past due)
   const oneDayAgo = new Date();
   oneDayAgo.setDate(oneDayAgo.getDate() - 1);
   oneDayAgo.setHours(23, 59, 59, 999);
 
-  // Check Payment collection for pending overdue payments
-  // Handle both ObjectId and String formats for backward compatibility
+  // Check 1: Payment collection for pending overdue payments
   const overduePayments = await Payment.find({
-    userId: { $in: [req.user._id.toString(), req.user._id] },
+    userId: req.user._id,
     status: 'pending',
     dueDate: { $lt: oneDayAgo }
   }).lean();
 
   console.log(`🔍 Found ${overduePayments.length} overdue Payment records`);
 
-  // Format overdue payment details
-  const overdueDetails = overduePayments.map(payment => ({
-    type: 'payment',
-    id: payment._id,
-    amount: payment.amount,
-    dueDate: payment.dueDate,
-    daysOverdue: Math.ceil((new Date().getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24)),
-    description: payment.description || 'Payment'
-  }));
+  // Check 2: Reservations with pending payment status where reservation date has passed
+  const overdueReservations = await Reservation.find({
+    userId: req.user._id,
+    paymentStatus: 'pending',
+    date: { $lt: oneDayAgo },
+    status: { $in: ['pending', 'confirmed'] }
+  }).lean();
 
-  console.log(`🔍 Total overdue payments: ${overdueDetails.length}`);
+  console.log(`🔍 Found ${overdueReservations.length} overdue Reservations`);
+
+  // Format overdue details
+  const overdueDetails: any[] = [];
+
+  // Add Payment records
+  overduePayments.forEach(payment => {
+    const daysOverdue = Math.ceil((new Date().getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24));
+    overdueDetails.push({
+      type: 'payment',
+      id: payment._id,
+      amount: payment.amount,
+      dueDate: payment.dueDate,
+      daysOverdue: daysOverdue,
+      description: payment.description || 'Payment'
+    });
+  });
+
+  // Add Reservation records
+  overdueReservations.forEach(reservation => {
+    const daysOverdue = Math.ceil((new Date().getTime() - new Date(reservation.date).getTime()) / (1000 * 60 * 60 * 24));
+    const description = `Court reservation for ${new Date(reservation.date).toDateString()} ${reservation.timeSlot}:00-${(reservation.endTimeSlot || reservation.timeSlot + 1)}:00`;
+    overdueDetails.push({
+      type: 'reservation',
+      id: reservation._id,
+      amount: reservation.totalFee || 0,
+      dueDate: reservation.date,
+      daysOverdue: daysOverdue,
+      description: description
+    });
+  });
+
+  const totalOverdue = overdueDetails.length;
+
+  console.log(`🔍 Total overdue items: ${totalOverdue}`);
 
   return res.status(200).json({
     success: true,
-    hasOverdue: overdueDetails.length > 0,
-    count: overdueDetails.length,
+    hasOverdue: totalOverdue > 0,
+    count: totalOverdue,
     overduePayments: overdueDetails
   });
 });

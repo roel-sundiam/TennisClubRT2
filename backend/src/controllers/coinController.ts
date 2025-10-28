@@ -509,6 +509,162 @@ export const reverseTransaction = asyncHandler(async (req: AuthenticatedRequest,
   }
 });
 
+// Get coin purchase report with statistics (Admin only)
+export const getCoinPurchaseReport = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { startDate, endDate, status, page = 1, limit = 10 } = req.query;
+
+    // Build filter
+    const filter: any = { type: 'purchased' };
+
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) {
+        filter.createdAt.$gte = new Date(startDate as string);
+      }
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = end;
+      }
+    }
+
+    // Get aggregate statistics
+    const statsAggregation = await CoinTransaction.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          totalPurchases: { $sum: 1 },
+          totalCoins: { $sum: '$amount' },
+          totalCostPHP: {
+            $sum: {
+              $ifNull: ['$metadata.costInPHP', '$amount']
+            }
+          },
+          statusBreakdown: {
+            $push: {
+              status: '$status',
+              amount: '$amount',
+              costInPHP: { $ifNull: ['$metadata.costInPHP', '$amount'] }
+            }
+          },
+          paymentMethodBreakdown: {
+            $push: {
+              paymentMethod: '$metadata.paymentMethod',
+              amount: '$amount',
+              costInPHP: { $ifNull: ['$metadata.costInPHP', '$amount'] }
+            }
+          }
+        }
+      }
+    ]);
+
+    // Group by status
+    const statusBreakdown = await CoinTransaction.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          totalCoins: { $sum: '$amount' },
+          totalCostPHP: {
+            $sum: {
+              $ifNull: ['$metadata.costInPHP', '$amount']
+            }
+          }
+        }
+      }
+    ]);
+
+    // Group by payment method
+    const paymentMethodBreakdown = await CoinTransaction.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: '$metadata.paymentMethod',
+          count: { $sum: 1 },
+          totalCoins: { $sum: '$amount' },
+          totalCostPHP: {
+            $sum: {
+              $ifNull: ['$metadata.costInPHP', '$amount']
+            }
+          }
+        }
+      }
+    ]);
+
+    // Get paginated purchases
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    const purchases = await CoinTransaction.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .populate('userId', 'username fullName email');
+
+    const total = await CoinTransaction.countDocuments(filter);
+
+    // Prepare statistics
+    const stats = statsAggregation[0] || {
+      totalPurchases: 0,
+      totalCoins: 0,
+      totalCostPHP: 0
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        summary: {
+          totalPurchases: stats.totalPurchases || 0,
+          totalCoins: stats.totalCoins || 0,
+          totalCostPHP: stats.totalCostPHP || 0
+        },
+        statusBreakdown: statusBreakdown.map(item => ({
+          status: item._id || 'unknown',
+          count: item.count,
+          totalCoins: item.totalCoins,
+          totalCostPHP: item.totalCostPHP
+        })),
+        paymentMethodBreakdown: paymentMethodBreakdown
+          .filter(item => item._id) // Filter out null payment methods
+          .map(item => ({
+            paymentMethod: item._id,
+            count: item.count,
+            totalCoins: item.totalCoins,
+            totalCostPHP: item.totalCostPHP
+          })),
+        purchases
+      },
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+        hasNext: pageNum * limitNum < total,
+        hasPrev: pageNum > 1
+      },
+      filters: {
+        startDate,
+        endDate,
+        status
+      },
+      message: `Found ${total} coin purchase records`
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Validation rules
 export const purchaseCoinsValidation = [
   body('amount')

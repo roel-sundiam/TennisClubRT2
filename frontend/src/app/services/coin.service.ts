@@ -59,6 +59,33 @@ export interface AdminCoinAction {
   reason: string;
 }
 
+export interface CoinPurchaseReportSummary {
+  totalPurchases: number;
+  totalCoins: number;
+  totalCostPHP: number;
+}
+
+export interface CoinPurchaseStatusBreakdown {
+  status: string;
+  count: number;
+  totalCoins: number;
+  totalCostPHP: number;
+}
+
+export interface CoinPurchasePaymentMethodBreakdown {
+  paymentMethod: string;
+  count: number;
+  totalCoins: number;
+  totalCostPHP: number;
+}
+
+export interface CoinPurchaseReport {
+  summary: CoinPurchaseReportSummary;
+  statusBreakdown: CoinPurchaseStatusBreakdown[];
+  paymentMethodBreakdown: CoinPurchasePaymentMethodBreakdown[];
+  purchases: CoinTransaction[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -260,5 +287,40 @@ export class CoinService {
     return this.http.post<any>(`${this.apiUrl}/coins/purchases/${transactionId}/reject`, {
       rejectionReason
     });
+  }
+
+  /**
+   * Get coin purchase report with statistics (admin only)
+   */
+  getCoinPurchaseReport(
+    startDate?: string,
+    endDate?: string,
+    status?: string,
+    page: number = 1,
+    limit: number = 10
+  ): Observable<{
+    success: boolean;
+    data: CoinPurchaseReport;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+    filters: {
+      startDate?: string;
+      endDate?: string;
+      status?: string;
+    };
+    message: string;
+  }> {
+    let params: any = { page: page.toString(), limit: limit.toString() };
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    if (status && status !== 'all') params.status = status;
+
+    return this.http.get<any>(`${this.apiUrl}/coins/purchases/report`, { params });
   }
 }
