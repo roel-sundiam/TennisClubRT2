@@ -350,33 +350,6 @@ import { environment } from '../../../environments/environment';
             </mat-card-actions>
           </mat-card>
 
-          <!-- Official Tennis App Store -->
-          <mat-card class="action-card" data-icon="store" data-title="Official Tennis App Store" 
-                   (click)="openTennisAppStore()" 
-                   (touchstart)="handleTouchStart($event)"
-                   (touchend)="handleTouchEnd($event, 'openTennisAppStore')">
-            <!-- Mobile Icon -->
-            <div class="mobile-card-icon">
-              <mat-icon>store</mat-icon>
-            </div>
-            <div class="mobile-card-title">Official Tennis App Store</div>
-
-            <!-- Desktop Content -->
-            <mat-card-header>
-              <mat-icon mat-card-avatar class="action-icon">store</mat-icon>
-              <mat-card-title>Official Tennis App Store</mat-card-title>
-              <mat-card-subtitle>Buy & sell tennis gear with fellow members</mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content>
-              <p>Browse tennis equipment for sale by members or list your own gear to sell to the tennis community.</p>
-            </mat-card-content>
-            <mat-card-actions>
-              <button mat-raised-button class="primary-btn" (click)="openTennisAppStore()">
-                <mat-icon>open_in_new</mat-icon>
-                Browse Marketplace
-              </button>
-            </mat-card-actions>
-          </mat-card>
         </div>
 
         <!-- Admin Section -->

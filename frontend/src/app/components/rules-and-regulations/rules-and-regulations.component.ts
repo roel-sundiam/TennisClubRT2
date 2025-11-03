@@ -57,12 +57,14 @@ import { Router } from '@angular/router';
               <mat-icon class="rule-icon">payment</mat-icon>
               <div class="rule-content">
                 <h3>Payment Policy</h3>
-                <p><strong>Pay before you play.</strong></p>
+                <p><strong>Play first, pay after.</strong> Payment button is enabled after your reservation time passes.</p>
+                <h4>Court Fees (Per Hour)</h4>
                 <ul>
-                  <li>Members: ₱20 per hour</li>
-                  <li>Non-Members: ₱50 per hour</li>
-                  <li>Lights Usage: ₱100 per hour</li>
+                  <li><strong>Peak Hours</strong> (5AM, 6PM, 7PM, 8PM, 9PM): ₱150 base fee</li>
+                  <li><strong>Non-Peak Hours</strong>: ₱100 base fee</li>
+                  <li><strong>Guest Fee</strong>: ₱70 per guest (added to reserver's payment)</li>
                 </ul>
+                <p class="fee-note"><mat-icon class="inline-icon">info</mat-icon> Base fee is split equally among all members. Only the reserver pays for guests.</p>
               </div>
             </div>
 

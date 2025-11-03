@@ -406,6 +406,16 @@ export const getReservation = asyncHandler(async (req: AuthenticatedRequest, res
 export const createReservation = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { date, timeSlot, players, duration = 1, tournamentTier = '100', totalFee }: CreateReservationRequest = req.body;
 
+  console.log('🔍 CREATE RESERVATION REQUEST:', {
+    date,
+    timeSlot,
+    playersCount: players?.length,
+    players,
+    duration,
+    totalFee,
+    user: req.user?.username
+  });
+
   if (!req.user) {
     res.status(401).json({
       success: false,
@@ -586,14 +596,6 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
     res.status(400).json({
       success: false,
       error: 'At least one player is required'
-    });
-    return;
-  }
-
-  if (players.length > 4) {
-    res.status(400).json({
-      success: false,
-      error: 'Maximum 4 players allowed'
     });
     return;
   }
@@ -932,14 +934,6 @@ export const updateReservation = asyncHandler(async (req: AuthenticatedRequest, 
       res.status(400).json({
         success: false,
         error: 'At least one player is required'
-      });
-      return;
-    }
-
-    if (players.length > 4) {
-      res.status(400).json({
-        success: false,
-        error: 'Maximum 4 players allowed'
       });
       return;
     }
@@ -1326,8 +1320,8 @@ export const createReservationValidation = [
     .isInt({ min: 1, max: 4 })
     .withMessage('Duration must be between 1 and 4 hours'),
   body('players')
-    .isArray({ min: 1, max: 4 })
-    .withMessage('Players must be an array with 1-4 items'),
+    .isArray({ min: 1 })
+    .withMessage('Players must be an array with at least 1 item'),
   body('players.*')
     .trim()
     .isLength({ min: 1, max: 50 })
@@ -1349,8 +1343,8 @@ export const updateReservationValidation = [
     .withMessage('Time slot must be between 5 and 22'),
   body('players')
     .optional()
-    .isArray({ min: 1, max: 4 })
-    .withMessage('Players must be an array with 1-4 items'),
+    .isArray({ min: 1 })
+    .withMessage('Players must be an array with at least 1 item'),
   body('players.*')
     .trim()
     .isLength({ min: 1, max: 50 })

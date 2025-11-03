@@ -83,11 +83,11 @@ export class AdminManualCourtUsageComponent implements OnInit {
   displayedColumns = ['playerName', 'amount', 'actions'];
   historyColumns = ['date', 'timeSlot', 'players', 'totalAmount'];
 
-  // Peak hours configuration
-  peakHours = [5, 18, 19, 21]; // 5AM, 6PM, 7PM, 9PM
-  peakHourFee = 100;
-  offPeakFeePerMember = 20;
-  offPeakFeePerNonMember = 50;
+  // Peak hours configuration (December 2025+ pricing)
+  peakHours = [5, 18, 19, 20, 21]; // 5AM, 6PM, 7PM, 8PM, 9PM
+  peakHourBaseFee = 150;        // Base fee for peak hours
+  nonPeakHourBaseFee = 100;     // Base fee for non-peak hours
+  guestFeePerPerson = 70;       // Additional fee per guest
 
   constructor(
     private fb: FormBuilder,
@@ -272,9 +272,9 @@ export class AdminManualCourtUsageComponent implements OnInit {
 
     this.calculating = true;
 
-    // Categorize players as members or non-members
+    // Categorize players as members or guests
     let memberCount = 0;
-    let nonMemberCount = 0;
+    let guestCount = 0;
 
     const memberNames = this.members.map(m => m.fullName.toLowerCase().trim());
 
@@ -283,23 +283,21 @@ export class AdminManualCourtUsageComponent implements OnInit {
       if (memberNames.includes(cleanName)) {
         memberCount++;
       } else {
-        nonMemberCount++;
+        guestCount++;
       }
     });
 
     // Calculate total fee for all hours in the range
+    // December 2025+ pricing: Peak ₱150 base + ₱70 per guest, Non-Peak ₱100 base + ₱70 per guest
     let totalFee = 0;
     const hours = endTime - startTime;
 
     for (let hour = startTime; hour < endTime; hour++) {
       const isPeakHour = this.peakHours.includes(hour);
+      const baseFee = isPeakHour ? this.peakHourBaseFee : this.nonPeakHourBaseFee;
+      const guestFees = guestCount * this.guestFeePerPerson;
 
-      if (isPeakHour) {
-        const calculatedFee = (memberCount * this.offPeakFeePerMember) + (nonMemberCount * this.offPeakFeePerNonMember);
-        totalFee += Math.max(this.peakHourFee, calculatedFee);
-      } else {
-        totalFee += (memberCount * this.offPeakFeePerMember) + (nonMemberCount * this.offPeakFeePerNonMember);
-      }
+      totalFee += baseFee + guestFees;
     }
 
     // Divide equally among players
@@ -313,10 +311,12 @@ export class AdminManualCourtUsageComponent implements OnInit {
 
     this.calculating = false;
 
+    // Create detailed fee breakdown message
+    const breakdown = `${memberCount} member(s), ${guestCount} guest(s)`;
     this.snackBar.open(
-      `Calculated: ₱${totalFee} total for ${hours} hour(s) (₱${feePerPlayer.toFixed(2)} per player)`,
+      `Calculated: ₱${totalFee} total for ${hours} hour(s) | ${breakdown} | ₱${feePerPlayer.toFixed(2)} per player`,
       'Close',
-      { duration: 4000 }
+      { duration: 5000 }
     );
   }
 

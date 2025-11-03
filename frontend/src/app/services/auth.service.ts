@@ -62,18 +62,25 @@ export class AuthService {
     // Check for existing token on service initialization
     const token = localStorage.getItem('token');
     const userString = localStorage.getItem('user');
+    const tokenExpiration = localStorage.getItem('tokenExpiration');
 
     if (token && userString && userString !== 'undefined' && userString !== 'null') {
       try {
         const user = JSON.parse(userString);
-        this.tokenSubject.next(token);
-        this.currentUserSubject.next(user);
-        console.log('🔐 Restored auth state from localStorage:', user.username);
+
+        // Check if token is expired
+        if (tokenExpiration && this.isTokenExpiredByTimestamp(Number(tokenExpiration))) {
+          console.log('🔐 Token expired during initialization, clearing auth state');
+          this.clearAuthState();
+        } else {
+          this.tokenSubject.next(token);
+          this.currentUserSubject.next(user);
+          console.log('🔐 Restored auth state from localStorage:', user.username);
+        }
       } catch (error) {
         console.error('Error parsing user from localStorage:', error);
         // Clear invalid data
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        this.clearAuthState();
       }
     }
 
@@ -90,16 +97,23 @@ export class AuthService {
       .pipe(
         tap((response: any) => {
           console.log('Login response:', response); // Debug log
-          // Backend returns: { success: true, data: { token, user }, message }
+          // Backend returns: { success: true, data: { token, user, expiresIn }, message }
           const token = response.data?.token || response.token;
           const user = response.data?.user || response.user;
+          const expiresIn = response.data?.expiresIn || response.expiresIn || '7d';
 
           if (token && user) {
+            // Calculate and store token expiration timestamp
+            const expirationTimestamp = this.calculateExpirationTimestamp(expiresIn);
+
             localStorage.setItem('token', token);
             localStorage.setItem('user', JSON.stringify(user));
+            localStorage.setItem('tokenExpiration', expirationTimestamp.toString());
+
             this.tokenSubject.next(token);
             this.currentUserSubject.next(user);
-            console.log('Auth state updated - token:', !!token, 'user:', user.username);
+
+            console.log('Auth state updated - token:', !!token, 'user:', user.username, 'expires:', new Date(expirationTimestamp).toLocaleString());
           } else {
             console.error('Invalid login response - missing token or user');
           }
@@ -109,12 +123,20 @@ export class AuthService {
   }
 
   logout(): void {
+    this.clearAuthState();
+    this.router.navigate(['/login']);
+  }
+
+  /**
+   * Clear all authentication state from localStorage and subjects
+   */
+  private clearAuthState(): void {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('tokenExpiration');
     this.tokenSubject.next(null);
     this.currentUserSubject.next(null);
     this.isLoadingSubject.next(false);
-    this.router.navigate(['/login']);
   }
 
   get currentUser(): User | null {
@@ -126,7 +148,18 @@ export class AuthService {
   }
 
   isAuthenticated(): boolean {
-    return !!this.token;
+    if (!this.token) {
+      return false;
+    }
+
+    // Check if token is expired
+    if (this.isTokenExpired()) {
+      console.log('🔐 Token expired, logging out');
+      this.logout();
+      return false;
+    }
+
+    return true;
   }
 
   isLoading(): boolean {
@@ -189,5 +222,60 @@ export class AuthService {
    */
   changePassword(passwordData: ChangePasswordRequest): Observable<any> {
     return this.http.put(`${this.apiUrl}/auth/change-password`, passwordData);
+  }
+
+  /**
+   * Check if the current token is expired
+   */
+  isTokenExpired(): boolean {
+    const tokenExpiration = localStorage.getItem('tokenExpiration');
+    if (!tokenExpiration) {
+      return false; // No expiration set, assume valid (for backwards compatibility)
+    }
+
+    return this.isTokenExpiredByTimestamp(Number(tokenExpiration));
+  }
+
+  /**
+   * Check if a given timestamp is in the past (token expired)
+   */
+  private isTokenExpiredByTimestamp(expirationTimestamp: number): boolean {
+    return Date.now() >= expirationTimestamp;
+  }
+
+  /**
+   * Calculate expiration timestamp from expiresIn string (e.g., "7d", "24h", "60m")
+   */
+  private calculateExpirationTimestamp(expiresIn: string): number {
+    const now = Date.now();
+    const match = expiresIn.match(/^(\d+)([dhms])$/);
+
+    if (!match) {
+      console.warn('Invalid expiresIn format:', expiresIn, '- defaulting to 7 days');
+      return now + (7 * 24 * 60 * 60 * 1000); // Default to 7 days
+    }
+
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+
+    let milliseconds = 0;
+    switch (unit) {
+      case 'd': // days
+        milliseconds = value * 24 * 60 * 60 * 1000;
+        break;
+      case 'h': // hours
+        milliseconds = value * 60 * 60 * 1000;
+        break;
+      case 'm': // minutes
+        milliseconds = value * 60 * 1000;
+        break;
+      case 's': // seconds
+        milliseconds = value * 1000;
+        break;
+      default:
+        milliseconds = 7 * 24 * 60 * 60 * 1000; // Default to 7 days
+    }
+
+    return now + milliseconds;
   }
 }

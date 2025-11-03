@@ -193,8 +193,11 @@ router.put(
           return;
         }
 
-        // Members can only process their own payments
-        if (payment.userId.toString() !== req.user._id.toString()) {
+        // Members can process their own payments OR payments they paid for others
+        const isOwnPayment = payment.userId.toString() === req.user._id.toString();
+        const isPaidByUser = payment.paidBy && payment.paidBy.toString() === req.user._id.toString();
+
+        if (!isOwnPayment && !isPaidByUser) {
           res.status(403).json({
             success: false,
             error: 'Access denied'

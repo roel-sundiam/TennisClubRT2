@@ -114,55 +114,68 @@ interface PaymentsReportData {
   ],
   template: `
     <div class="report-container">
-      <!-- Header -->
-      <div class="report-header">
-        <div class="header-info">
-          <button mat-icon-button (click)="goBack()" class="back-button">
+      <!-- Modern Header with Gradient -->
+      <div class="modern-header">
+        <div class="header-background"></div>
+        <div class="header-content">
+          <button mat-icon-button (click)="goBack()" class="back-btn">
             <mat-icon>arrow_back</mat-icon>
           </button>
-          <div class="title-section">
-            <h1>Payment Management</h1>
-            <p class="subtitle">Payment approval and recording workflow for admin verification</p>
+          <div class="header-text">
+            <h1 class="page-title">
+              <mat-icon class="title-icon">assessment</mat-icon>
+              Payment Management
+            </h1>
+            <p class="page-subtitle">Streamlined payment approval and recording workflow</p>
           </div>
         </div>
-        
-        <!-- Date Range Filter -->
-        <mat-card class="filter-card">
-          <mat-card-header>
-            <mat-card-title>Date Range Filter</mat-card-title>
-          </mat-card-header>
+      </div>
+
+      <!-- Filter Section with Modern Design -->
+      <div class="filter-section">
+        <mat-card class="filter-card modern-card">
+          <div class="filter-header">
+            <div class="filter-title">
+              <mat-icon>filter_list</mat-icon>
+              <span>Filter Options</span>
+            </div>
+          </div>
           <mat-card-content>
-            <form [formGroup]="dateRangeForm" class="date-filter-form">
-              <mat-form-field appearance="outline">
-                <mat-label>Start Date</mat-label>
-                <input matInput [matDatepicker]="startPicker" formControlName="startDate">
-                <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
-                <mat-datepicker #startPicker></mat-datepicker>
-              </mat-form-field>
-              
-              <mat-form-field appearance="outline">
-                <mat-label>End Date</mat-label>
-                <input matInput [matDatepicker]="endPicker" formControlName="endDate">
-                <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
-                <mat-datepicker #endPicker></mat-datepicker>
-              </mat-form-field>
-              
-              <div class="filter-actions">
-                <button mat-raised-button color="accent" (click)="openRecordedPaymentsModal()" class="recorded-payments-btn">
-                  <mat-icon>verified</mat-icon>
-                  View Record
-                </button>
-                <button mat-raised-button color="primary" (click)="loadReport()" [disabled]="loading">
+            <form [formGroup]="dateRangeForm" class="filter-form">
+              <div class="date-inputs">
+                <mat-form-field appearance="outline" class="modern-input">
+                  <mat-label>Start Date</mat-label>
+                  <input matInput [matDatepicker]="startPicker" formControlName="startDate">
+                  <mat-icon matPrefix>event</mat-icon>
+                  <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+                  <mat-datepicker #startPicker></mat-datepicker>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="modern-input">
+                  <mat-label>End Date</mat-label>
+                  <input matInput [matDatepicker]="endPicker" formControlName="endDate">
+                  <mat-icon matPrefix>event</mat-icon>
+                  <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+                  <mat-datepicker #endPicker></mat-datepicker>
+                </mat-form-field>
+              </div>
+
+              <div class="action-buttons">
+                <button mat-raised-button class="primary-action" (click)="loadReport()" [disabled]="loading">
                   <mat-icon>refresh</mat-icon>
-                  Update Report
+                  <span>Update Report</span>
                 </button>
-                <button mat-button (click)="resetDateRange()">
-                  <mat-icon>clear</mat-icon>
-                  Clear Filter
+                <button mat-stroked-button class="secondary-action" (click)="openRecordedPaymentsModal()">
+                  <mat-icon>verified</mat-icon>
+                  <span>View Recorded</span>
                 </button>
-                <button mat-button (click)="exportToCSV()" [disabled]="!reportData || reportData.payments.length === 0">
+                <button mat-stroked-button class="secondary-action" (click)="resetDateRange()">
+                  <mat-icon>restore</mat-icon>
+                  <span>Reset</span>
+                </button>
+                <button mat-stroked-button class="export-action" (click)="exportToCSV()" [disabled]="!reportData || reportData.payments.length === 0">
                   <mat-icon>download</mat-icon>
-                  Export CSV
+                  <span>Export CSV</span>
                 </button>
               </div>
             </form>
@@ -176,118 +189,152 @@ interface PaymentsReportData {
       </div>
 
       <div *ngIf="!loading && reportData">
-        <!-- Summary Cards -->
-        <div class="summary-grid">
-          <mat-card class="summary-card total">
-            <mat-card-content>
-              <div class="summary-content">
-                <mat-icon class="summary-icon">payments</mat-icon>
-                <div class="summary-details">
-                  <h3>Total Payments</h3>
-                  <p class="summary-value">₱{{reportData.summary.totalAmount.toFixed(2)}}</p>
-                  <p class="summary-label">{{reportData.summary.totalPayments}} payments</p>
-                </div>
-              </div>
-            </mat-card-content>
-          </mat-card>
+        <!-- Modern Summary Cards -->
+        <div class="stats-section">
+          <h2 class="section-title">
+            <mat-icon>insights</mat-icon>
+            Overview & Analytics
+          </h2>
 
-          <mat-card class="summary-card pending">
-            <mat-card-content>
-              <div class="summary-content">
-                <mat-icon class="summary-icon">pending</mat-icon>
-                <div class="summary-details">
-                  <h3>Pending Approval</h3>
-                  <p class="summary-value">{{reportData.summary.pendingPayments}}</p>
-                  <p class="summary-label">Need admin approval</p>
-                </div>
+          <div class="stats-grid">
+            <!-- Total Payments Card -->
+            <div class="stat-card total-card">
+              <div class="stat-icon-wrapper total-bg">
+                <mat-icon class="stat-icon">payments</mat-icon>
               </div>
-            </mat-card-content>
-          </mat-card>
-
-          <mat-card class="summary-card completed">
-            <mat-card-content>
-              <div class="summary-content">
-                <mat-icon class="summary-icon">check_circle</mat-icon>
-                <div class="summary-details">
-                  <h3>Approved</h3>
-                  <p class="summary-value">{{reportData.summary.completedPayments}}</p>
-                  <p class="summary-label">Ready to record</p>
-                </div>
+              <div class="stat-content">
+                <div class="stat-label">Total Payments</div>
+                <div class="stat-value">₱{{reportData.summary.totalAmount.toFixed(2)}}</div>
+                <div class="stat-meta">{{reportData.summary.totalPayments}} transactions</div>
               </div>
-            </mat-card-content>
-          </mat-card>
-
-          <mat-card class="summary-card recorded">
-            <mat-card-content>
-              <div class="summary-content">
-                <mat-icon class="summary-icon">verified</mat-icon>
-                <div class="summary-details">
-                  <h3>Recorded</h3>
-                  <p class="summary-value">{{reportData.summary.recordedPayments}}</p>
-                  <p class="summary-label">Fully processed</p>
-                </div>
-              </div>
-            </mat-card-content>
-          </mat-card>
-        </div>
-
-        <!-- Service Fee Breakdown -->
-        <div class="service-fee-grid">
-          <mat-card class="summary-card service-fee">
-            <mat-card-content>
-              <div class="summary-content">
-                <mat-icon class="summary-icon">monetization_on</mat-icon>
-                <div class="summary-details">
-                  <h3>App Service Fees (10%)</h3>
-                  <p class="summary-value">₱{{reportData.summary.totalServiceFees?.toFixed(2) || '0.00'}}</p>
-                  <p class="summary-label">Revenue from app fees</p>
-                </div>
-              </div>
-            </mat-card-content>
-          </mat-card>
-
-          <mat-card class="summary-card court-revenue">
-            <mat-card-content>
-              <div class="summary-content">
-                <mat-icon class="summary-icon">sports_tennis</mat-icon>
-                <div class="summary-details">
-                  <h3>Court Revenue (90%)</h3>
-                  <p class="summary-value">₱{{reportData.summary.totalCourtRevenue?.toFixed(2) || '0.00'}}</p>
-                  <p class="summary-label">Revenue to tennis club</p>
-                </div>
-              </div>
-            </mat-card-content>
-          </mat-card>
-        </div>
-
-        <!-- Payment Method Breakdown -->
-        <mat-card class="breakdown-card">
-          <mat-card-header>
-            <mat-card-title>Payment Method Breakdown</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
-            <div class="payment-method-grid">
-              <div *ngFor="let method of reportData.paymentMethodBreakdown" class="payment-method-item">
-                <div class="method-header">
-                  <mat-icon>{{getPaymentMethodIcon(method.paymentMethod)}}</mat-icon>
-                  <h4>{{formatPaymentMethod(method.paymentMethod)}}</h4>
-                </div>
-                <div class="method-stats">
-                  <span class="count">{{method.count}} payments</span>
-                  <span class="total">₱{{method.totalAmount.toFixed(2)}}</span>
-                </div>
+              <div class="stat-trend">
+                <mat-icon class="trend-icon">trending_up</mat-icon>
               </div>
             </div>
-          </mat-card-content>
-        </mat-card>
+
+            <!-- Pending Card -->
+            <div class="stat-card pending-card">
+              <div class="stat-icon-wrapper pending-bg">
+                <mat-icon class="stat-icon">pending_actions</mat-icon>
+              </div>
+              <div class="stat-content">
+                <div class="stat-label">Pending Approval</div>
+                <div class="stat-value">{{reportData.summary.pendingPayments}}</div>
+                <div class="stat-meta">Awaiting review</div>
+              </div>
+              <div class="stat-badge pending-badge">Action Required</div>
+            </div>
+
+            <!-- Approved Card -->
+            <div class="stat-card approved-card">
+              <div class="stat-icon-wrapper approved-bg">
+                <mat-icon class="stat-icon">check_circle</mat-icon>
+              </div>
+              <div class="stat-content">
+                <div class="stat-label">Approved</div>
+                <div class="stat-value">{{reportData.summary.completedPayments}}</div>
+                <div class="stat-meta">Ready to record</div>
+              </div>
+              <div class="stat-badge approved-badge">Ready</div>
+            </div>
+
+            <!-- Recorded Card -->
+            <div class="stat-card recorded-card">
+              <div class="stat-icon-wrapper recorded-bg">
+                <mat-icon class="stat-icon">verified</mat-icon>
+              </div>
+              <div class="stat-content">
+                <div class="stat-label">Recorded</div>
+                <div class="stat-value">{{reportData.summary.recordedPayments}}</div>
+                <div class="stat-meta">Fully processed</div>
+              </div>
+              <div class="stat-badge recorded-badge">Complete</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Revenue Breakdown Section -->
+        <div class="revenue-section">
+          <h2 class="section-title">
+            <mat-icon>account_balance</mat-icon>
+            Revenue Distribution
+          </h2>
+
+          <div class="revenue-grid">
+            <mat-card class="revenue-card modern-card">
+              <div class="revenue-header">
+                <div class="revenue-icon service-fee-icon">
+                  <mat-icon>monetization_on</mat-icon>
+                </div>
+                <div class="revenue-info">
+                  <div class="revenue-title">App Service Fees</div>
+                  <div class="revenue-subtitle">10% commission</div>
+                </div>
+              </div>
+              <div class="revenue-amount service-fee-amount">
+                ₱{{reportData.summary.totalServiceFees?.toFixed(2) || '0.00'}}
+              </div>
+              <div class="revenue-footer">
+                <mat-icon>info_outline</mat-icon>
+                <span>Platform maintenance & development</span>
+              </div>
+            </mat-card>
+
+            <mat-card class="revenue-card modern-card">
+              <div class="revenue-header">
+                <div class="revenue-icon court-revenue-icon">
+                  <mat-icon>sports_tennis</mat-icon>
+                </div>
+                <div class="revenue-info">
+                  <div class="revenue-title">Court Revenue</div>
+                  <div class="revenue-subtitle">90% to club</div>
+                </div>
+              </div>
+              <div class="revenue-amount court-revenue-amount">
+                ₱{{reportData.summary.totalCourtRevenue?.toFixed(2) || '0.00'}}
+              </div>
+              <div class="revenue-footer">
+                <mat-icon>info_outline</mat-icon>
+                <span>Direct earnings for tennis club</span>
+              </div>
+            </mat-card>
+          </div>
+        </div>
+
+        <!-- Payment Methods Section -->
+        <div class="payment-methods-section">
+          <h2 class="section-title">
+            <mat-icon>credit_card</mat-icon>
+            Payment Methods Breakdown
+          </h2>
+
+          <mat-card class="modern-card">
+            <mat-card-content>
+              <div class="methods-grid">
+                <div *ngFor="let method of reportData.paymentMethodBreakdown" class="method-card">
+                  <div class="method-icon-wrapper">
+                    <mat-icon class="method-icon">{{getPaymentMethodIcon(method.paymentMethod)}}</mat-icon>
+                  </div>
+                  <div class="method-details">
+                    <div class="method-name">{{formatPaymentMethod(method.paymentMethod)}}</div>
+                    <div class="method-count">{{method.count}} payments</div>
+                  </div>
+                  <div class="method-amount">₱{{method.totalAmount.toFixed(2)}}</div>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        </div>
 
         <!-- Payments Table -->
-        <mat-card class="receipts-table-card">
-          <mat-card-header>
-            <mat-card-title>Court Payment Management</mat-card-title>
-            <mat-card-subtitle>Payment approval and recording workflow for admin verification</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content>
+        <div class="table-section">
+          <h2 class="section-title">
+            <mat-icon>table_chart</mat-icon>
+            Payment Records
+          </h2>
+
+          <mat-card class="modern-card table-card">
+            <mat-card-content>
             <mat-tab-group>
               <!-- Active Payments Tab -->
               <mat-tab label="Active Payments">
@@ -667,8 +714,9 @@ interface PaymentsReportData {
                 </div>
               </mat-tab>
             </mat-tab-group>
-          </mat-card-content>
-        </mat-card>
+            </mat-card-content>
+          </mat-card>
+        </div>
       </div>
     </div>
 
@@ -782,222 +830,517 @@ interface PaymentsReportData {
 
   `,
   styles: [`
+    /* ===== CONTAINER & LAYOUT ===== */
     .report-container {
-      padding: 20px;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      padding-bottom: 40px;
+    }
+
+    /* ===== MODERN HEADER ===== */
+    .modern-header {
+      position: relative;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 32px 24px;
+      margin-bottom: 32px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .header-background {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image:
+        radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .header-content {
+      position: relative;
       max-width: 1400px;
       margin: 0 auto;
-    }
-
-    .report-header {
-      margin-bottom: 24px;
-    }
-
-    .header-info {
       display: flex;
       align-items: center;
-      margin-bottom: 16px;
-    }
-
-    .back-button {
-      margin-right: 12px;
-    }
-
-    .title-section h1 {
-      margin: 0;
-      color: #1976d2;
-    }
-
-    .subtitle {
-      margin: 4px 0 0 0;
-      color: #666;
-      font-size: 14px;
-    }
-
-    .filter-card {
-      margin-bottom: 24px;
-    }
-
-    .date-filter-form {
-      display: flex;
       gap: 16px;
-      align-items: flex-end;
-      flex-wrap: wrap;
+      z-index: 1;
     }
 
-    .filter-actions {
+    .back-btn {
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
+      color: white;
+      transition: all 0.3s ease;
+    }
+
+    .back-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateX(-4px);
+    }
+
+    .header-text {
+      flex: 1;
+    }
+
+    .page-title {
+      margin: 0;
+      font-size: 32px;
+      font-weight: 700;
       display: flex;
+      align-items: center;
       gap: 12px;
+      letter-spacing: -0.5px;
+    }
+
+    .title-icon {
+      font-size: 36px;
+      width: 36px;
+      height: 36px;
+    }
+
+    .page-subtitle {
+      margin: 8px 0 0 48px;
+      font-size: 16px;
+      opacity: 0.95;
+      font-weight: 400;
+    }
+
+    /* ===== FILTER SECTION ===== */
+    .filter-section {
+      max-width: 1400px;
+      margin: 0 auto 32px;
+      padding: 0 24px;
+    }
+
+    .modern-card {
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      border: none;
+      background: white;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .modern-card:hover {
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    }
+
+    .filter-header {
+      padding: 20px 24px 0;
+    }
+
+    .filter-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    .filter-title mat-icon {
+      color: #667eea;
+    }
+
+    .filter-form {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .date-inputs {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+    }
+
+    .modern-input {
+      width: 100%;
+    }
+
+    .action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-top: 8px;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .action-buttons button {
+      border-radius: 8px;
+      font-weight: 500;
+      text-transform: none;
+      letter-spacing: 0.25px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .primary-action {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0 24px;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .primary-action:hover:not(:disabled) {
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .secondary-action {
+      border-color: #cbd5e1;
+      color: #475569;
+    }
+
+    .secondary-action:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+
+    .export-action {
+      border-color: #10b981;
+      color: #10b981;
+    }
+
+    .export-action:hover:not(:disabled) {
+      background: #d1fae5;
+      border-color: #059669;
+    }
+
+    /* ===== SECTION TITLES ===== */
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 20px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 20px;
+    }
+
+    .section-title mat-icon {
+      color: #667eea;
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
     }
 
     .loading-container {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 40px;
+      padding: 60px 40px;
       text-align: center;
+      background: white;
+      border-radius: 16px;
+      margin: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     }
 
-    .summary-grid {
+    /* ===== STATS SECTION ===== */
+    .stats-section {
+      max-width: 1400px;
+      margin: 0 auto 32px;
+      padding: 0 24px;
+    }
+
+    .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
+      gap: 20px;
     }
 
-    .service-fee-grid {
+    .stat-card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      border: 1px solid transparent;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+    }
+
+    .total-card::before { background: linear-gradient(90deg, #667eea, #764ba2); }
+    .pending-card::before { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+    .approved-card::before { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+    .recorded-card::before { background: linear-gradient(90deg, #10b981, #059669); }
+
+    .stat-icon-wrapper {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+
+    .total-bg { background: linear-gradient(135deg, #667eea15, #764ba215); }
+    .pending-bg { background: linear-gradient(135deg, #f59e0b15, #ef444415); }
+    .approved-bg { background: linear-gradient(135deg, #3b82f615, #2563eb15); }
+    .recorded-bg { background: linear-gradient(135deg, #10b98115, #05966915); }
+
+    .stat-icon {
+      font-size: 28px;
+      width: 28px;
+      height: 28px;
+    }
+
+    .total-bg .stat-icon { color: #667eea; }
+    .pending-bg .stat-icon { color: #f59e0b; }
+    .approved-bg .stat-icon { color: #3b82f6; }
+    .recorded-bg .stat-icon { color: #10b981; }
+
+    .stat-content {
+      flex: 1;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: #64748b;
+      font-weight: 500;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 4px;
+      letter-spacing: -1px;
+    }
+
+    .stat-meta {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    .stat-badge {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .pending-badge { background: #fef3c7; color: #92400e; }
+    .approved-badge { background: #dbeafe; color: #1e40af; }
+    .recorded-badge { background: #d1fae5; color: #065f46; }
+
+    .stat-trend {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      opacity: 0.1;
+    }
+
+    .trend-icon {
+      font-size: 48px;
+      width: 48px;
+      height: 48px;
+    }
+
+    /* ===== REVENUE SECTION ===== */
+    .revenue-section {
+      max-width: 1400px;
+      margin: 0 auto 32px;
+      padding: 0 24px;
+    }
+
+    .revenue-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
     }
 
-    .summary-card {
-      border-left: 4px solid #1976d2;
+    .revenue-card {
+      padding: 24px;
     }
 
-    .summary-card.pending {
-      border-left-color: #ff9800;
-    }
-
-    .summary-card.completed {
-      border-left-color: #2196f3;
-    }
-
-    .summary-card.recorded {
-      border-left-color: #4caf50;
-    }
-
-    .summary-card.service-fee {
-      border-left-color: #ff9800;
-    }
-
-    .summary-card.court-revenue {
-      border-left-color: #4caf50;
-    }
-
-    .summary-content {
+    .revenue-header {
       display: flex;
       align-items: center;
       gap: 16px;
+      margin-bottom: 20px;
     }
 
-    .summary-icon {
-      font-size: 32px;
-      width: 32px;
-      height: 32px;
-      color: #1976d2;
+    .revenue-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    .summary-card.pending .summary-icon {
-      color: #ff9800;
+    .service-fee-icon {
+      background: linear-gradient(135deg, #f59e0b15, #ef444415);
     }
 
-    .summary-card.completed .summary-icon {
-      color: #2196f3;
-    }
-
-    .summary-card.recorded .summary-icon {
-      color: #4caf50;
-    }
-
-    .summary-card.service-fee .summary-icon {
-      color: #ff9800;
-    }
-
-    .summary-card.court-revenue .summary-icon {
-      color: #4caf50;
-    }
-
-    .summary-details h3 {
-      margin: 0 0 8px 0;
-      font-size: 16px;
-      color: #333;
-    }
-
-    .summary-value {
+    .service-fee-icon mat-icon {
+      color: #f59e0b;
       font-size: 24px;
-      font-weight: bold;
-      margin: 0 0 4px 0;
-      color: #1976d2;
+      width: 24px;
+      height: 24px;
     }
 
-    .summary-card.pending .summary-value {
-      color: #ff9800;
+    .court-revenue-icon {
+      background: linear-gradient(135deg, #10b98115, #05966915);
     }
 
-    .summary-card.completed .summary-value {
-      color: #2196f3;
+    .court-revenue-icon mat-icon {
+      color: #10b981;
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
     }
 
-    .summary-card.recorded .summary-value {
-      color: #4caf50;
+    .revenue-info {
+      flex: 1;
     }
 
-    .summary-card.service-fee .summary-value {
-      color: #ff9800;
+    .revenue-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 4px;
     }
 
-    .summary-card.court-revenue .summary-value {
-      color: #4caf50;
+    .revenue-subtitle {
+      font-size: 13px;
+      color: #64748b;
     }
 
-    .summary-label {
-      margin: 0;
-      font-size: 12px;
-      color: #666;
+    .revenue-amount {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      letter-spacing: -1px;
     }
 
-    .breakdown-card {
-      margin-bottom: 24px;
-    }
+    .service-fee-amount { color: #f59e0b; }
+    .court-revenue-amount { color: #10b981; }
 
-    .payment-method-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-    }
-
-    .payment-method-item {
-      padding: 16px;
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-    }
-
-    .method-header {
+    .revenue-footer {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 12px;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+      color: #64748b;
+      font-size: 13px;
     }
 
-    .method-header mat-icon {
-      color: #1976d2;
+    .revenue-footer mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
     }
 
-    .method-header h4 {
-      margin: 0;
-      font-size: 14px;
+    /* ===== PAYMENT METHODS SECTION ===== */
+    .payment-methods-section {
+      max-width: 1400px;
+      margin: 0 auto 32px;
+      padding: 0 24px;
     }
 
-    .method-stats {
+    .methods-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+    }
+
+    .method-card {
       display: flex;
-      flex-direction: column;
-      gap: 4px;
+      align-items: center;
+      gap: 16px;
+      padding: 20px;
+      background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      transition: all 0.3s ease;
     }
 
-    .count {
-      font-size: 12px;
-      color: #666;
+    .method-card:hover {
+      border-color: #cbd5e1;
+      transform: translateX(4px);
+      background: white;
     }
 
-    .total {
-      font-weight: bold;
-      color: #1976d2;
+    .method-icon-wrapper {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #667eea15, #764ba215);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .method-icon {
+      color: #667eea;
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+    }
+
+    .method-details {
+      flex: 1;
+    }
+
+    .method-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+
+    .method-count {
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .method-amount {
+      font-size: 18px;
+      font-weight: 700;
+      color: #667eea;
     }
 
 
-    .receipts-table-card {
-      margin-bottom: 24px;
+    /* ===== TABLE SECTION ===== */
+    .table-section {
+      max-width: 1400px;
+      margin: 0 auto 32px;
+      padding: 0 24px;
+    }
+
+    .table-card {
+      overflow: hidden;
     }
 
     .table-container {
@@ -1012,6 +1355,41 @@ interface PaymentsReportData {
     .receipts-table {
       width: 100%;
       min-width: 1000px;
+    }
+
+    /* Modern table styling */
+    ::ng-deep .mat-mdc-tab-group {
+      --mdc-tab-indicator-active-indicator-color: #667eea;
+    }
+
+    ::ng-deep .mat-mdc-tab:not(.mat-mdc-tab-disabled).mdc-tab--active .mdc-tab__text-label {
+      color: #667eea;
+      font-weight: 600;
+    }
+
+    ::ng-deep .mat-mdc-tab {
+      color: #64748b;
+    }
+
+    ::ng-deep .mat-mdc-table {
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    ::ng-deep .mat-mdc-header-row {
+      background: #f8fafc;
+    }
+
+    ::ng-deep .mat-mdc-header-cell {
+      color: #475569;
+      font-weight: 600;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    ::ng-deep .mat-mdc-row:hover {
+      background: #f8fafc;
     }
 
     .member-info strong {
@@ -1293,20 +1671,91 @@ interface PaymentsReportData {
       font-size: 14px;
     }
 
+    /* ===== RESPONSIVE DESIGN ===== */
     @media (max-width: 768px) {
-      .report-container {
-        padding: 16px;
+      .modern-header {
+        padding: 24px 16px;
       }
-      
-      .date-filter-form {
-        flex-direction: column;
-        align-items: stretch;
+
+      .page-title {
+        font-size: 24px;
       }
-      
-      .summary-grid {
+
+      .title-icon {
+        font-size: 28px;
+        width: 28px;
+        height: 28px;
+      }
+
+      .page-subtitle {
+        font-size: 14px;
+        margin-left: 40px;
+      }
+
+      .filter-section,
+      .stats-section,
+      .revenue-section,
+      .payment-methods-section,
+      .table-section {
+        padding: 0 16px;
+      }
+
+      .stats-grid {
         grid-template-columns: 1fr;
       }
+
+      .revenue-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .methods-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .action-buttons {
+        flex-direction: column;
+      }
+
+      .action-buttons button {
+        width: 100%;
+      }
+
+      .date-inputs {
+        grid-template-columns: 1fr;
+      }
+
+      .stat-value {
+        font-size: 28px;
+      }
+
+      .revenue-amount {
+        font-size: 28px;
+      }
     }
+
+    /* ===== SMOOTH ANIMATIONS ===== */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .stat-card,
+    .revenue-card,
+    .method-card {
+      animation: fadeIn 0.5s ease-out;
+    }
+
+    /* Stagger animation for cards */
+    .stat-card:nth-child(1) { animation-delay: 0.1s; }
+    .stat-card:nth-child(2) { animation-delay: 0.2s; }
+    .stat-card:nth-child(3) { animation-delay: 0.3s; }
+    .stat-card:nth-child(4) { animation-delay: 0.4s; }
 
     /* Amount Display Styles */
     .amount-container {
@@ -1500,17 +1949,25 @@ export class CourtReceiptsReportComponent implements OnInit {
                 const reservation = payment.reservationId || {};
                 const poll = payment.pollId || {};
                 const openPlayEvent = poll.openPlayEvent || {};
-                
-                // Determine if this is an Open Play event
+
+                // Determine payment type
                 const isOpenPlayEvent = !!payment.pollId;
-                
+                const isManualPayment = payment.metadata?.isManualPayment;
+
                 let players: string[] = [];
                 let reservationDate: string;
                 let timeSlot: number;
                 let timeSlotDisplay: string;
                 let openPlayParticipants: string[] = [];
-                
-                if (isOpenPlayEvent) {
+
+                if (isManualPayment) {
+                  // Manual payment
+                  players = payment.metadata.playerNames || [];
+                  reservationDate = payment.metadata.courtUsageDate || new Date().toISOString();
+                  timeSlot = payment.metadata.startTime || 0;
+                  const endTime = payment.metadata.endTime || (timeSlot + 1);
+                  timeSlotDisplay = `${timeSlot}:00-${endTime}:00`;
+                } else if (isOpenPlayEvent) {
                   // Open Play event
                   reservationDate = openPlayEvent.eventDate || new Date().toISOString();
                   timeSlot = openPlayEvent.startTime || 18;
@@ -1519,12 +1976,20 @@ export class CourtReceiptsReportComponent implements OnInit {
                   players = openPlayParticipants; // For backward compatibility
                 } else {
                   // Court reservation
-                  players = reservation.players || [];
+                  // Map player objects to their names
+                  const playersArray = reservation.players || [];
+                  players = playersArray.map((p: any) => {
+                    if (typeof p === 'string') return p;
+                    // New format: objects with 'name' property
+                    if (p.name) return p.name;
+                    // Fallback to user object properties
+                    return p.fullName || p.username || 'Unknown Player';
+                  });
                   reservationDate = reservation.date || new Date().toISOString();
                   timeSlot = reservation.timeSlot || 0;
                   const endTimeSlot = reservation.endTimeSlot || (timeSlot + 1);
                   timeSlotDisplay = `${timeSlot}:00-${endTimeSlot}:00`;
-                  
+
                 }
                 
                 return {
@@ -1863,17 +2328,25 @@ export class CourtReceiptsReportComponent implements OnInit {
               const reservation = payment.reservationId || {};
               const poll = payment.pollId || {};
               const openPlayEvent = poll.openPlayEvent || {};
-              
-              // Determine if this is an Open Play event
+
+              // Determine payment type
               const isOpenPlayEvent = !!payment.pollId;
-              
+              const isManualPayment = payment.metadata?.isManualPayment;
+
               let players: string[] = [];
               let reservationDate: string;
               let timeSlot: number;
               let timeSlotDisplay: string;
               let openPlayParticipants: string[] = [];
-              
-              if (isOpenPlayEvent) {
+
+              if (isManualPayment) {
+                // Manual payment
+                players = payment.metadata.playerNames || [];
+                reservationDate = payment.metadata.courtUsageDate || new Date().toISOString();
+                timeSlot = payment.metadata.startTime || 0;
+                const endTime = payment.metadata.endTime || (timeSlot + 1);
+                timeSlotDisplay = `${timeSlot}:00-${endTime}:00`;
+              } else if (isOpenPlayEvent) {
                 // Open Play event
                 reservationDate = openPlayEvent.eventDate || new Date().toISOString();
                 timeSlot = openPlayEvent.startTime || 18;
@@ -1882,7 +2355,15 @@ export class CourtReceiptsReportComponent implements OnInit {
                 players = openPlayParticipants; // For backward compatibility
               } else {
                 // Court reservation
-                players = reservation.players || [];
+                // Map player objects to their names
+                const playersArray = reservation.players || [];
+                players = playersArray.map((p: any) => {
+                  if (typeof p === 'string') return p;
+                  // New format: objects with 'name' property
+                  if (p.name) return p.name;
+                  // Fallback to user object properties
+                  return p.fullName || p.username || 'Unknown Player';
+                });
                 reservationDate = reservation.date || new Date().toISOString();
                 timeSlot = reservation.timeSlot || 0;
                 const endTimeSlot = reservation.endTimeSlot || (timeSlot + 1);

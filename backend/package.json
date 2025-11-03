@@ -23,7 +23,8 @@
     "backup:collections": "npx ts-node src/scripts/backupDatabase.ts -- --collections",
     "restore": "npx ts-node src/scripts/restoreDatabase.ts",
     "restore:dry-run": "npx ts-node src/scripts/restoreDatabase.ts -- --dry-run",
-    "cleanup-orphaned-payments": "npx ts-node src/scripts/cleanupOrphanedPayments.ts"
+    "cleanup-orphaned-payments": "npx ts-node src/scripts/cleanupOrphanedPayments.ts",
+    "clear-reservations-payments": "npx ts-node src/scripts/clearReservationsAndPayments.ts"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",

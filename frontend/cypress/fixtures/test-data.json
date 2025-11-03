@@ -1,0 +1,41 @@
+{
+  "reservations": {
+    "peakHour": {
+      "date": "2025-12-01",
+      "timeSlot": 18,
+      "baseFee": 150,
+      "guestFee": 70,
+      "isPeak": true
+    },
+    "offPeakHour": {
+      "date": "2025-12-01",
+      "timeSlot": 10,
+      "baseFee": 100,
+      "guestFee": 70,
+      "isPeak": false
+    }
+  },
+  "courts": {
+    "court1": {
+      "courtId": 1,
+      "name": "Court 1"
+    },
+    "court2": {
+      "courtId": 2,
+      "name": "Court 2"
+    }
+  },
+  "guests": {
+    "single": ["John Doe"],
+    "multiple": ["John Doe", "Jane Smith", "Bob Johnson"]
+  },
+  "coins": {
+    "initialBalance": 100,
+    "purchaseAmounts": [50, 100, 200, 500],
+    "pageVisitCost": 1
+  },
+  "payments": {
+    "methods": ["Cash", "GCash", "Bank Transfer"],
+    "statuses": ["pending", "paid", "cancelled"]
+  }
+}

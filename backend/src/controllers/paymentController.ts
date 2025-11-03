@@ -340,7 +340,7 @@ async function updateCourtUsageReport(payment: any): Promise<void> {
 
 // Create payment for a reservation
 export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { reservationId, paymentMethod, amount, customAmount, isManualPayment, playerNames, courtUsageDate, notes } = req.body;
+  const { reservationId, paymentMethod, amount, customAmount, isManualPayment, playerNames, courtUsageDate, notes, payForUserIds } = req.body;
 
   console.log('💰 CREATE PAYMENT REQUEST:', {
     reservationId,
@@ -351,6 +351,7 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
     playerNames,
     courtUsageDate,
     notes,
+    payForUserIds,
     userRole: req.user?.role,
     username: req.user?.username,
     fullRequestBody: req.body
@@ -407,17 +408,19 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
     });
   }
 
-  // Check if payment already exists for this reservation (skip for manual payments)
+  // Check if payment already exists for this reservation (skip for manual payments AND multi-member payments)
   let existingPayment = null;
-  if (!isManualPayment && reservationId) {
-    existingPayment = await Payment.findOne({ 
-      reservationId, 
-      status: { $in: ['pending', 'completed'] } 
+  if (!isManualPayment && reservationId && !payForUserIds) {
+    existingPayment = await Payment.findOne({
+      reservationId,
+      status: { $in: ['pending', 'completed'] }
     });
   }
-  
+
   console.log('💰 EXISTING PAYMENT CHECK:', {
     reservationId,
+    payForUserIds: payForUserIds || null,
+    skipCheck: !!payForUserIds,
     existingPayment: existingPayment ? {
       id: existingPayment._id,
       status: existingPayment.status,
@@ -426,7 +429,7 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
     } : null,
     userRole: req.user?.role
   });
-  
+
   if (existingPayment) {
     // If user is admin and trying to create payment, redirect to update the existing one
     if (req.user.role === 'admin' || req.user.role === 'superadmin') {
@@ -458,7 +461,7 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
       Object.assign(existingPayment, updateData);
       await existingPayment.save();
       await existingPayment.populate('userId', 'username fullName email');
-      await existingPayment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
+      await existingPayment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee timeSlotDisplay');
       await existingPayment.populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime');
       
       return res.status(200).json({
@@ -646,7 +649,272 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
     }
   }
 
-  // Create payment record
+  // Handle multi-member payment (pay for others)
+  if (payForUserIds && Array.isArray(payForUserIds) && payForUserIds.length > 0) {
+    console.log(`💰 Multi-member payment requested for ${payForUserIds.length} members`);
+
+    // Validate that user is the reserver (only reserver can pay for others)
+    if (!isManualPayment && reservation && reservation.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: 'Only the reserver can pay for other members'
+      });
+    }
+
+    // Validate all users exist and are in the reservation
+    const targetUsers = await User.find({ _id: { $in: payForUserIds } });
+    if (targetUsers.length !== payForUserIds.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'One or more users not found'
+      });
+    }
+
+    // Verify all users are in the reservation
+    if (!isManualPayment && reservation) {
+      for (const userId of payForUserIds) {
+        const isInReservation = reservation.players.some(player => {
+          if (typeof player === 'object' && 'userId' in player) {
+            return player.userId?.toString() === userId;
+          }
+          return false;
+        });
+
+        if (!isInReservation) {
+          const user = targetUsers.find(u => u._id.toString() === userId);
+          return res.status(400).json({
+            success: false,
+            error: `User ${user?.fullName} is not in this reservation`
+          });
+        }
+      }
+    }
+
+    // Check for already completed payments (don't allow duplicate completed payments)
+    const completedPayments = await Payment.find({
+      reservationId: reservationId,
+      userId: { $in: payForUserIds },
+      status: { $in: ['completed', 'record'] }
+    });
+
+    if (completedPayments.length > 0) {
+      const duplicateUser = targetUsers.find(u =>
+        completedPayments.some(p => p.userId.toString() === u._id.toString())
+      );
+      return res.status(400).json({
+        success: false,
+        error: `Payment already completed for ${duplicateUser?.fullName}`
+      });
+    }
+
+    // Find existing pending payments that can be updated
+    const existingPendingPayments = await Payment.find({
+      reservationId: reservationId,
+      userId: { $in: payForUserIds },
+      status: 'pending'
+    });
+
+    const createdPayments = [];
+
+    console.log(`💰 Processing payments for ${payForUserIds.length} users:`, payForUserIds);
+
+    for (const userId of payForUserIds) {
+      const targetUser = targetUsers.find(u => u._id.toString() === userId);
+      console.log(`💰 Processing payment for user: ${targetUser?.fullName} (${userId})`);
+
+      // Check if this user already has a pending payment
+      const existingPayment = existingPendingPayments.find(p => p.userId.toString() === userId);
+      console.log(`💰 Existing pending payment found for ${targetUser?.fullName}:`, existingPayment ? 'YES' : 'NO');
+
+      // Calculate individual amount for this member
+      let memberAmount = paymentAmount;
+      if (!isManualPayment && reservation) {
+        // Use the reservation's totalFee which correctly calculates multi-hour peak/off-peak pricing
+        const members = reservation.players.filter((p: any) => typeof p === 'object' && p.isMember);
+        const guests = reservation.players.filter((p: any) => typeof p === 'object' && p.isGuest);
+
+        // Calculate total guest fee (guests pay 70 per hour)
+        const duration = reservation.duration || 1;
+        const totalGuestFee = guests.length * 70 * duration;
+
+        // Base fee is total fee minus guest fees
+        const baseFee = reservation.totalFee - totalGuestFee;
+        const baseFeePerMember = baseFee / members.length;
+
+        // Only reserver pays guest fees
+        if (userId === reservation.userId.toString()) {
+          memberAmount = baseFeePerMember + totalGuestFee;
+        } else {
+          memberAmount = baseFeePerMember;
+        }
+
+        console.log(`💰 Payment calculation for ${targetUser?.fullName}:`, {
+          totalFee: reservation.totalFee,
+          memberCount: members.length,
+          guestCount: guests.length,
+          baseFee,
+          baseFeePerMember,
+          totalGuestFee,
+          isReserver: userId === reservation.userId.toString(),
+          finalAmount: memberAmount
+        });
+      }
+
+      let payment;
+
+      if (existingPayment) {
+        // Update existing pending payment
+        console.log(`💰 Updating existing pending payment for ${targetUser?.fullName}`);
+
+        // Only set paidBy if paying for someone else
+        const isPayingForSelf = userId === req.user._id.toString();
+
+        if (!isPayingForSelf) {
+          existingPayment.paidBy = req.user._id.toString();
+          existingPayment.notes = notes || `Paid by ${req.user.fullName} on behalf of ${targetUser?.fullName}`;
+          if (existingPayment.metadata) {
+            existingPayment.metadata.paidOnBehalf = true;
+            existingPayment.metadata.originalDebtor = targetUser?.fullName;
+          }
+        } else {
+          existingPayment.notes = notes || `Paid by ${req.user.fullName}`;
+        }
+
+        existingPayment.amount = memberAmount;
+        existingPayment.paymentMethod = paymentMethod;
+        existingPayment.status = 'completed';
+
+        await existingPayment.save();
+        await existingPayment.populate('userId', 'username fullName email');
+        await existingPayment.populate('paidBy', 'username fullName email');
+
+        if (!isManualPayment) {
+          await existingPayment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee timeSlotDisplay');
+        }
+
+        payment = existingPayment;
+      } else {
+        // Create new payment
+        console.log(`💰 Creating new payment for ${targetUser?.fullName}`);
+
+        // Only set paidBy if paying for someone else
+        const isPayingForSelf = userId === req.user._id.toString();
+
+        const paymentData: any = {
+          userId: userId,
+          amount: memberAmount,
+          paymentMethod,
+          status: 'completed',
+          dueDate
+        };
+
+        if (!isPayingForSelf) {
+          paymentData.paidBy = req.user._id.toString();
+          paymentData.notes = notes || `Paid by ${req.user.fullName} on behalf of ${targetUser?.fullName}`;
+        } else {
+          paymentData.notes = notes || `Paid by ${req.user.fullName}`;
+        }
+
+        if (isManualPayment) {
+          paymentData.description = `Manual payment for court usage on ${new Date(courtUsageDate).toDateString()}`;
+          paymentData.metadata = {
+            isManualPayment: true,
+            playerNames: [targetUser?.fullName],
+            courtUsageDate: new Date(courtUsageDate),
+            playerCount: 1,
+            originalFee: memberAmount,
+            discounts: [],
+            paidOnBehalf: !isPayingForSelf,
+            originalDebtor: isPayingForSelf ? undefined : targetUser?.fullName
+          };
+        } else {
+          paymentData.reservationId = reservationId;
+          paymentData.description = `Court reservation payment for ${reservation!.date.toDateString()} ${reservation!.timeSlot}:00-${reservation!.timeSlot + 1}:00`;
+          paymentData.metadata = {
+            timeSlot: reservation!.timeSlot,
+            date: reservation!.date,
+            playerCount: reservation!.players.length,
+            isPeakHour: calculationBreakdown?.isPeakHour,
+            originalFee: memberAmount,
+            discounts: [],
+            paidOnBehalf: !isPayingForSelf,
+            originalDebtor: isPayingForSelf ? undefined : targetUser?.fullName
+          };
+        }
+
+        payment = new Payment(paymentData);
+        await payment.save();
+        await payment.populate('userId', 'username fullName email');
+        await payment.populate('paidBy', 'username fullName email');
+
+        if (!isManualPayment) {
+          await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee timeSlotDisplay');
+
+          // Add payment ID to reservation
+          if (!reservation!.paymentIds) {
+            reservation!.paymentIds = [];
+          }
+          reservation!.paymentIds.push((payment._id as any).toString());
+        }
+      }
+
+      createdPayments.push(payment);
+      console.log(`💰 Added to createdPayments. Total so far: ${createdPayments.length}`);
+    }
+
+    console.log(`💰 FINAL: Processed ${createdPayments.length} payments`);
+    console.log(`💰 Payment details:`, createdPayments.map(p => ({
+      id: p._id,
+      userId: p.userId,
+      amount: p.amount,
+      status: p.status,
+      paidBy: p.paidBy
+    })));
+
+    // Update reservation payment status
+    if (!isManualPayment && reservation) {
+      // Check if all members have paid
+      const allPayments = await Payment.find({
+        reservationId: reservationId,
+        status: { $in: ['completed', 'record'] }
+      });
+
+      const members = reservation.players.filter((p: any) => typeof p === 'object' && p.isMember);
+      if (allPayments.length >= members.length) {
+        reservation.paymentStatus = 'paid';
+      }
+      // Note: We keep it as 'pending' if not all members have paid
+      // The 'partial' status would require schema update
+
+      await reservation.save({ validateBeforeSave: false });
+    }
+
+    // Add debug info to response
+    const debugInfo = {
+      requestedUserIds: payForUserIds,
+      processedCount: createdPayments.length,
+      paymentDetails: createdPayments.map((p: any) => ({
+        paymentId: p._id.toString(),
+        userId: p.userId._id?.toString() || p.userId.toString(),
+        userName: p.userId.fullName || 'Unknown',
+        amount: p.amount,
+        status: p.status,
+        paidBy: p.paidBy?.fullName || 'Self'
+      }))
+    };
+
+    console.log(`💰 Sending response with debug info:`, debugInfo);
+
+    return res.status(201).json({
+      success: true,
+      data: createdPayments,
+      message: `Successfully created ${createdPayments.length} payment(s)`,
+      totalAmount: createdPayments.reduce((sum, p) => sum + p.amount, 0),
+      debug: debugInfo
+    });
+  }
+
+  // Create single payment record (original logic)
   let paymentData: any = {
     userId: isManualPayment ? req.user._id : reservation!.userId,
     amount: paymentAmount,
@@ -685,14 +953,14 @@ export const createPayment = asyncHandler(async (req: AuthenticatedRequest, res:
 
   await payment.save();
   await payment.populate('userId', 'username fullName email');
-  
+
   if (!isManualPayment) {
-    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
+    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee timeSlotDisplay');
     // Update reservation payment status - since payments are automatically completed, set to paid
     reservation!.paymentStatus = 'paid';
     await reservation!.save({ validateBeforeSave: false });
   }
-  
+
   await payment.populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime');
 
   return res.status(201).json({
@@ -829,7 +1097,7 @@ export const getPayment = asyncHandler(async (req: AuthenticatedRequest, res: Re
   
   const payment = await Payment.findById(id)
     .populate('userId', 'username fullName email')
-    .populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee')
+    .populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee timeSlotDisplay')
     .populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime');
   
   if (!payment) {
@@ -926,7 +1194,7 @@ export const processPayment = asyncHandler(async (req: AuthenticatedRequest, res
 
     // Populate related data for response
     await payment.populate('userId', 'username fullName email');
-    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
+    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee timeSlotDisplay');
     await payment.populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime');
 
     console.log('💰 Payment processing completed successfully:', {
@@ -1128,7 +1396,7 @@ export const updatePayment = asyncHandler(async (req: AuthenticatedRequest, res:
   
   try {
     console.log('💰 Populating reservationId...');
-    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
+    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee timeSlotDisplay');
     console.log('💰 reservationId populated successfully');
   } catch (error: any) {
     console.error('💰 ERROR during reservationId populate:', error);
@@ -1218,7 +1486,7 @@ export const cancelPayment = asyncHandler(async (req: AuthenticatedRequest, res:
   }
 
   await payment.populate('userId', 'username fullName email');
-  await payment.populate('reservationId', 'userId date timeSlot players status totalFee');
+  await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee timeSlotDisplay');
   await payment.populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime');
 
   return res.status(200).json({
@@ -1276,7 +1544,7 @@ export const getMyPayments = asyncHandler(async (req: AuthenticatedRequest, res:
   try {
     const payments = await Payment.find(filter)
       .populate('userId', 'username fullName email')
-      .populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee')
+      .populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee timeSlotDisplay')
       .populate('pollId', 'title openPlayEvent.eventDate openPlayEvent.startTime openPlayEvent.endTime')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -1509,7 +1777,7 @@ export const approvePayment = asyncHandler(async (req: AuthenticatedRequest, res
 
     // Populate related data for response
     await payment.populate('userId', 'username fullName email');
-    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
+    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee timeSlotDisplay');
     await payment.populate('approvedBy', 'username fullName');
 
     console.log('✅ Payment approved successfully:', {
@@ -1590,7 +1858,7 @@ export const recordPayment = asyncHandler(async (req: AuthenticatedRequest, res:
 
     // Populate related data for response
     await payment.populate('userId', 'username fullName email');
-    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
+    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee timeSlotDisplay');
     await payment.populate('approvedBy', 'username fullName');
     await payment.populate('recordedBy', 'username fullName');
 
@@ -1701,7 +1969,7 @@ export const unrecordPayment = asyncHandler(async (req: AuthenticatedRequest, re
 
     // Populate related data for response
     await payment.populate('userId', 'username fullName email');
-    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
+    await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee timeSlotDisplay');
     await payment.populate('approvedBy', 'username fullName');
 
     console.log('🔄 Payment unrecorded successfully:', {
@@ -2126,7 +2394,7 @@ export const payOnBehalf = asyncHandler(async (req: AuthenticatedRequest, res: R
   // Populate related data for response
   await payment.populate('userId', 'username fullName email');
   await payment.populate('paidBy', 'username fullName email');
-  await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee');
+  await payment.populate('reservationId', 'userId date timeSlot endTimeSlot duration players status totalFee timeSlotDisplay');
 
   return res.status(201).json({
     success: true,

@@ -19,6 +19,8 @@ interface Payment {
     userId?: string;
     date: Date;
     timeSlot: number;
+    endTimeSlot?: number;
+    duration?: number;
     players: string[];
     timeSlotDisplay: string;
     totalFee?: number;
@@ -106,6 +108,8 @@ interface Reservation {
   userId?: string;
   date: Date;
   timeSlot: number;
+  endTimeSlot?: number;
+  duration?: number;
   players: (string | ReservationPlayer)[];
   paymentIds?: string[];
   status: string;
@@ -463,73 +467,6 @@ interface Notification {
         <div class="pending-container">
           <h2>Pending Payments</h2>
 
-          <!-- Debug Info Panel -->
-          <div class="debug-panel">
-            <button class="debug-toggle-btn" (click)="toggleDebugInfo()">
-              <mat-icon>{{showDebugInfo ? 'visibility_off' : 'bug_report'}}</mat-icon>
-              {{showDebugInfo ? 'Hide Debug Info' : 'Show Debug Info'}}
-            </button>
-
-            <div class="debug-content" *ngIf="showDebugInfo">
-              <h4>Pay for Others - Debug Information</h4>
-              <p class="debug-description">This shows why the "Pay for Others" button appears or not:</p>
-
-              <!-- Warning if reservation IDs are missing -->
-              <div class="debug-warning" *ngIf="hasMissingReservationIds()">
-                <mat-icon>warning</mat-icon>
-                <div>
-                  <strong>⚠️ Missing Reservation Owner IDs detected!</strong>
-                  <p>If you just updated the code, please restart the backend server to populate reservation data correctly.</p>
-                  <p>Run: <code>cd backend && npm run dev</code></p>
-                </div>
-              </div>
-
-              <div class="debug-entries" *ngIf="debugInfo.length > 0">
-                <div class="debug-entry" *ngFor="let entry of debugInfo">
-                  <div class="debug-row">
-                    <span class="debug-label">Payment ID:</span>
-                    <span class="debug-value">{{entry.paymentId}}</span>
-                  </div>
-                  <div class="debug-row">
-                    <span class="debug-label">Reservation Owner ID:</span>
-                    <span class="debug-value" [class.debug-missing]="!entry.reservationUserId">
-                      {{entry.reservationUserId || '❌ Missing'}}
-                    </span>
-                  </div>
-                  <div class="debug-row">
-                    <span class="debug-label">Current User ID:</span>
-                    <span class="debug-value" [class.debug-missing]="!entry.currentUserId">
-                      {{entry.currentUserId || '❌ Missing'}}
-                    </span>
-                  </div>
-                  <div class="debug-row">
-                    <span class="debug-label">Is Reserver:</span>
-                    <span class="debug-value" [class.debug-success]="entry.isReserver" [class.debug-fail]="!entry.isReserver">
-                      {{entry.isReserver ? '✅ Yes - Button shows' : '❌ No - Button hidden'}}
-                    </span>
-                  </div>
-                  <div class="debug-row">
-                    <span class="debug-label">Match Status:</span>
-                    <span class="debug-value"
-                          [class.debug-success]="entry.reservationUserId && entry.reservationUserId === entry.currentUserId"
-                          [class.debug-fail]="!entry.reservationUserId || entry.reservationUserId !== entry.currentUserId">
-                      <ng-container *ngIf="entry.reservationUserId && entry.currentUserId">
-                        {{entry.reservationUserId === entry.currentUserId ? '✅ IDs Match' : '❌ IDs Don\'t Match'}}
-                      </ng-container>
-                      <ng-container *ngIf="!entry.reservationUserId || !entry.currentUserId">
-                        ❌ Cannot compare - Missing data
-                      </ng-container>
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="debug-empty" *ngIf="debugInfo.length === 0">
-                <p>No debug entries yet. The debug info will populate when payments are checked.</p>
-              </div>
-            </div>
-          </div>
-
           <!-- Payment Form Section (when reservation selected) -->
           <div class="payment-form-section" *ngIf="selectedReservation" id="payment-form-section">
             <div class="section-header">
@@ -630,11 +567,90 @@ interface Notification {
                 <!-- Notes -->
                 <div class="field">
                   <label for="notes">Notes (Optional)</label>
-                  <textarea 
+                  <textarea
                     id="notes"
                     formControlName="notes"
                     placeholder="Add any notes about this payment..."
                     rows="3"></textarea>
+                </div>
+
+
+                <!-- Total Amount Display -->
+                <div class="total-amount-display" style="background: #f0f9ff; border: 2px solid #0284c7; border-radius: 8px; padding: 1rem; margin: 1rem 0;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="font-size: 1.1rem; color: #0c4a6e;">Total Amount to Pay:</strong>
+                    <strong style="font-size: 1.5rem; color: #0284c7;">₱{{ getGrandTotal().toFixed(2) }}</strong>
+                  </div>
+                  <small style="color: #64748b; display: block; margin-top: 0.5rem;" *ngIf="!paymentForm.get('alsoPayForOthers')?.value || totalAmountForOthers === 0">
+                    Your share only
+                  </small>
+                  <small style="color: #64748b; display: block; margin-top: 0.5rem;" *ngIf="paymentForm.get('alsoPayForOthers')?.value && totalAmountForOthers > 0">
+                    Your share (₱{{ paymentForm.get('courtFee')?.value || 0 }}) + Others (₱{{ totalAmountForOthers.toFixed(2) }})
+                  </small>
+                </div>
+
+                <!-- Pay for Others Section -->
+                <div class="pay-for-others-section" *ngIf="availableMembersForPayment.length > 0 && selectedReservation">
+                  <div class="field checkbox-field">
+                    <label class="checkbox-label">
+                      <input
+                        type="checkbox"
+                        formControlName="alsoPayForOthers"
+                        (change)="updateTotalForOthers()">
+                      <span>Also pay for other members</span>
+                    </label>
+                  </div>
+
+                  <!-- Member Selection -->
+                  <div class="members-selection" *ngIf="paymentForm.get('alsoPayForOthers')?.value">
+                    <div class="members-list-header">
+                      <h4>Select members to pay for:</h4>
+                      <small class="help-text">You can select multiple members</small>
+                    </div>
+
+                    <div class="members-list">
+                      <div
+                        *ngFor="let member of availableMembersForPayment"
+                        class="member-item"
+                        [class.selected]="member.selected">
+                        <label class="member-checkbox-label" (click)="toggleMemberSelection(member); $event.preventDefault()">
+                          <input
+                            type="checkbox"
+                            [checked]="member.selected">
+                          <div class="member-info">
+                            <span class="member-name">{{ member.fullName }}</span>
+                            <span class="member-amount">₱{{ member.amount.toFixed(2) }}</span>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <!-- Total for Others -->
+                    <div class="total-for-others" *ngIf="totalAmountForOthers > 0">
+                      <div class="total-row">
+                        <span>Total for others:</span>
+                        <strong>₱{{ totalAmountForOthers.toFixed(2) }}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Grand Total -->
+                  <div class="grand-total" *ngIf="paymentForm.get('alsoPayForOthers')?.value && totalAmountForOthers > 0">
+                    <div class="total-breakdown">
+                      <div class="breakdown-row">
+                        <span>Your payment:</span>
+                        <span>₱{{ paymentForm.get('courtFee')?.value || 0 }}</span>
+                      </div>
+                      <div class="breakdown-row">
+                        <span>Paying for others:</span>
+                        <span>₱{{ totalAmountForOthers.toFixed(2) }}</span>
+                      </div>
+                      <div class="breakdown-row grand-total-row">
+                        <strong>Grand Total:</strong>
+                        <strong class="grand-total-amount">₱{{ getGrandTotal().toFixed(2) }}</strong>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- Form Actions -->
@@ -751,15 +767,6 @@ interface Notification {
                         [disabled]="!canMakePayment(payment)"
                         [title]="!canMakePayment(payment) ? getPaymentDisabledMessage(payment) : ''">
                         Pay Now
-                      </button>
-
-                      <!-- Pay for Others button (only for reservers) -->
-                      <button
-                        class="pay-others-btn"
-                        (click)="openPayOnBehalfModal(payment)"
-                        *ngIf="payment.reservationId && isReserver(payment)"
-                        title="Pay for other members in this reservation">
-                        Pay for Others
                       </button>
                     </div>
                     
@@ -948,9 +955,13 @@ export class PaymentsComponent implements OnInit {
   payOnBehalfForm: FormGroup;
   loadingPayOnBehalf = false;
 
-  // Debug info
-  showDebugInfo = false;
-  debugInfo: {paymentId: string; reservationUserId?: string; currentUserId?: string; isReserver: boolean}[] = [];
+  // Unified payment form - Pay for Others
+  availableMembersForPayment: {userId: string; fullName: string; amount: number; selected: boolean}[] = [];
+  totalAmountForOthers = 0;
+
+  // Debug info for grouping
+  groupingDebugInfo: any = null;
+  paymentLoadingDebugInfo: any = null;
 
   private apiUrl = environment.apiUrl;
 
@@ -967,7 +978,9 @@ export class PaymentsComponent implements OnInit {
       courtFee: ['', [Validators.required, Validators.min(0.01)]], // Editable court fee for all users
       paymentMethod: ['', Validators.required],
       transactionId: [''],
-      notes: ['']
+      notes: [''],
+      alsoPayForOthers: [false], // New checkbox for paying for others
+      selectedMembers: [[]] // Array of selected member user IDs
     });
 
     this.manualPaymentForm = this.fb.group({
@@ -1065,19 +1078,55 @@ export class PaymentsComponent implements OnInit {
         id: p._id
       })));
       
-      // Get all payment records to check which reservations already have payments
+      // Get all payment records to check which reservations the current user has paid for
       const allPaymentsResponse = await this.http.get<any>(`${this.apiUrl}/payments/my`).toPromise();
       const allPayments = allPaymentsResponse?.data || [];
-      
-      const reservationIdsWithPayments = new Set(
+
+      this.paymentLoadingDebugInfo = {
+        allPayments: allPayments.map((p: Payment) => ({
+          id: p._id,
+          reservationId: p.reservationId?._id,
+          timeSlot: p.reservationId?.timeSlot,
+          status: p.status,
+          amount: p.amount
+        })),
+        unpaidReservations: unpaidReservations.map((r: Reservation) => ({
+          id: r._id,
+          timeSlot: r.timeSlot,
+          date: new Date(r.date).toDateString(),
+          totalFee: r.totalFee
+        })),
+        existingPayments: existingPayments.map((p: Payment) => ({
+          id: p._id,
+          reservationId: p.reservationId?._id,
+          timeSlot: p.reservationId?.timeSlot,
+          status: p.status
+        }))
+      };
+
+      console.log('📋 All payments for current user:', allPayments.length, this.paymentLoadingDebugInfo.allPayments);
+      console.log('📋 Unpaid reservations from backend:', unpaidReservations.length, this.paymentLoadingDebugInfo.unpaidReservations);
+
+      // Create a set of reservation IDs that have ANY payment record (to avoid creating duplicates)
+      const reservationIdsWithPayment = new Set(
         allPayments
           .filter((payment: Payment) => payment.reservationId)
           .map((payment: Payment) => payment.reservationId!._id)
       );
-      
-      // Filter out unpaid reservations that already have payment records
+
+      this.paymentLoadingDebugInfo.reservationIdsWithCompletedPayment = Array.from(reservationIdsWithPayment);
+      console.log('📋 Reservation IDs with ANY payment record:', this.paymentLoadingDebugInfo.reservationIdsWithCompletedPayment);
+
+      // Filter out unpaid reservations that already have a payment record (to avoid creating synthetic duplicates)
       const reservationsNeedingPayments = unpaidReservations
-        .filter((reservation: Reservation) => !reservationIdsWithPayments.has(reservation._id));
+        .filter((reservation: Reservation) => !reservationIdsWithPayment.has(reservation._id));
+
+      this.paymentLoadingDebugInfo.reservationsNeedingPayments = reservationsNeedingPayments.map((r: Reservation) => ({
+        id: r._id,
+        timeSlot: r.timeSlot,
+        totalFee: r.totalFee
+      }));
+      console.log('📋 Reservations needing synthetic payments:', reservationsNeedingPayments.length, this.paymentLoadingDebugInfo.reservationsNeedingPayments);
       
       // Convert unpaid reservations to payment-like objects for display
       const syntheticPayments = await Promise.all(reservationsNeedingPayments.map(async (reservation: Reservation) => {
@@ -1109,17 +1158,20 @@ export class PaymentsComponent implements OnInit {
             userId: reservation.userId,
             date: new Date(reservation.date),
             timeSlot: reservation.timeSlot,
+            endTimeSlot: reservation.endTimeSlot,
+            duration: reservation.duration,
             players: reservation.players,
-            timeSlotDisplay: reservation.timeSlotDisplay
+            timeSlotDisplay: reservation.timeSlotDisplay,
+            totalFee: reservation.totalFee
           },
-          userId: { _id: '', username: '', fullName: '' }, // Not needed for display
+          userId: { _id: this.currentUser?._id || '', username: this.currentUser?.username || '', fullName: this.currentUser?.fullName || '' }, // Use current user's ID for grouping
           amount: amount,
           currency: 'PHP',
           paymentMethod: 'cash' as const,
           status: 'pending' as const,
           referenceNumber: '',
           dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
-          description: `Court reservation payment for ${new Date(reservation.date).toDateString()} ${reservation.timeSlot}:00-${reservation.timeSlot + 1}:00`,
+          description: `Court reservation payment for ${new Date(reservation.date).toDateString()} ${reservation.timeSlotDisplay || `${reservation.timeSlot}:00-${reservation.timeSlot + 1}:00`}`,
           formattedAmount: `₱${amount.toFixed(2)}`,
           statusDisplay: 'Pending',
           isOverdue: this.isReservationOverdue(reservation),
@@ -1226,10 +1278,179 @@ export class PaymentsComponent implements OnInit {
   onReservationChange(event: any): void {
     const reservationId = event.target.value;
     this.selectedReservation = this.unpaidReservations.find(r => r._id === reservationId) || null;
+
+    // Load available members for "Pay for Others" feature
+    if (this.selectedReservation) {
+      this.loadAvailableMembersForPayment(this.selectedReservation);
+    }
   }
 
-  onSubmit(): void {
-    if (this.paymentForm.invalid || this.loading) return;
+  async loadAvailableMembersForPayment(reservation: Reservation): Promise<void> {
+    try {
+      // Extract userId - it might be an object or a string
+      let reservationUserId = typeof reservation.userId === 'object'
+        ? (reservation.userId as any)?._id
+        : reservation.userId;
+
+      console.log('🔍 loadAvailableMembersForPayment called:', {
+        reservationId: reservation._id,
+        reservationUserId: reservationUserId,
+        reservationUserIdType: typeof reservation.userId,
+        reservationUserIdRaw: reservation.userId,
+        currentUserId: this.currentUser?._id,
+        isReserver: reservationUserId === this.currentUser?._id
+      });
+
+    // If userId is not populated, fetch full reservation details
+    if (!reservationUserId) {
+      try {
+        console.log('⚠️ Reservation userId not populated, fetching full details...');
+        const fullReservationResponse = await this.http.get<any>(`${this.apiUrl}/reservations/${reservation._id}`).toPromise();
+        const fullReservation = fullReservationResponse?.data;
+        if (fullReservation && fullReservation.userId) {
+          reservation.userId = fullReservation.userId;
+          console.log('✅ Fetched userId from full reservation:', reservation.userId);
+
+          // Re-extract userId after fetching
+          reservationUserId = typeof reservation.userId === 'object'
+            ? (reservation.userId as any)?._id
+            : reservation.userId;
+          console.log('✅ Extracted userId after fetch:', reservationUserId);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching full reservation:', error);
+      }
+    }
+
+    // Only allow reserver to pay for others (compare extracted IDs)
+    if (reservationUserId !== this.currentUser?._id) {
+      console.log('❌ User is not the reserver, hiding Pay for Others', {
+        reservationUserId,
+        currentUserId: this.currentUser?._id
+      });
+      this.availableMembersForPayment = [];
+      return;
+    }
+
+    console.log('✅ User is the reserver, loading available members...');
+      // Fetch ALL payments for this user to detect who has paid
+      const allPaymentsResponse = await this.http.get<any>(`${this.apiUrl}/payments/my`).toPromise();
+      const allPayments = allPaymentsResponse?.data || [];
+
+      // Find payments for this specific reservation
+      const reservationPayments = allPayments.filter((p: any) =>
+        p.reservationId && p.reservationId._id === reservation._id
+      );
+
+      // Track who has paid
+      const paidMemberIds = new Set<string>();
+      reservationPayments.forEach((p: any) => {
+        if (p.status === 'completed' || p.status === 'record') {
+          paidMemberIds.add(p.userId._id || p.userId);
+        }
+      });
+
+      // Get members from reservation
+      const members = reservation.players.filter((p: any) =>
+        typeof p === 'object' && p.isMember
+      ) as ReservationPlayer[];
+
+      console.log('📋 ALL players in reservation:', reservation.players);
+      console.log('📋 Members in reservation (filtered):', members.map(m => ({
+        name: m.name,
+        userId: m.userId,
+        isMember: m.isMember
+      })));
+
+      console.log('💰 Paid member IDs:', Array.from(paidMemberIds));
+
+      // Filter unpaid members (excluding current user)
+      this.availableMembersForPayment = members
+        .filter(member => {
+          const hasUserId = !!member.userId;
+          const isPaid = member.userId ? paidMemberIds.has(member.userId) : false;
+          const isCurrentUser = member.userId === this.currentUser?._id;
+          const willInclude = hasUserId && !isPaid && !isCurrentUser;
+
+          console.log(`  🔍 Member: ${member.name}`, {
+            userId: member.userId,
+            hasUserId,
+            isPaid,
+            isCurrentUser,
+            willInclude
+          });
+
+          return willInclude;
+        })
+        .map(member => ({
+          userId: member.userId!,
+          fullName: member.name,
+          amount: this.calculateMemberAmount(reservation, member),
+          selected: false
+        }));
+
+      console.log('✅ Available members for payment:', this.availableMembersForPayment.map(m => ({
+        fullName: m.fullName,
+        amount: m.amount,
+        userId: m.userId
+      })));
+
+      console.log(`📊 Final count: ${this.availableMembersForPayment.length} unpaid members available`);
+
+    } catch (outerError) {
+      console.error('❌ Error loading available members:', outerError);
+      this.availableMembersForPayment = [];
+    }
+  }
+
+  // Helper method to extract userId from object or string
+  getReservationUserId(userId: any): string | undefined {
+    if (typeof userId === 'object' && userId?._id) {
+      return userId._id;
+    }
+    return userId;
+  }
+
+  toggleMemberSelection(member: {userId: string; fullName: string; amount: number; selected: boolean}): void {
+    // Find the actual member in the array and toggle it
+    const memberInArray = this.availableMembersForPayment.find(m => m.userId === member.userId);
+    if (memberInArray) {
+      memberInArray.selected = !memberInArray.selected;
+    }
+
+    this.updateTotalForOthers();
+
+    // Update form control
+    const selectedIds = this.availableMembersForPayment
+      .filter(m => m.selected)
+      .map(m => m.userId);
+    this.paymentForm.patchValue({ selectedMembers: selectedIds });
+  }
+
+  updateTotalForOthers(): void {
+    this.totalAmountForOthers = this.availableMembersForPayment
+      .filter(m => m.selected)
+      .reduce((sum, m) => sum + m.amount, 0);
+  }
+
+  getGrandTotal(): number {
+    const ownAmount = parseFloat(this.paymentForm.get('courtFee')?.value || 0);
+    return ownAmount + this.totalAmountForOthers;
+  }
+
+  onSubmit(event?: Event): void {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    console.log('🔍 onSubmit called, form valid:', this.paymentForm.valid, 'loading:', this.loading);
+    console.log('🔍 Form value:', this.paymentForm.value);
+
+    if (this.paymentForm.invalid || this.loading) {
+      console.log('🔍 onSubmit BLOCKED - invalid or loading');
+      return;
+    }
 
     this.loading = true;
     const formValue = this.paymentForm.value;
@@ -1239,13 +1460,19 @@ export class PaymentsComponent implements OnInit {
     const isManualPayment = (this.selectedReservation as any)?.isManualPayment;
     const originalPaymentId = (this.selectedReservation as any)?.originalPaymentId;
 
+    console.log('🔍 isOpenPlay:', isOpenPlay, 'originalPaymentId:', originalPaymentId);
+
     if (isOpenPlay && originalPaymentId) {
+      console.log('🔍 Taking Open Play path');
       // For Open Play, update the existing payment record with the chosen payment method
       this.updateOpenPlayPayment(originalPaymentId, formValue.paymentMethod, formValue.transactionId);
       return;
     }
 
+    console.log('🔍 isManualPayment:', isManualPayment);
+
     if (isManualPayment && originalPaymentId) {
+      console.log('🔍 Taking Manual Payment path');
       // For Manual Payment, update the existing payment record with the chosen payment method
       this.updateManualPayment(originalPaymentId, formValue.paymentMethod, formValue.transactionId);
       return;
@@ -1253,8 +1480,17 @@ export class PaymentsComponent implements OnInit {
 
     // Check if this is for an existing payment that needs to be updated
     const existingPaymentId = (this.selectedReservation as any)?.existingPaymentId;
-    
-    if (existingPaymentId) {
+
+    console.log('🔍 existingPaymentId:', existingPaymentId);
+    console.log('🔍 alsoPayForOthers:', formValue.alsoPayForOthers);
+    console.log('🔍 selectedMembers:', formValue.selectedMembers);
+
+    // If paying for others, skip the existing payment update path and use multi-member payment
+    const isPayingForOthers = formValue.alsoPayForOthers && formValue.selectedMembers && formValue.selectedMembers.length > 0;
+
+    if (existingPaymentId && !isPayingForOthers) {
+      console.log('🔍 Taking existing payment update path (single payment)');
+
       // Update existing payment instead of creating new one
       console.log('💰 Updating existing payment:', existingPaymentId);
       
@@ -1269,21 +1505,11 @@ export class PaymentsComponent implements OnInit {
       this.http.put<any>(`${this.apiUrl}/payments/${existingPaymentId}`, updateData).subscribe({
         next: (response) => {
           this.loading = false;
-          
-          // For admin users, auto-complete ALL payment methods since admin is confirming payment
-          if (this.isAdmin()) {
-            this.processPayment(existingPaymentId, true);
-            this.showSuccess('Payment Completed', 'Payment has been processed and completed successfully');
-          } else {
-            // For regular users, only auto-complete cash payments
-            if (formValue.paymentMethod === 'cash') {
-              this.processPayment(existingPaymentId, true);
-              this.showSuccess('Payment Completed', 'Cash payment has been completed successfully');
-            } else {
-              this.showSuccess('Payment Updated', 'Payment method updated successfully');
-            }
-          }
-          
+
+          // Auto-complete all payments regardless of payment method
+          this.processPayment(existingPaymentId, true);
+          this.showSuccess('Payment Completed', 'Payment has been processed and completed successfully');
+
           this.resetForm();
           this.loadPendingPayments(true);
         },
@@ -1303,60 +1529,114 @@ export class PaymentsComponent implements OnInit {
       transactionId: formValue.transactionId || undefined,
       notes: formValue.notes || undefined
     };
-    
+
     // Check if this is a grouped payment with multiple reservations
     if (this.selectedReservation && this.selectedReservation._groupedReservationIds && this.selectedReservation._groupedReservationIds.length > 1) {
       paymentData.groupedReservationIds = this.selectedReservation._groupedReservationIds;
       console.log(`💰 Creating grouped payment for ${paymentData.groupedReservationIds.length} reservations:`, paymentData.groupedReservationIds);
     }
-    
-    // Add court fee from form input
-    paymentData.customAmount = formValue.courtFee;
 
+    // Add court fee from form input (only for own payment if paying for others)
+    if (formValue.alsoPayForOthers && formValue.selectedMembers && formValue.selectedMembers.length > 0) {
+      // Multi-member payment: include current user + selected members
+      paymentData.payForUserIds = [this.currentUser._id, ...formValue.selectedMembers];
+      console.log(`💰 Multi-member payment for ${paymentData.payForUserIds.length} member(s) (self + others):`, paymentData.payForUserIds);
+    } else {
+      // Single payment: just for current user
+      paymentData.customAmount = formValue.courtFee;
+      console.log(`💰 Single payment with customAmount: ₱${paymentData.customAmount}`);
+    }
+
+    console.log('💰 Full payment data being sent:', paymentData);
 
     this.http.post<any>(`${this.apiUrl}/payments`, paymentData).subscribe({
       next: (response) => {
         this.loading = false;
-        
-        // For admin users, auto-complete ALL payment methods since admin is confirming payment
-        if (this.isAdmin()) {
-          this.processPayment(response.data._id, true);
-          this.showSuccess('Payment Completed', 'Payment has been processed and completed successfully');
-        } else {
-          // For regular users, only auto-complete cash payments
-          if (formValue.paymentMethod === 'cash') {
-            this.processPayment(response.data._id, true);
-            this.showSuccess('Payment Completed', 'Cash payment has been completed successfully');
-          } else {
-            this.showSuccess('Payment Logged', 'Payment has been logged and is pending confirmation');
-          }
+
+        // Store response for debugging
+        (window as any).lastPaymentResponse = response;
+
+        // Console log the full response for debugging
+        console.log('🔍 PAYMENT RESPONSE:', JSON.stringify(response, null, 2));
+
+        // Show debug info from backend if available
+        if (response.debug) {
+          console.log('🔍 DEBUG INFO FROM BACKEND:');
+          console.log('  - Requested User IDs:', response.debug.requestedUserIds);
+          console.log('  - Processed Count:', response.debug.processedCount);
+          console.log('  - Payment Details:', response.debug.paymentDetails);
         }
-        
+
+        // Check if this is multi-member payment response (array of payments)
+        const isMultiPayment = Array.isArray(response.data);
+        const payments = isMultiPayment ? response.data : [response.data];
+
+        console.log('🔍 Is Multi Payment:', isMultiPayment);
+        console.log('🔍 Payment Count:', payments.length);
+        console.log('🔍 Payments:', JSON.stringify(payments, null, 2));
+
+        if (isMultiPayment) {
+          // Multi-member payment
+          const totalAmount = response.totalAmount || 0;
+          const count = payments.length;
+
+          console.log('🔍 About to auto-process', count, 'payments');
+          // Auto-process only pending payments
+          payments.forEach((payment: any, idx: number) => {
+            console.log(`🔍 Payment ${idx + 1}: status=${payment.status}, id=${payment._id}`);
+            if (payment.status === 'pending') {
+              console.log(`🔍 Processing payment ${idx + 1}:`, payment._id);
+              this.processPayment(payment._id, true);
+            } else {
+              console.log(`🔍 Skipping payment ${idx + 1} - already ${payment.status}`);
+            }
+          });
+
+          this.showSuccess('Payments Completed',
+            `Successfully created ${count} payment(s) for ₱${totalAmount.toFixed(2)}`);
+        } else {
+          // Single payment - auto-process only if pending
+          console.log('🔍 Single payment status:', response.data.status);
+          if (response.data.status === 'pending') {
+            console.log('🔍 About to auto-process single payment:', response.data._id);
+            this.processPayment(response.data._id, true);
+          } else {
+            console.log('🔍 Skipping process - payment already', response.data.status);
+          }
+          this.showSuccess('Payment Completed', 'Payment has been processed and completed successfully');
+        }
+
         this.resetForm();
         this.loadPendingPayments(true);
       },
       error: (error) => {
         this.loading = false;
+        console.error('🔍 PAYMENT ERROR:', error);
+        console.error('🔍 Error details:', error.error);
+        console.error('🔍 Payment data that was sent:', paymentData);
         const message = error.error?.error || 'Failed to log payment';
-        this.showError('Payment Failed', message);
+        this.showError('Payment Failed', message + '. Check console (F12) for details.');
       }
     });
   }
 
 
   processPayment(paymentId: string, silent = false): void {
+    console.log('🔍 processPayment called for:', paymentId, 'silent:', silent);
     this.processing.push(paymentId);
-    
+
     this.http.put<any>(`${this.apiUrl}/payments/${paymentId}/process`, {}).subscribe({
       next: (response) => {
+        console.log('🔍 processPayment SUCCESS for:', paymentId, 'response:', response);
         this.processing = this.processing.filter(id => id !== paymentId);
         if (!silent) {
           this.showSuccess('Payment Processed', 'Payment has been marked as completed and moved to Payment History');
         }
-        
+
         // Refresh both tabs sequentially with cache busting to ensure fresh data
         // First refresh pending payments to remove the completed payment
         this.loadPendingPayments(true).then(() => {
+          console.log('🔍 Pending payments refreshed after processing', paymentId);
           // Then refresh payment history to show the newly completed payment
           this.loadPaymentHistory(true);
         }).catch(error => {
@@ -1366,6 +1646,7 @@ export class PaymentsComponent implements OnInit {
         });
       },
       error: (error) => {
+        console.error('🔍 processPayment ERROR for:', paymentId, 'error:', error);
         this.processing = this.processing.filter(id => id !== paymentId);
         const message = error.error?.error || 'Failed to process payment';
         this.showError('Process Failed', message);
@@ -1607,9 +1888,11 @@ export class PaymentsComponent implements OnInit {
         day: 'numeric',
         year: 'numeric'
       });
-      // Use timeSlotDisplay if available (for grouped payments), otherwise calculate manually
+      // Use timeSlotDisplay if available (for grouped payments), otherwise calculate manually using endTimeSlot
+      const endTime = payment.reservationId.endTimeSlot ||
+                      (payment.reservationId.timeSlot + (payment.reservationId.duration || 1));
       const timeRange = payment.reservationId.timeSlotDisplay ||
-        `${this.formatTime(payment.reservationId.timeSlot)}-${this.formatTime(payment.reservationId.timeSlot + 1)}`;
+        `${this.formatTime(payment.reservationId.timeSlot)}-${this.formatTime(endTime)}`;
       return `${date} ${timeRange}`;
     } else if (payment.metadata?.isManualPayment) {
       // Format manual court usage payment
@@ -1667,19 +1950,36 @@ export class PaymentsComponent implements OnInit {
    * Group consecutive payments for the same date/user to display multi-hour reservations as single entries
    */
   groupPayments(payments: Payment[]): Payment[] {
+    // Initialize debug info
+    this.groupingDebugInfo = {
+      inputPayments: payments.length,
+      courtPayments: [],
+      groups: [],
+      finalResult: 0
+    };
+
     // Separate court payments from other payments
-    const courtPayments = payments.filter(p => 
-      p.reservationId && 
-      p.reservationId.timeSlot !== undefined && 
+    const courtPayments = payments.filter(p =>
+      p.reservationId &&
+      p.reservationId.timeSlot !== undefined &&
       p.reservationId.date
     );
-    const nonCourtPayments = payments.filter(p => 
-      !p.reservationId || 
-      p.reservationId.timeSlot === undefined || 
+    const nonCourtPayments = payments.filter(p =>
+      !p.reservationId ||
+      p.reservationId.timeSlot === undefined ||
       !p.reservationId.date
     );
 
-    // Initialize debug info
+    this.groupingDebugInfo.courtPayments = courtPayments.map(p => ({
+      id: p._id,
+      timeSlot: p.reservationId?.timeSlot,
+      date: new Date(p.reservationId!.date).toDateString(),
+      userId: p.userId._id,
+      amount: p.amount
+    }));
+
+    console.log('🔍 groupPayments: Input payments:', payments.length);
+    console.log('🔍 groupPayments: Court payments:', courtPayments.length, this.groupingDebugInfo.courtPayments);
 
     if (courtPayments.length === 0) {
       return payments;
@@ -1687,36 +1987,57 @@ export class PaymentsComponent implements OnInit {
 
     // Group payments by date and user first
     const groupsByDateAndUser = new Map<string, Payment[]>();
-    
+
     courtPayments.forEach(payment => {
       const dateStr = new Date(payment.reservationId!.date).toDateString();
       const userId = payment.userId._id;
       const key = `${dateStr}-${userId}`;
-      
+
+      console.log(`🔍 Grouping payment: timeSlot=${payment.reservationId!.timeSlot}, key=${key}`);
+
       if (!groupsByDateAndUser.has(key)) {
         groupsByDateAndUser.set(key, []);
       }
       groupsByDateAndUser.get(key)!.push(payment);
     });
 
+    console.log('🔍 Groups by date/user:', groupsByDateAndUser.size, 'groups');
+
     const grouped: Payment[] = [];
 
     // Process each date/user group
-    groupsByDateAndUser.forEach(userPayments => {
+    groupsByDateAndUser.forEach((userPayments, key) => {
+      const groupDebug: any = {
+        key,
+        paymentCount: userPayments.length,
+        timeSlots: [],
+        consecutiveGroups: []
+      };
+
+      console.log(`🔍 Processing group ${key}:`, userPayments.length, 'payments');
+
       // Sort by timeSlot
-      const sorted = userPayments.sort((a, b) => 
+      const sorted = userPayments.sort((a, b) =>
         a.reservationId!.timeSlot - b.reservationId!.timeSlot
       );
+
+      groupDebug.timeSlots = sorted.map(p => p.reservationId!.timeSlot);
+      console.log(`🔍 Sorted timeSlots for ${key}:`, groupDebug.timeSlots);
 
       let i = 0;
       while (i < sorted.length) {
         const consecutiveGroup = [sorted[i]];
         let j = i + 1;
 
+        console.log(`🔍 Starting group at index ${i}, timeSlot=${sorted[i].reservationId!.timeSlot}`);
+
         // Find consecutive time slots
         while (j < sorted.length) {
           const currentLastSlot = consecutiveGroup[consecutiveGroup.length - 1].reservationId!.timeSlot;
-          if (sorted[j].reservationId!.timeSlot === currentLastSlot + 1) {
+          const nextSlot = sorted[j].reservationId!.timeSlot;
+          console.log(`🔍 Checking if ${nextSlot} is consecutive to ${currentLastSlot}: ${nextSlot === currentLastSlot + 1}`);
+
+          if (nextSlot === currentLastSlot + 1) {
             consecutiveGroup.push(sorted[j]);
             j++;
           } else {
@@ -1724,12 +2045,23 @@ export class PaymentsComponent implements OnInit {
           }
         }
 
+        const groupSlots = consecutiveGroup.map(p => p.reservationId!.timeSlot);
+        console.log(`🔍 Consecutive group has ${consecutiveGroup.length} payments:`, groupSlots);
+
+        groupDebug.consecutiveGroups.push({
+          slots: groupSlots,
+          count: consecutiveGroup.length,
+          willMerge: consecutiveGroup.length > 1
+        });
+
         // Create merged payment or single payment
         if (consecutiveGroup.length > 1) {
-          
+
           const firstSlot = consecutiveGroup[0];
           const lastSlot = consecutiveGroup[consecutiveGroup.length - 1];
           const totalAmount = consecutiveGroup.reduce((sum, p) => sum + p.amount, 0);
+
+          console.log(`🔍 Creating merged payment: ${firstSlot.reservationId!.timeSlot}-${lastSlot.reservationId!.timeSlot + 1}, amount=₱${totalAmount}`);
 
           const mergedPayment: Payment = {
             ...firstSlot,
@@ -1743,15 +2075,22 @@ export class PaymentsComponent implements OnInit {
             },
             _groupedPayments: consecutiveGroup
           };
-          
+
           grouped.push(mergedPayment);
         } else {
+          console.log(`🔍 Creating single payment: timeSlot=${consecutiveGroup[0].reservationId!.timeSlot}`);
+
           // Single payment - ensure it has timeSlotDisplay
-          const singlePayment = { ...consecutiveGroup[0] };
+          const singlePayment = {
+            ...consecutiveGroup[0],
+            reservationId: consecutiveGroup[0].reservationId ? {
+              ...consecutiveGroup[0].reservationId
+            } : undefined
+          };
           if (singlePayment.reservationId && !singlePayment.reservationId.timeSlotDisplay) {
             singlePayment.reservationId.timeSlotDisplay = this.formatTimeRange(
-              singlePayment.reservationId.timeSlot, 
-              singlePayment.reservationId.timeSlot + 1
+              singlePayment.reservationId.timeSlot,
+              singlePayment.reservationId.endTimeSlot || (singlePayment.reservationId.timeSlot + (singlePayment.reservationId.duration || 1))
             );
           }
           grouped.push(singlePayment);
@@ -1759,7 +2098,12 @@ export class PaymentsComponent implements OnInit {
 
         i = j; // Move to next unprocessed payment
       }
+
+      this.groupingDebugInfo.groups.push(groupDebug);
     });
+
+    this.groupingDebugInfo.finalResult = grouped.length + nonCourtPayments.length;
+    console.log(`🔍 Final grouped array has ${grouped.length} payments`);
 
     // Combine and sort by creation date (most recent first)
     return [...grouped, ...nonCourtPayments].sort((a, b) => {
@@ -1935,13 +2279,17 @@ export class PaymentsComponent implements OnInit {
     this.selectedReservation = null;
     this.isDirectPayment = false;
     this.showReservationSelector = false;
+    this.availableMembersForPayment = [];
+    this.totalAmountForOthers = 0;
     this.paymentForm.reset();
     this.paymentForm.patchValue({
       reservationId: '',
       courtFee: '',
       paymentMethod: '',
       transactionId: '',
-      notes: ''
+      notes: '',
+      alsoPayForOthers: false,
+      selectedMembers: []
     });
   }
 
@@ -1972,7 +2320,8 @@ export class PaymentsComponent implements OnInit {
       timeSlotDisplay: reservation.timeSlotDisplay,
       status: 'confirmed',
       paymentStatus: 'pending',
-      totalFee: ('totalFee' in reservation) ? reservation.totalFee : 0
+      totalFee: ('totalFee' in reservation) ? reservation.totalFee : 0,
+      userId: ('userId' in reservation) ? reservation.userId : undefined
     };
     
     // Use override amount if provided, otherwise recalculate the fee
@@ -2010,6 +2359,7 @@ export class PaymentsComponent implements OnInit {
         status: 'confirmed',
         paymentStatus: 'pending',
         totalFee: totalAmount, // Use the grouped total amount
+        userId: firstReservation.userId, // Pass the userId to identify the reserver
         _groupedReservationIds: payment._groupedPayments.map(p => p.reservationId!._id) // Store all reservation IDs
       };
 
@@ -2031,11 +2381,13 @@ export class PaymentsComponent implements OnInit {
     }
   }
 
-  calculateAndSetReservationFeeWithMemberData(reservation: Reservation): void {
+  async calculateAndSetReservationFeeWithMemberData(reservation: Reservation): Promise<void> {
     console.log('🔍 DEBUG calculateAndSetReservationFeeWithMemberData input:', {
       reservationId: reservation._id,
       initialTotalFee: reservation.totalFee,
       timeSlot: reservation.timeSlot,
+      duration: reservation.duration,
+      endTimeSlot: reservation.endTimeSlot,
       players: reservation.players
     });
     // Calculate fee using current member data instead of backend calculation
@@ -2043,38 +2395,72 @@ export class PaymentsComponent implements OnInit {
       reservationId: {
         players: reservation.players,
         timeSlot: reservation.timeSlot,
+        duration: reservation.duration,
+        endTimeSlot: reservation.endTimeSlot,
         date: reservation.date
       }
     };
 
     const feeInfo = this.getPlayerFeeInfo(mockPayment);
     const calculatedFee = (feeInfo.memberCount * feeInfo.memberFee) + (feeInfo.nonMemberCount * feeInfo.nonMemberFee);
-    
+
     console.log(`💰 Setting reservation fee with member data:`);
     console.log(`💰 Players: ${this.formatPlayerNames(reservation.players)}`);
     console.log(`💰 Original stored fee: ₱${reservation.totalFee}`);
     console.log(`💰 Calculated fee: ₱${calculatedFee} (${feeInfo.memberCount} members × ₱${feeInfo.memberFee} + ${feeInfo.nonMemberCount} non-members × ₱${feeInfo.nonMemberFee})`);
-    
+
     // Update the reservation with the correctly calculated fee
     reservation.totalFee = calculatedFee;
+
+    // Calculate isPeakHour for member amount calculations
+    const peakHours = [5, 18, 19, 21];
+    const isPeakHour = peakHours.includes(reservation.timeSlot);
+    (reservation as any).isPeakHour = isPeakHour;
+
     this.selectedReservation = reservation;
+
+    // Calculate the reserver's individual amount (only their share, not total fee)
+    const members = reservation.players.filter((p: any) =>
+      typeof p === 'object' && p.isMember
+    ) as ReservationPlayer[];
+
+    // Find the reserver in the members list
+    const reserverMember = members.find(m =>
+      m.userId === this.getReservationUserId(reservation.userId)
+    );
+
+    // Calculate reserver's amount
+    let reserverAmount = calculatedFee; // Default to total fee if not found
+    if (reserverMember) {
+      reserverAmount = this.calculateMemberAmount(reservation, reserverMember);
+      console.log(`💰 Reserver's individual amount: ₱${reserverAmount}`);
+    } else {
+      console.log(`⚠️ Could not find reserver in members list, using total fee: ₱${reserverAmount}`);
+    }
+
     this.paymentForm.patchValue({
       reservationId: reservation._id,
-      courtFee: calculatedFee
+      courtFee: reserverAmount // Set to reserver's amount only
     });
+
+    // Load available members for "Pay for Others" feature
+    await this.loadAvailableMembersForPayment(reservation);
   }
 
-  calculateAndSetReservationFee(reservation: Reservation, overrideAmount?: number): void {
+  async calculateAndSetReservationFee(reservation: Reservation, overrideAmount?: number): Promise<void> {
     // Use override amount if provided, otherwise use reservation's totalFee
     const correctFee = overrideAmount || reservation.totalFee || 0;
-    
+
     console.log(`✅ Using fee: ₱${correctFee} ${overrideAmount ? '(override provided)' : '(from reservation)'}`);
-    
+
     this.selectedReservation = reservation;
     this.paymentForm.patchValue({
       reservationId: reservation._id,
       courtFee: correctFee
     });
+
+    // Load available members for "Pay for Others" feature
+    await this.loadAvailableMembersForPayment(reservation);
   }
 
   payForOpenPlay(payment: Payment): void {
@@ -2166,11 +2552,14 @@ export class PaymentsComponent implements OnInit {
       _id: payment.reservationId._id,
       date: payment.reservationId.date,
       timeSlot: payment.reservationId.timeSlot,
+      endTimeSlot: payment.reservationId.endTimeSlot,
+      duration: payment.reservationId.duration,
       players: payment.reservationId.players,
       timeSlotDisplay: payment.reservationId.timeSlotDisplay,
       status: 'confirmed',
       paymentStatus: 'pending',
-      totalFee: payment.reservationId.totalFee || payment.amount // Use reservation's totalFee first
+      totalFee: payment.reservationId.totalFee || payment.amount, // Use reservation's totalFee first
+      userId: payment.reservationId.userId // Pass the userId to identify the reserver
     };
     
     console.log('🔍 DEBUG reservationForForm totalFee:', reservationForForm.totalFee);
@@ -2413,57 +2802,86 @@ export class PaymentsComponent implements OnInit {
     const reservation = payment.reservationId;
     const players = reservation.players;
     const timeSlot = reservation.timeSlot;
-    
-    // Peak hours: 5AM, 6PM, 7PM, 9PM (5, 18, 19, 21)
-    const peakHours = [5, 18, 19, 21];
+    const duration = reservation.duration || 1; // Default to 1 hour if not specified
+
+    // Peak hours: 5AM, 6PM, 7PM, 8PM, 9PM (5, 18, 19, 20, 21)
+    const peakHours = [5, 18, 19, 20, 21];
     const isPeakHour = peakHours.includes(timeSlot);
-    
-    // Try to distinguish members from non-members
-    // For now, we'll need to check if we have member data or use a heuristic
-    const { memberCount, nonMemberCount } = this.categorizePlayersForPayment(players);
-    
-    if (isPeakHour) {
-      // Peak hours: ₱100 minimum total
-      const baseFee = (memberCount * 20) + (nonMemberCount * 50);
-      const totalFee = Math.max(100, baseFee);
-      
-      if (memberCount > 0 && nonMemberCount > 0) {
-        // Mixed members and non-members: distribute proportionally
-        const memberRatio = (memberCount * 20) / (memberCount * 20 + nonMemberCount * 50);
-        const memberPortionOfTotal = Math.round(totalFee * memberRatio);
-        const nonMemberPortionOfTotal = totalFee - memberPortionOfTotal;
-        
-        return {
-          memberFee: Math.round(memberPortionOfTotal / memberCount),
-          nonMemberFee: Math.round(nonMemberPortionOfTotal / nonMemberCount),
-          memberCount,
-          nonMemberCount
-        };
-      } else if (memberCount > 0) {
-        // Only members
-        return {
-          memberFee: Math.round(totalFee / memberCount),
-          nonMemberFee: 0,
-          memberCount,
-          nonMemberCount: 0
-        };
+
+    // Check if this is December 2025 format (players have isMember/isGuest flags)
+    const isNewFormat = players.length > 0 && typeof players[0] === 'object' && 'isMember' in players[0];
+
+    if (isNewFormat) {
+      // December 2025 pricing: ₱100/150 base + ₱70 per guest, calculated hour-by-hour
+      const PEAK_BASE = 150;
+      const NON_PEAK_BASE = 100;
+      const GUEST_FEE = 70;
+
+      const memberCount = players.filter((p: any) => p.isMember).length;
+      const guestCount = players.filter((p: any) => p.isGuest).length;
+
+      // Calculate base fee hour-by-hour for multi-hour reservations
+      let totalBaseFee = 0;
+      const endTimeSlot = timeSlot + duration;
+      for (let hour = timeSlot; hour < endTimeSlot; hour++) {
+        const isHourPeak = peakHours.includes(hour);
+        totalBaseFee += isHourPeak ? PEAK_BASE : NON_PEAK_BASE;
+      }
+
+      const totalGuestFee = guestCount * GUEST_FEE * duration;
+      const totalFee = totalBaseFee + totalGuestFee;
+      const baseFeePerMember = memberCount > 0 ? totalBaseFee / memberCount : 0;
+
+      console.log(`💰 December 2025 Pricing: ${duration}h (hourly calculation) (${memberCount}M + ${guestCount}G) = ₱${totalFee} (Base: ₱${totalBaseFee}, Guest: ₱${totalGuestFee})`);
+
+      return {
+        memberFee: Math.round(baseFeePerMember),
+        nonMemberFee: guestCount > 0 ? GUEST_FEE * duration : 0,
+        memberCount,
+        nonMemberCount: guestCount
+      };
+    } else {
+      // Legacy format - use old pricing logic
+      const { memberCount, nonMemberCount } = this.categorizePlayersForPayment(players);
+
+      if (isPeakHour) {
+        const baseFee = (memberCount * 20) + (nonMemberCount * 50);
+        const totalFee = Math.max(100, baseFee) * duration;
+
+        if (memberCount > 0 && nonMemberCount > 0) {
+          const memberRatio = (memberCount * 20) / (memberCount * 20 + nonMemberCount * 50);
+          const memberPortionOfTotal = Math.round(totalFee * memberRatio);
+          const nonMemberPortionOfTotal = totalFee - memberPortionOfTotal;
+
+          return {
+            memberFee: Math.round(memberPortionOfTotal / memberCount),
+            nonMemberFee: Math.round(nonMemberPortionOfTotal / nonMemberCount),
+            memberCount,
+            nonMemberCount
+          };
+        } else if (memberCount > 0) {
+          return {
+            memberFee: Math.round(totalFee / memberCount),
+            nonMemberFee: 0,
+            memberCount,
+            nonMemberCount: 0
+          };
+        } else {
+          return {
+            memberFee: 0,
+            nonMemberFee: Math.round(totalFee / nonMemberCount),
+            memberCount: 0,
+            nonMemberCount
+          };
+        }
       } else {
-        // Only non-members
         return {
-          memberFee: 0,
-          nonMemberFee: Math.round(totalFee / nonMemberCount),
-          memberCount: 0,
+          memberFee: 20 * duration,
+          nonMemberFee: 50 * duration,
+          memberCount,
           nonMemberCount
         };
       }
-    } else {
-      // Off-peak: ₱20 per member, ₱50 per non-member
-      return {
-        memberFee: 20,
-        nonMemberFee: 50,
-        memberCount,
-        nonMemberCount
-      };
     }
   }
 
@@ -2711,24 +3129,25 @@ export class PaymentsComponent implements OnInit {
       isReservationPayment: !!payment.reservationId,
       timeSlotDisplay: payment.reservationId?.timeSlotDisplay
     });
-    
+
     // Always use the stored amount since users can now edit court fees
     // This respects both user-edited amounts and admin overrides
+    // Rounding is now done at the reservation level, so amounts are already rounded in the database
     if (payment.amount !== undefined && payment.amount !== null) {
       console.log(`💰 Using stored payment amount for ${payment._id}: ₱${payment.amount}`);
       return '₱' + payment.amount.toFixed(2);
     }
-    
+
     // For Open Play Events and other payment types, use stored amount
     if (payment.formattedAmount) {
       return payment.formattedAmount;
     }
-    
+
     // Final fallback to raw amount
     if (payment.amount !== undefined) {
       return '₱' + payment.amount.toFixed(2);
     }
-    
+
     // Last resort fallback
     return '₱0.00';
   }
@@ -2787,46 +3206,56 @@ export class PaymentsComponent implements OnInit {
           return false;
         }) as ReservationPlayer[];
 
-        // Get paid member IDs - check from already loaded pending/completed payments
+        // Get paid member IDs - fetch ALL payments for this reservation from API
         const paidMemberIds = new Set<string>();
 
-        // Check both pendingPayments and paymentHistory for this reservation
-        const allLoadedPayments = [...this.pendingPayments, ...this.paymentHistory];
-        const reservationPayments = allLoadedPayments.filter(p =>
-          p.reservationId && p.reservationId._id === reservation._id
-        );
+        // Fetch all payments for this reservation to get accurate paid status
+        this.http.get<any>(`${this.apiUrl}/payments/my`).subscribe({
+          next: (allPaymentsResponse) => {
+            const allPayments = allPaymentsResponse.data || [];
 
-        reservationPayments.forEach((p: any) => {
-          if (p.status === 'completed' || p.status === 'record') {
-            // Add the userId of whoever this payment is for
-            if (p.userId && p.userId._id) {
-              paidMemberIds.add(p.userId._id);
-            } else if (typeof p.userId === 'string') {
-              paidMemberIds.add(p.userId);
+            // Find payments for this specific reservation
+            const reservationPayments = allPayments.filter((p: any) =>
+              p.reservationId && p.reservationId._id === reservation._id
+            );
+
+            reservationPayments.forEach((p: any) => {
+              if (p.status === 'completed' || p.status === 'record') {
+                // Add the userId of whoever this payment is for
+                if (p.userId && p.userId._id) {
+                  paidMemberIds.add(p.userId._id);
+                } else if (typeof p.userId === 'string') {
+                  paidMemberIds.add(p.userId);
+                }
+              }
+            });
+
+            console.log('🔍 Found paid members:', Array.from(paidMemberIds));
+            console.log('🔍 All members in reservation:', members.map(m => ({name: m.name, userId: m.userId})));
+
+            // Filter unpaid members
+            this.unpaidMembers = members
+              .filter(member => member.userId && !paidMemberIds.has(member.userId))
+              .map(member => ({
+                userId: member.userId!,
+                fullName: member.name,
+                amount: this.calculateMemberAmount(reservation, member)
+              }));
+
+            console.log('🔍 Unpaid members:', this.unpaidMembers);
+
+            if (this.unpaidMembers.length === 0) {
+              this.showNotification('info', 'All Paid', 'All members have already paid for this reservation.');
+              return;
             }
+
+            this.showPayOnBehalfModal = true;
+          },
+          error: (error) => {
+            console.error('❌ Error fetching all payments:', error);
+            this.showNotification('error', 'Error', 'Failed to load payment information');
           }
         });
-
-        console.log('🔍 Found paid members:', Array.from(paidMemberIds));
-        console.log('🔍 All members in reservation:', members.map(m => ({name: m.name, userId: m.userId})));
-
-        // Filter unpaid members
-        this.unpaidMembers = members
-          .filter(member => member.userId && !paidMemberIds.has(member.userId))
-          .map(member => ({
-            userId: member.userId!,
-            fullName: member.name,
-            amount: this.calculateMemberAmount(reservation, member)
-          }));
-
-        console.log('🔍 Unpaid members:', this.unpaidMembers);
-
-        if (this.unpaidMembers.length === 0) {
-          this.showNotification('info', 'All Paid', 'All members have already paid for this reservation.');
-          return;
-        }
-
-        this.showPayOnBehalfModal = true;
       },
       error: (error) => {
         console.error('❌ Error fetching reservation:', error);
@@ -2836,10 +3265,18 @@ export class PaymentsComponent implements OnInit {
   }
 
   calculateMemberAmount(reservation: any, member: ReservationPlayer): number {
-    // Calculate based on December 2025 pricing
-    const isPeakHour = reservation.isPeakHour || false;
-    const baseFee = isPeakHour ? 150 : 100;
-    const guestFee = 70;
+    console.log('🔍 calculateMemberAmount called with:', {
+      reservationId: reservation._id,
+      totalFee: reservation.totalFee,
+      duration: reservation.duration,
+      timeSlot: reservation.timeSlot,
+      endTimeSlot: reservation.endTimeSlot,
+      memberName: member.name
+    });
+
+    // Use the reservation's totalFee which correctly calculates multi-hour peak/off-peak pricing
+    const totalFee = reservation.totalFee || 0;
+    const duration = reservation.duration || 1;
 
     const members = reservation.players.filter((p: any) =>
       typeof p === 'object' && p.isMember
@@ -2848,13 +3285,28 @@ export class PaymentsComponent implements OnInit {
       typeof p === 'object' && p.isGuest
     );
 
+    console.log('🔍 Calculation breakdown:', {
+      totalFee,
+      duration,
+      memberCount: members.length,
+      guestCount: guests.length
+    });
+
+    // Calculate total guest fee (70 per hour per guest)
+    const totalGuestFee = guests.length * 70 * duration;
+
+    // Base fee is total minus guest fees
+    const baseFee = totalFee - totalGuestFee;
     const baseFeePerMember = baseFee / members.length;
 
     // Only the reserver pays guest fees
     if (member.userId === reservation.userId) {
-      return baseFeePerMember + (guests.length * guestFee);
+      const totalAmount = baseFeePerMember + totalGuestFee;
+      console.log(`💰 Reserver amount: ₱${baseFeePerMember.toFixed(2)} (base) + ₱${totalGuestFee} (guests) = ₱${totalAmount.toFixed(2)}`);
+      return totalAmount;
     }
 
+    console.log(`💰 Non-reserver amount: ₱${baseFeePerMember.toFixed(2)} (base only)`);
     return baseFeePerMember;
   }
 
@@ -2916,46 +3368,10 @@ export class PaymentsComponent implements OnInit {
   }
 
   isReserver(payment: Payment): boolean {
-    const debugEntry = {
-      paymentId: payment._id,
-      reservationUserId: payment.reservationId?.userId,
-      currentUserId: this.currentUser?._id,
-      isReserver: false
-    };
-
-    if (!payment.reservationId) {
-      this.updateDebugInfo(debugEntry);
+    if (!payment.reservationId || !payment.reservationId.userId) {
       return false;
     }
-
-    if (!payment.reservationId.userId) {
-      this.updateDebugInfo(debugEntry);
-      return false;
-    }
-
-    debugEntry.isReserver = payment.reservationId.userId === this.currentUser?._id;
-    this.updateDebugInfo(debugEntry);
-
-    return debugEntry.isReserver;
-  }
-
-  updateDebugInfo(entry: {paymentId: string; reservationUserId?: string; currentUserId?: string; isReserver: boolean}): void {
-    // Remove existing entry for this payment
-    this.debugInfo = this.debugInfo.filter(d => d.paymentId !== entry.paymentId);
-    // Add new entry
-    this.debugInfo.push(entry);
-    // Keep only last 10 entries
-    if (this.debugInfo.length > 10) {
-      this.debugInfo = this.debugInfo.slice(-10);
-    }
-  }
-
-  toggleDebugInfo(): void {
-    this.showDebugInfo = !this.showDebugInfo;
-  }
-
-  hasMissingReservationIds(): boolean {
-    return this.debugInfo.some(entry => !entry.reservationUserId);
+    return payment.reservationId.userId === this.currentUser?._id;
   }
 
   // Admin detection

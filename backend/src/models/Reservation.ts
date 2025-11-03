@@ -234,7 +234,8 @@ reservationSchema.pre('save', function(next) {
       }
     }
 
-    reservation.totalFee = totalFee;
+    // Round to nearest 10 pesos (e.g., 183.33 → 190)
+    reservation.totalFee = Math.ceil(totalFee / 10) * 10;
   }
   
   next();

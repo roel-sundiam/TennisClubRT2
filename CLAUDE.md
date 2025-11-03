@@ -75,7 +75,7 @@ pending registration → admin approval → membership fee payment → active me
 #### Court Reservation System
 
 - **Operating Hours**: 5 AM - 10 PM (timeSlot: 5-22)
-- **Peak Hours**: 5AM, 6PM, 7PM, 9PM
+- **Peak Hours**: 5AM, 6PM, 7PM, 8PM, 9PM
 - **Pricing (December 2025+)**:
   - Peak: ₱150 base + ₱70 per guest
   - Non-Peak: ₱100 base + ₱70 per guest

@@ -158,7 +158,7 @@ interface Reservation {
 
             <!-- End Time Buttons -->
             <div class="time-selection" *ngIf="selectedStartTime">
-              <h4>End Time</h4>
+              <h4>End Time <span class="hint-text">(Maximum 4 hours per reservation)</span></h4>
               <div class="time-buttons" *ngIf="availableEndTimes.length > 0">
                 <button
                   *ngFor="let slot of availableEndTimes"
@@ -299,7 +299,7 @@ interface Reservation {
             <button
               type="button"
               (click)="addPlayer()"
-              [disabled]="playersArray.length >= 4 || loadingMembers"
+              [disabled]="loadingMembers"
               class="add-btn"
             >
               + Add Member Player
@@ -307,7 +307,7 @@ interface Reservation {
 
             <!-- Custom Players Section -->
             <div class="custom-players-section" *ngIf="!loadingMembers">
-              <h4>Non-Member Players (₱50 each)</h4>
+              <h4>Non-Member Players (₱70 per hour each)</h4>
 
               <div
                 *ngFor="
@@ -343,7 +343,6 @@ interface Reservation {
               <button
                 type="button"
                 (click)="addCustomPlayer()"
-                [disabled]="getTotalPlayerCount() >= 4"
                 class="add-btn"
               >
                 + Add Custom Player
@@ -405,7 +404,7 @@ interface Reservation {
                         <span class="player-badge" *ngIf="player.isGuest">(Guest)</span>
                       </span>
                       <span class="player-amount">
-                        <span *ngIf="!player.isGuest">₱{{ player.amount }}</span>
+                        <span *ngIf="!player.isGuest">₱{{ player.amount.toFixed(2) }}</span>
                         <span *ngIf="player.isGuest" style="color: #666;">No payment</span>
                       </span>
                     </div>
@@ -596,6 +595,7 @@ export class ReservationsComponent implements OnInit, OnDestroy {
   creditAmountToUse = 0;
   timeSlots: TimeSlot[] = []; // For START times (hours 5-21)
   allTimeSlots: TimeSlot[] = []; // All slots including hour 22 for END time calculations
+  timeSlotsLoaded = false; // Track if time slot data has been loaded
   existingReservations: Reservation[] = [];
   members: Member[] = [];
   loadingMembers = false;
@@ -990,6 +990,7 @@ export class ReservationsComponent implements OnInit, OnDestroy {
       this.selectedEndTime = null;
       this.availableEndTimes = [];
       this.calculatedFee = 0;
+      this.timeSlotsLoaded = false; // Reset loading flag when date changes
 
       // Clear form controls for time selection
       this.reservationForm.patchValue({
@@ -1014,15 +1015,28 @@ export class ReservationsComponent implements OnInit, OnDestroy {
     this.reservationForm.get('startTime')?.setValue(hour);
     this.reservationForm.get('endTime')?.setValue('');
 
-    console.log('🔍 About to call updateAvailableEndTimes()');
-    // Update available end times
-    this.updateAvailableEndTimes();
+    // Only update available end times if time slot data has been loaded
+    if (this.timeSlotsLoaded) {
+      console.log('🔍 About to call updateAvailableEndTimes() - data is loaded');
+      this.updateAvailableEndTimes();
+    } else {
+      console.log('⏳ Time slot data not yet loaded, will update end times after data arrives');
+    }
 
     // Trigger fee calculation
     this.calculateFee();
   }
 
   selectEndTime(hour: number): void {
+    // Validate maximum 4 hours duration
+    if (this.selectedStartTime) {
+      const duration = hour - this.selectedStartTime;
+      if (duration > 4) {
+        this.showError('Invalid Duration', 'Maximum reservation duration is 4 hours. Please select an end time within 4 hours of your start time.');
+        return;
+      }
+    }
+
     this.selectedEndTime = hour;
 
     // Update form control
@@ -1079,6 +1093,14 @@ export class ReservationsComponent implements OnInit, OnDestroy {
     console.log('🔍 selectedStartTime:', this.selectedStartTime);
     console.log('🔍 selectedDate:', this.selectedDate);
     console.log('🔍 timeSlots array length:', this.timeSlots.length);
+    console.log('🔍 timeSlotsLoaded:', this.timeSlotsLoaded);
+
+    // Defensive check: ensure data is loaded before proceeding
+    if (!this.timeSlotsLoaded || !this.allTimeSlots.length) {
+      this.availableEndTimes = [];
+      console.log('⚠️ Time slot data not loaded yet, returning empty availableEndTimes');
+      return;
+    }
 
     // Enhanced logging for debugging specific time slots
     console.log('🔍 Detailed timeSlots data for debugging:');
@@ -1096,9 +1118,11 @@ export class ReservationsComponent implements OnInit, OnDestroy {
 
     // CRITICAL FIX: Restore proper consecutive booking logic
     // Court reservations must be consecutive - no gaps allowed
-    console.log('🔍 Checking consecutive hours starting from', this.selectedStartTime + 1);
+    // Maximum duration: 4 hours
+    const maxEndTime = Math.min(this.selectedStartTime + 4, 22);
+    console.log('🔍 Checking consecutive hours starting from', this.selectedStartTime + 1, 'up to', maxEndTime, '(max 4 hours)');
 
-    for (let hour = this.selectedStartTime + 1; hour <= 22; hour++) {
+    for (let hour = this.selectedStartTime + 1; hour <= maxEndTime; hour++) {
       console.log(`🔍 Checking hour ${hour} for consecutive availability`);
 
       if (hour <= 21) {
@@ -1187,10 +1211,8 @@ export class ReservationsComponent implements OnInit, OnDestroy {
   }
 
   addPlayer(): void {
-    if (this.getTotalPlayerCount() < 4) {
-      this.playersArray.push(this.fb.control('', Validators.required));
-      this.calculateFee();
-    }
+    this.playersArray.push(this.fb.control('', Validators.required));
+    this.calculateFee();
   }
 
   removePlayer(index: number): void {
@@ -1202,11 +1224,9 @@ export class ReservationsComponent implements OnInit, OnDestroy {
   }
 
   addCustomPlayer(): void {
-    if (this.getTotalPlayerCount() < 4) {
-      this.customPlayerNames.push('');
-      console.log('🔍 Added custom player, array now:', this.customPlayerNames);
-      this.calculateFee();
-    }
+    this.customPlayerNames.push('');
+    console.log('🔍 Added custom player, array now:', this.customPlayerNames);
+    this.calculateFee();
   }
 
   removeCustomPlayer(index: number): void {
@@ -1243,6 +1263,9 @@ export class ReservationsComponent implements OnInit, OnDestroy {
 
   loadReservationsForDate(): void {
     if (!this.selectedDate) return;
+
+    // Reset loading flag at the start
+    this.timeSlotsLoaded = false;
 
     // Format date as YYYY-MM-DD in Philippine timezone
     const year = this.selectedDate.getFullYear();
@@ -1286,17 +1309,29 @@ export class ReservationsComponent implements OnInit, OnDestroy {
           const unavailableSlots = this.timeSlots.filter(s => !s.available);
           console.log('❌ All unavailable slots:', unavailableSlots.map(s => ({ hour: s.hour, blocked: s.blockedByOpenPlay, available: s.available })));
           console.log('🔍 Updated time slots with Open Play blocking:', this.timeSlots);
+
+          // Mark slots as loaded and trigger end time update if start time is already selected
+          this.timeSlotsLoaded = true;
+          if (this.selectedStartTime !== null) {
+            console.log('🔄 Start time already selected, updating available end times now that data is loaded');
+            this.updateAvailableEndTimes();
+          }
         } else {
           console.log('❌ No timeSlots in backend response, falling back to local generation');
           console.log('📊 Backend response data keys:', Object.keys(response.data || {}));
           // Fallback to local generation if backend doesn't provide timeSlots
           this.updateTimeSlotAvailability();
+          this.timeSlotsLoaded = true;
+          if (this.selectedStartTime !== null) {
+            this.updateAvailableEndTimes();
+          }
         }
       },
       error: (error) => {
         console.error('Error loading reservations:', error);
         this.existingReservations = [];
         this.updateTimeSlotAvailability();
+        this.timeSlotsLoaded = true; // Mark as loaded even on error to prevent blocking UI
       },
     });
   }
@@ -1405,8 +1440,9 @@ export class ReservationsComponent implements OnInit, OnDestroy {
       console.log(`🔍 Hour ${hour}: Base=₱${baseFee}, Guests=${guestCount}×₱${GUEST_FEE}, Total=₱${hourlyFee}`);
     }
 
-    this.calculatedFee = totalFee;
-    console.log('🔍 Final calculated fee:', this.calculatedFee);
+    // Round to nearest 10 pesos (e.g., 550 → 550, 183.33 → 190)
+    this.calculatedFee = Math.ceil(totalFee / 10) * 10;
+    console.log(`🔍 Final calculated fee: ₱${totalFee} → ₱${this.calculatedFee} (rounded)`);
 
     // Update credit usage after fee calculation
     this.checkCreditUsage();
@@ -1568,7 +1604,10 @@ export class ReservationsComponent implements OnInit, OnDestroy {
 
     const baseFeeTotal = this.getBaseFeeTotal();
     const guestFeeTotal = this.getGuestFeeTotal();
-    const baseFeePerMember = Math.round((baseFeeTotal / memberCount) * 100) / 100;
+
+    // Round total fee to nearest 10, then divide among members
+    const totalFee = Math.ceil((baseFeeTotal + guestFeeTotal) / 10) * 10;
+    const baseFeePerMember = (totalFee - guestFeeTotal) / memberCount;
 
     // Add member players
     let memberIndex = 0;
@@ -1577,12 +1616,12 @@ export class ReservationsComponent implements OnInit, OnDestroy {
       if (playerName) {
         const isReserver = memberIndex === 0;
         const amount = isReserver
-          ? Math.round((baseFeePerMember + guestFeeTotal) * 100) / 100
+          ? baseFeePerMember + guestFeeTotal
           : baseFeePerMember;
 
-        let breakdown = `Base share: ₱${baseFeePerMember}`;
+        let breakdown = `Base share: ₱${baseFeePerMember.toFixed(2)}`;
         if (isReserver && guestFeeTotal > 0) {
-          breakdown += ` + Guest fees: ₱${guestFeeTotal}`;
+          breakdown += ` + Guest fees: ₱${guestFeeTotal.toFixed(2)}`;
         }
 
         result.push({
@@ -1793,6 +1832,9 @@ export class ReservationsComponent implements OnInit, OnDestroy {
       })
       .catch((error) => {
         console.error('❌ Reservation failed:', error);
+        console.error('❌ Error status:', error.status);
+        console.error('❌ Error response:', error.error);
+        console.error('❌ Full error object:', JSON.stringify(error, null, 2));
         this.loading = false;
 
         // Check if error is due to overdue payments
@@ -1800,7 +1842,7 @@ export class ReservationsComponent implements OnInit, OnDestroy {
           this.overduePaymentDetails = error.error.overduePayments;
           this.showOverduePaymentModal = true;
         } else {
-          const message = error.error?.message || 'Failed to create reservation. Please try again.';
+          const message = error.error?.message || error.error?.error || 'Failed to create reservation. Please try again.';
           this.showError('Booking Failed', message);
         }
       });
