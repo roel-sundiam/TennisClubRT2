@@ -1,7 +1,10 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import { CourtReservation as ICourtReservation } from '../types/index';
 
-export interface IReservationDocument extends Omit<ICourtReservation, '_id'>, Document {}
+export interface IReservationDocument extends Omit<ICourtReservation, '_id'>, Document {
+  blockReason?: 'maintenance' | 'private_event' | 'weather' | 'other';
+  blockNotes?: string;
+}
 
 const reservationSchema = new Schema<IReservationDocument>({
   userId: {
@@ -39,8 +42,8 @@ const reservationSchema = new Schema<IReservationDocument>({
   status: {
     type: String,
     enum: {
-      values: ['pending', 'confirmed', 'cancelled', 'completed', 'no-show'],
-      message: 'Status must be pending, confirmed, cancelled, completed, or no-show'
+      values: ['pending', 'confirmed', 'cancelled', 'completed', 'no-show', 'blocked'],
+      message: 'Status must be pending, confirmed, cancelled, completed, no-show, or blocked'
     },
     default: 'pending',
     index: true
@@ -48,11 +51,23 @@ const reservationSchema = new Schema<IReservationDocument>({
   paymentStatus: {
     type: String,
     enum: {
-      values: ['pending', 'paid', 'overdue'],
-      message: 'Payment status must be pending, paid, or overdue'
+      values: ['pending', 'paid', 'overdue', 'not_applicable'],
+      message: 'Payment status must be pending, paid, overdue, or not_applicable'
     },
     default: 'pending',
     index: true
+  },
+  blockReason: {
+    type: String,
+    enum: {
+      values: ['maintenance', 'private_event', 'weather', 'other'],
+      message: 'Block reason must be maintenance, private_event, weather, or other'
+    }
+  },
+  blockNotes: {
+    type: String,
+    trim: true,
+    maxlength: [200, 'Block notes cannot exceed 200 characters']
   },
   totalFee: {
     type: Number,
@@ -102,7 +117,7 @@ const reservationSchema = new Schema<IReservationDocument>({
   duration: {
     type: Number,
     min: [1, 'Duration must be at least 1 hour'],
-    max: [4, 'Duration cannot exceed 4 hours'],
+    max: [12, 'Duration cannot exceed 12 hours'], // Allow up to 12 for blocked reservations
     default: 1,
     required: true,
     index: true
@@ -139,7 +154,7 @@ reservationSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      status: { $in: ['pending', 'confirmed'] }
+      status: { $in: ['pending', 'confirmed', 'blocked'] }
     }
   }
 );
@@ -246,13 +261,13 @@ reservationSchema.statics.isSlotRangeAvailable = async function(date: Date, star
   // Check for any existing reservations that would conflict with the requested range
   const query: any = {
     date: date,
-    status: { $in: ['pending', 'confirmed'] },
+    status: { $in: ['pending', 'confirmed', 'blocked'] },
     $or: [
       // Case 1: Existing reservation starts within our requested range
       {
         timeSlot: { $gte: startTimeSlot, $lt: endTimeSlot }
       },
-      // Case 2: Existing reservation ends within our requested range  
+      // Case 2: Existing reservation ends within our requested range
       {
         endTimeSlot: { $gt: startTimeSlot, $lte: endTimeSlot }
       },
@@ -263,11 +278,11 @@ reservationSchema.statics.isSlotRangeAvailable = async function(date: Date, star
       }
     ]
   };
-  
+
   if (excludeId) {
     query._id = { $ne: excludeId };
   }
-  
+
   const conflictingReservations = await this.find(query);
   return conflictingReservations.length === 0;
 };

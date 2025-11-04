@@ -127,8 +127,8 @@ export interface CourtReservation {
   date: Date;
   timeSlot: number;
   players: string[] | ReservationPlayer[]; // Support both formats for backward compatibility
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no-show';
-  paymentStatus: 'pending' | 'paid' | 'overdue';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no-show' | 'blocked';
+  paymentStatus: 'pending' | 'paid' | 'overdue' | 'not_applicable';
   paymentIds?: string[]; // Track multiple payment IDs (December 2025 changes)
   totalFee: number;
   weatherForecast?: {
@@ -151,6 +151,9 @@ export interface CourtReservation {
   duration: number;
   endTimeSlot?: number; // Calculated automatically
   isMultiHour?: boolean; // Calculated automatically
+  // Court blocking fields
+  blockReason?: 'maintenance' | 'private_event' | 'weather' | 'other';
+  blockNotes?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -167,8 +170,11 @@ export interface CreateReservationRequest {
 export interface UpdateReservationRequest {
   date?: string;
   timeSlot?: number;
-  players?: string[];
+  endTimeSlot?: number;
   duration?: number;
+  isMultiHour?: boolean;
+  timeSlotDisplay?: string;
+  players?: string[];
 }
 
 export interface Payment {

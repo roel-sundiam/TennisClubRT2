@@ -787,9 +787,13 @@ export class ReservationsComponent implements OnInit, OnDestroy {
 
           console.log('🔍 All time slots loaded:', this.allTimeSlots.length);
           console.log('🔍 Start time slots:', this.timeSlots.length);
+
+          // CRITICAL FIX: Mark time slots as loaded in edit mode
+          this.timeSlotsLoaded = true;
         } else {
           console.log('❌ No timeSlots in backend response');
           this.updateTimeSlotAvailability();
+          this.timeSlotsLoaded = true;
         }
 
         // Use setTimeout to ensure Angular change detection picks up the changes
@@ -1723,9 +1727,18 @@ export class ReservationsComponent implements OnInit, OnDestroy {
       }
     });
 
+    // Calculate duration and end time slot
+    const startTime = formValue.startTime;
+    const endTime = formValue.endTime;
+    const duration = endTime - startTime;
+
     const updateData = {
       date: formValue.date,
-      timeSlot: formValue.startTime,
+      timeSlot: startTime,
+      endTimeSlot: endTime,
+      duration: duration,
+      isMultiHour: duration > 1,
+      timeSlotDisplay: `${startTime}:00 - ${endTime}:00`,
       players: players,
     };
 

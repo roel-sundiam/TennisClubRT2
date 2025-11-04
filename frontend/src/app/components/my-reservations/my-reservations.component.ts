@@ -25,7 +25,7 @@ interface Reservation {
   timeSlot: number;
   timeSlotDisplay: string;
   players: string[];
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no-show';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no-show' | 'blocked';
   paymentStatus: 'pending' | 'paid' | 'overdue';
   totalFee: number;
   feePerPlayer: number;
@@ -39,10 +39,24 @@ interface Reservation {
     description: string;
     icon: string;
     rainChance?: number;
+    humidity?: number;
   };
+  blockReason?: 'maintenance' | 'private_event' | 'weather' | 'other';
+  blockNotes?: string;
   createdAt: Date;
   updatedAt: Date;
   isHomeownerDay?: boolean; // Flag for Homeowner's Day entries
+}
+
+interface GroupedReservations {
+  date: string; // "Tue, Nov 4"
+  dateKey: string; // For grouping
+  reservations: Reservation[];
+}
+
+interface AvatarInfo {
+  initials: string;
+  color: string;
 }
 
 @Component({
@@ -92,7 +106,7 @@ interface Reservation {
                 <mat-spinner diameter="50"></mat-spinner>
                 <p>Loading all reservations...</p>
               </div>
-              
+
               <div *ngIf="!loading && allReservations.length === 0" class="no-reservations">
                 <mat-icon class="large-icon">event_note</mat-icon>
                 <h2>No Reservations Found</h2>
@@ -102,10 +116,109 @@ interface Reservation {
                   Book a Court
                 </button>
               </div>
-              
-              <div *ngIf="!loading && allReservations.length > 0" class="reservations-list">
-                <!-- NEW COMPACT DESIGN LOADED -->
-                <div *ngFor="let reservation of allReservations" 
+
+              <!-- Mobile View: New Design -->
+              <div *ngIf="!loading && allReservations.length > 0 && isMobileView" class="reservations-list mobile-schedule">
+                <div *ngFor="let group of groupedAllReservations" class="date-group">
+                  <!-- Sticky Date Header -->
+                  <div class="date-header">{{group.date}}</div>
+
+                  <!-- Reservation Cards for this Date -->
+                  <div *ngFor="let reservation of group.reservations"
+                       class="mobile-event-card"
+                       [class.homeowner-day]="reservation.isHomeownerDay"
+                       [class.expanded]="isExpanded(reservation._id)"
+                       (click)="toggleExpansion(reservation._id)">
+
+                    <!-- Time Range -->
+                    <h2 class="event-time">{{reservation.timeSlotDisplay}}</h2>
+
+                    <!-- Blocked Court Info -->
+                    <div class="block-info" *ngIf="isBlockedReservation(reservation)">
+                      <mat-icon class="inline-icon">{{getBlockReasonIcon(reservation)}}</mat-icon>
+                      <span class="block-text">
+                        <strong>{{getBlockReasonDisplay(reservation)}}</strong>
+                        <span *ngIf="reservation.blockNotes"> - {{reservation.blockNotes}}</span>
+                      </span>
+                    </div>
+
+                    <!-- Participants with Avatars (non-blocked) -->
+                    <div class="participants-section" *ngIf="!isBlockedReservation(reservation)">
+                      <div *ngFor="let playerName of getAllPlayers(reservation)" class="participant-row">
+                        <div class="avatar" [style.background-color]="getAvatarColor(playerName)">
+                          {{getInitials(playerName)}}
+                        </div>
+                        <span class="participant-name">{{playerName}}</span>
+                      </div>
+                    </div>
+
+                    <!-- Weather Info -->
+                    <div class="weather-row" *ngIf="reservation.weatherForecast">
+                      <mat-icon class="weather-icon">{{getWeatherIcon(reservation.weatherForecast.icon)}}</mat-icon>
+                      <span class="temp">{{reservation.weatherForecast.temperature}}°C</span>
+                      <span class="humidity" *ngIf="reservation.weatherForecast.humidity">
+                        Humidity: {{reservation.weatherForecast.humidity}}%
+                      </span>
+                      <span class="rain-chance-mobile" *ngIf="reservation.weatherForecast.rainChance !== undefined">
+                        Rain: {{reservation.weatherForecast.rainChance}}%
+                      </span>
+                    </div>
+
+                    <!-- Fee Badge (Floating) -->
+                    <div class="fee-badge" [style.background-color]="getFeeColor(reservation.totalFee)">
+                      ₱{{reservation.totalFee}}
+                    </div>
+
+                    <!-- Expanded Content -->
+                    <div class="expanded-content" *ngIf="isExpanded(reservation._id)">
+                      <mat-divider></mat-divider>
+
+                      <div class="expanded-details">
+                        <div class="detail-row">
+                          <mat-icon class="detail-icon">event</mat-icon>
+                          <span class="detail-label">Status:</span>
+                          <mat-chip class="status-chip" [ngClass]="'status-' + reservation.status">
+                            {{reservation.status | titlecase}}
+                          </mat-chip>
+                        </div>
+
+                        <div class="detail-row" *ngIf="reservation.userId">
+                          <mat-icon class="detail-icon">person</mat-icon>
+                          <span class="detail-label">Reserved by:</span>
+                          <span class="detail-value">{{reservation.userId.fullName}}</span>
+                        </div>
+
+                        <div class="detail-row" *ngIf="isBlockedReservation(reservation) && reservation.blockReason">
+                          <mat-icon class="detail-icon">{{getBlockReasonIcon(reservation)}}</mat-icon>
+                          <span class="detail-label">Block Reason:</span>
+                          <span class="detail-value">{{getBlockReasonDisplay(reservation)}}</span>
+                        </div>
+
+                        <div class="detail-row" *ngIf="reservation.status === 'blocked' && reservation.blockNotes">
+                          <mat-icon class="detail-icon">notes</mat-icon>
+                          <span class="detail-label">Notes:</span>
+                          <span class="detail-value">{{reservation.blockNotes}}</span>
+                        </div>
+
+                        <div class="detail-row">
+                          <mat-icon class="detail-icon">payments</mat-icon>
+                          <span class="detail-label">Fee per player:</span>
+                          <span class="detail-value">₱{{(reservation.totalFee / getAllPlayers(reservation).length) | number:'1.0-0'}}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Expand Indicator -->
+                    <mat-icon class="expand-icon" *ngIf="!isExpanded(reservation._id)">expand_more</mat-icon>
+                    <mat-icon class="expand-icon" *ngIf="isExpanded(reservation._id)">expand_less</mat-icon>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Desktop View: Original Design -->
+              <div *ngIf="!loading && allReservations.length > 0 && !isMobileView" class="reservations-list">
+                <!-- Original Desktop Design -->
+                <div *ngFor="let reservation of allReservations"
                      class="reservation-card-compact all-reservations"
                      [class.homeowner-day]="reservation.isHomeownerDay"
                      [style.border-left-color]="getWeatherBorderColor(reservation)">
@@ -116,29 +229,57 @@ interface Reservation {
                     </div>
                     <div class="reservation-main show-user-info">
                       <div class="time-slot">{{reservation.timeSlotDisplay}}</div>
-                      <div class="user-info" *ngIf="reservation.userId">
+                      <!-- Show user info only for non-blocked -->
+                      <div class="user-info" *ngIf="!isBlockedReservation(reservation) && reservation.userId">
                         <mat-icon class="inline-icon">person</mat-icon>
                         <span class="user-text">{{reservation.userId.fullName}}</span>
                       </div>
-                      <div class="players-info">
+                      <!-- Show block info for blocked reservations -->
+                      <div class="block-info" *ngIf="isBlockedReservation(reservation)">
+                        <mat-icon class="inline-icon">{{getBlockReasonIcon(reservation)}}</mat-icon>
+                        <span class="block-text">
+                          <strong>{{getBlockReasonDisplay(reservation)}}</strong>
+                          <span *ngIf="reservation.blockNotes"> - {{reservation.blockNotes}}</span>
+                        </span>
+                      </div>
+                      <!-- Show players for non-blocked reservations -->
+                      <div class="players-info" *ngIf="!isBlockedReservation(reservation)">
                         <mat-icon class="inline-icon">people</mat-icon>
                         <span class="players-text">{{formatPlayerNames(getFilteredPlayers(reservation))}}</span>
                       </div>
                     </div>
                   </div>
                   <div class="card-right">
-                    <div class="status-chips">
+                    <!-- Hide status chip for blocked reservations -->
+                    <div class="status-chips" *ngIf="!isBlockedReservation(reservation)">
                       <mat-chip *ngIf="reservation.status !== 'pending'" class="status-chip" [ngClass]="'status-' + reservation.status">
                         {{reservation.status | titlecase}}
                       </mat-chip>
                     </div>
-                    <div class="fee-weather">
+                    <div class="status-chips" *ngIf="isBlockedReservation(reservation)">
+                      <!-- Empty for blocked reservations -->
+                    </div>
+                    <!-- For blocked: hide fee, show only weather -->
+                    <div class="fee-weather" *ngIf="!isBlockedReservation(reservation)">
                       <span class="fee">₱{{reservation.totalFee}}</span>
                       <span class="weather" *ngIf="reservation.weatherForecast">
                         <mat-icon class="weather-icon">{{getWeatherIcon(reservation.weatherForecast.icon)}}</mat-icon>
                         {{reservation.weatherForecast.temperature}}°C
+                        <span class="humidity-desktop" *ngIf="reservation.weatherForecast.humidity !== undefined">
+                          {{reservation.weatherForecast.humidity}}% humidity
+                        </span>
                         <span class="rain-chance" *ngIf="reservation.weatherForecast.rainChance !== undefined">
-                          {{reservation.weatherForecast.rainChance}}%
+                          {{reservation.weatherForecast.rainChance}}% rain
+                        </span>
+                      </span>
+                    </div>
+                    <div class="fee-weather" *ngIf="isBlockedReservation(reservation)">
+                      <!-- No fee for blocked, only weather -->
+                      <span class="weather" *ngIf="reservation.weatherForecast">
+                        <mat-icon class="weather-icon">{{getWeatherIcon(reservation.weatherForecast.icon)}}</mat-icon>
+                        {{reservation.weatherForecast.temperature}}°C
+                        <span class="rain-chance" *ngIf="reservation.weatherForecast.rainChance !== undefined">
+                          {{reservation.weatherForecast.rainChance}}% rain
                         </span>
                       </span>
                     </div>
@@ -155,7 +296,7 @@ interface Reservation {
                 <mat-spinner diameter="50"></mat-spinner>
                 <p>Loading your reservations...</p>
               </div>
-              
+
               <div *ngIf="!loading && upcomingReservations.length === 0" class="no-reservations">
                 <mat-icon class="large-icon">event_busy</mat-icon>
                 <h2>No Upcoming Reservations</h2>
@@ -165,8 +306,105 @@ interface Reservation {
                   Book Your First Court
                 </button>
               </div>
-              
-              <div *ngIf="!loading" class="reservations-list">
+
+              <!-- Mobile View: New Design -->
+              <div *ngIf="!loading && upcomingReservations.length > 0 && isMobileView" class="reservations-list mobile-schedule">
+                <div *ngFor="let group of groupedUpcomingReservations" class="date-group">
+                  <!-- Sticky Date Header -->
+                  <div class="date-header">{{group.date}}</div>
+
+                  <!-- Reservation Cards for this Date -->
+                  <div *ngFor="let reservation of group.reservations"
+                       class="mobile-event-card"
+                       [class.expanded]="isExpanded(reservation._id)">
+
+                    <!-- Action Buttons (Floating Top Right) -->
+                    <div class="action-buttons-mobile">
+                      <button mat-icon-button class="action-btn edit-btn"
+                              (click)="editReservation(reservation); $event.stopPropagation()"
+                              [disabled]="!canEdit(reservation)"
+                              matTooltip="Edit">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                      <button mat-icon-button class="action-btn cancel-btn"
+                              (click)="cancelReservation(reservation); $event.stopPropagation()"
+                              [disabled]="!canCancel(reservation)"
+                              matTooltip="Cancel">
+                        <mat-icon>cancel</mat-icon>
+                      </button>
+                    </div>
+
+                    <!-- Clickable area for expansion -->
+                    <div (click)="toggleExpansion(reservation._id)">
+                      <!-- Time Range -->
+                      <h2 class="event-time">{{reservation.timeSlotDisplay}}</h2>
+
+                      <!-- Participants with Avatars -->
+                      <div class="participants-section">
+                        <div *ngFor="let playerName of getAllPlayers(reservation)" class="participant-row">
+                          <div class="avatar" [style.background-color]="getAvatarColor(playerName)">
+                            {{getInitials(playerName)}}
+                          </div>
+                          <span class="participant-name">{{playerName}}</span>
+                        </div>
+                      </div>
+
+                      <!-- Weather Info -->
+                      <div class="weather-row" *ngIf="reservation.weatherForecast">
+                        <mat-icon class="weather-icon">{{getWeatherIcon(reservation.weatherForecast.icon)}}</mat-icon>
+                        <span class="temp">{{reservation.weatherForecast.temperature}}°C</span>
+                        <span class="humidity" *ngIf="reservation.weatherForecast.humidity">
+                          Humidity: {{reservation.weatherForecast.humidity}}%
+                        </span>
+                        <span class="rain-chance-mobile" *ngIf="reservation.weatherForecast.rainChance !== undefined">
+                          Rain: {{reservation.weatherForecast.rainChance}}%
+                        </span>
+                      </div>
+
+                      <!-- Fee Badge (Floating) -->
+                      <div class="fee-badge" [style.background-color]="getFeeColor(reservation.totalFee)">
+                        ₱{{reservation.totalFee}}
+                      </div>
+
+                      <!-- Expanded Content -->
+                      <div class="expanded-content" *ngIf="isExpanded(reservation._id)">
+                        <mat-divider></mat-divider>
+
+                        <div class="expanded-details">
+                          <div class="detail-row">
+                            <mat-icon class="detail-icon">event</mat-icon>
+                            <span class="detail-label">Status:</span>
+                            <mat-chip class="status-chip" [ngClass]="'status-' + reservation.status">
+                              {{reservation.status | titlecase}}
+                            </mat-chip>
+                          </div>
+
+                          <div class="detail-row">
+                            <mat-icon class="detail-icon">payment</mat-icon>
+                            <span class="detail-label">Payment:</span>
+                            <mat-chip class="payment-chip" [ngClass]="'payment-' + reservation.paymentStatus">
+                              {{getPaymentStatusText(reservation.paymentStatus)}}
+                            </mat-chip>
+                          </div>
+
+                          <div class="detail-row">
+                            <mat-icon class="detail-icon">payments</mat-icon>
+                            <span class="detail-label">Fee per player:</span>
+                            <span class="detail-value">₱{{(reservation.totalFee / getAllPlayers(reservation).length) | number:'1.0-0'}}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Expand Indicator -->
+                      <mat-icon class="expand-icon" *ngIf="!isExpanded(reservation._id)">expand_more</mat-icon>
+                      <mat-icon class="expand-icon" *ngIf="isExpanded(reservation._id)">expand_less</mat-icon>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Desktop View: Original Design -->
+              <div *ngIf="!loading && upcomingReservations.length > 0 && !isMobileView" class="reservations-list">
                 <div *ngFor="let reservation of upcomingReservations" class="reservation-card-compact">
                   <!-- Mobile Action Buttons (Upper Right Corner) -->
                   <div class="card-actions-mobile" *ngIf="isMobileView">
@@ -251,7 +489,84 @@ interface Reservation {
                 <p>Your reservation history will appear here.</p>
               </div>
 
-              <div *ngIf="!loading" class="reservations-list">
+              <!-- Mobile View: New Design -->
+              <div *ngIf="!loading && pastReservations.length > 0 && isMobileView" class="reservations-list mobile-schedule">
+                <div *ngFor="let group of groupedPastReservations" class="date-group">
+                  <!-- Sticky Date Header -->
+                  <div class="date-header past-header">{{group.date}}</div>
+
+                  <!-- Reservation Cards for this Date -->
+                  <div *ngFor="let reservation of group.reservations"
+                       class="mobile-event-card past-card"
+                       [class.expanded]="isExpanded(reservation._id)"
+                       (click)="toggleExpansion(reservation._id)">
+
+                    <!-- Time Range -->
+                    <h2 class="event-time">{{reservation.timeSlotDisplay}}</h2>
+
+                    <!-- Participants with Avatars -->
+                    <div class="participants-section">
+                      <div *ngFor="let playerName of getAllPlayers(reservation)" class="participant-row">
+                        <div class="avatar" [style.background-color]="getAvatarColor(playerName)">
+                          {{getInitials(playerName)}}
+                        </div>
+                        <span class="participant-name">{{playerName}}</span>
+                      </div>
+                    </div>
+
+                    <!-- Weather Info (if available) -->
+                    <div class="weather-row" *ngIf="reservation.weatherForecast">
+                      <mat-icon class="weather-icon">{{getWeatherIcon(reservation.weatherForecast.icon)}}</mat-icon>
+                      <span class="temp">{{reservation.weatherForecast.temperature}}°C</span>
+                      <span class="humidity" *ngIf="reservation.weatherForecast.humidity">
+                        Humidity: {{reservation.weatherForecast.humidity}}%
+                      </span>
+                      <span class="rain-chance-mobile" *ngIf="reservation.weatherForecast.rainChance !== undefined">
+                        Rain: {{reservation.weatherForecast.rainChance}}%
+                      </span>
+                    </div>
+
+                    <!-- Fee Badge (Floating) -->
+                    <div class="fee-badge past-badge" [style.background-color]="getFeeColor(reservation.totalFee)">
+                      ₱{{reservation.totalFee}}
+                    </div>
+
+                    <!-- Expanded Content -->
+                    <div class="expanded-content" *ngIf="isExpanded(reservation._id)">
+                      <mat-divider></mat-divider>
+
+                      <div class="expanded-details">
+                        <div class="detail-row">
+                          <mat-icon class="detail-icon">event</mat-icon>
+                          <span class="detail-label">Status:</span>
+                          <mat-chip class="status-chip" [ngClass]="'status-' + reservation.status">
+                            {{reservation.status | titlecase}}
+                          </mat-chip>
+                        </div>
+
+                        <div class="detail-row">
+                          <mat-icon class="detail-icon">payments</mat-icon>
+                          <span class="detail-label">Fee per player:</span>
+                          <span class="detail-value">₱{{(reservation.totalFee / getAllPlayers(reservation).length) | number:'1.0-0'}}</span>
+                        </div>
+
+                        <div class="detail-row">
+                          <mat-icon class="detail-icon">calendar_today</mat-icon>
+                          <span class="detail-label">Date:</span>
+                          <span class="detail-value">{{reservation.date | date:'fullDate'}}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Expand Indicator -->
+                    <mat-icon class="expand-icon" *ngIf="!isExpanded(reservation._id)">expand_more</mat-icon>
+                    <mat-icon class="expand-icon" *ngIf="isExpanded(reservation._id)">expand_less</mat-icon>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Desktop View: Original Design -->
+              <div *ngIf="!loading && pastReservations.length > 0 && !isMobileView" class="reservations-list">
                 <div *ngFor="let reservation of pastReservations" class="reservation-card-compact past">
                   <div class="card-left">
                     <div class="date-badge past">
@@ -513,6 +828,12 @@ export class MyReservationsComponent implements OnInit, OnDestroy {
   loading = true;
   currentTab = 0;
 
+  // Mobile All tab - grouped reservations
+  groupedAllReservations: GroupedReservations[] = [];
+  groupedUpcomingReservations: GroupedReservations[] = [];
+  groupedPastReservations: GroupedReservations[] = [];
+  expandedReservations = new Set<string>(); // Track which cards are expanded
+
   // Admin statistics
   adminStats = {
     total: 0,
@@ -566,6 +887,138 @@ export class MyReservationsComponent implements OnInit, OnDestroy {
 
   private checkScreenSize(): void {
     this.isMobileView = window.innerWidth <= 768;
+  }
+
+  /**
+   * Generate initials from a full name
+   */
+  getInitials(name: string): string {
+    if (!name) return '??';
+    const parts = name.trim().split(' ');
+    if (parts.length === 1) {
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  /**
+   * Generate consistent color for a name using simple hash
+   */
+  getAvatarColor(name: string): string {
+    const colors = [
+      '#5B7FE6', // Blue
+      '#8B5CF6', // Purple
+      '#10B981', // Green
+      '#F59E0B', // Orange
+      '#EC4899', // Pink
+      '#3B82F6', // Light blue
+      '#14B8A6', // Teal
+      '#EF4444'  // Red
+    ];
+
+    // Simple hash function
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    return colors[Math.abs(hash) % colors.length];
+  }
+
+  /**
+   * Get avatar info for a player
+   */
+  getAvatarInfo(name: string): AvatarInfo {
+    return {
+      initials: this.getInitials(name),
+      color: this.getAvatarColor(name)
+    };
+  }
+
+  /**
+   * Group reservations by date for mobile All tab
+   */
+  groupReservationsByDate(reservations: Reservation[]): GroupedReservations[] {
+    const grouped = new Map<string, Reservation[]>();
+
+    reservations.forEach(reservation => {
+      const dateKey = new Date(reservation.date).toDateString();
+      if (!grouped.has(dateKey)) {
+        grouped.set(dateKey, []);
+      }
+      grouped.get(dateKey)!.push(reservation);
+    });
+
+    // Convert to array and format dates
+    const result: GroupedReservations[] = [];
+    grouped.forEach((reservations, dateKey) => {
+      const date = new Date(dateKey);
+      const formattedDate = date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+      });
+
+      result.push({
+        date: formattedDate,
+        dateKey: dateKey,
+        reservations: reservations.sort((a, b) => a.timeSlot - b.timeSlot)
+      });
+    });
+
+    // Sort by date
+    return result.sort((a, b) =>
+      new Date(a.dateKey).getTime() - new Date(b.dateKey).getTime()
+    );
+  }
+
+  /**
+   * Toggle card expansion
+   */
+  toggleExpansion(reservationId: string): void {
+    if (this.expandedReservations.has(reservationId)) {
+      this.expandedReservations.delete(reservationId);
+    } else {
+      this.expandedReservations.add(reservationId);
+    }
+  }
+
+  /**
+   * Check if a card is expanded
+   */
+  isExpanded(reservationId: string): boolean {
+    return this.expandedReservations.has(reservationId);
+  }
+
+  /**
+   * Get all unique players including reserver
+   */
+  getAllPlayers(reservation: Reservation): string[] {
+    const players: string[] = [];
+
+    // Add reserver
+    if (reservation.userId?.fullName) {
+      players.push(reservation.userId.fullName);
+    }
+
+    // Add other players
+    reservation.players.forEach((player: any) => {
+      const name = typeof player === 'string' ? player : player.name;
+      if (!players.includes(name)) {
+        players.push(name);
+      }
+    });
+
+    return players;
+  }
+
+  /**
+   * Get color for fee badge
+   */
+  getFeeColor(fee: number): string {
+    if (fee >= 150) return '#059669'; // Dark green
+    if (fee >= 120) return '#10B981'; // Green
+    return '#10B981'; // Default green
   }
 
   /**
@@ -771,18 +1224,20 @@ click "Try Again" below to reconnect.
         
         this.upcomingReservations = this.groupConsecutiveReservations(upcomingRaw);
         this.pastReservations = this.groupConsecutiveReservations(pastRaw);
-        
+
         // Ensure all time displays use AM/PM format
         this.convertToAMPMFormat(this.upcomingReservations);
         this.convertToAMPMFormat(this.pastReservations);
-        
-        // Add weather data to upcoming reservations for testing
-        this.addWeatherToUpcomingReservations();
-        
+
+        // Group reservations by date for mobile view
+        this.groupedUpcomingReservations = this.groupReservationsByDate(this.upcomingReservations);
+        this.groupedPastReservations = this.groupReservationsByDate(this.pastReservations);
+
         console.log('📊 Personal Reservations loaded:');
         console.log('- Upcoming:', this.upcomingReservations.length);
         console.log('- Past:', this.pastReservations.length);
-        
+        console.log('- Weather data from backend:', this.upcomingReservations.filter(r => r.weatherForecast).length, 'reservations');
+
         this.loading = false;
         
         // Load all reservations since it's now the first tab (without showing loading again)
@@ -898,17 +1353,26 @@ click "Try Again" below to reconnect.
         // Ensure all time displays use AM/PM format
         this.convertToAMPMFormat(this.allReservations);
         console.log('🔍 After grouping:', this.allReservations.length);
-        
-        // Add mock rain chance data to a few reservations for testing
-        this.addMockRainChanceForTesting();
-        
+
         // Add Homeowner's Day entries for upcoming Wednesdays
         this.addHomeownerDayEntries();
-        
+
+        // Group reservations by date for mobile view
+        this.groupedAllReservations = this.groupReservationsByDate(this.allReservations);
+
         console.log('📊 All Reservations loaded:');
         console.log('- Total from all users (excluding cancelled):', this.allReservations.length);
         console.log('- Cancelled reservations filtered out:', reservations.length - activeReservations.length);
-        
+        console.log('- Grouped by date:', this.groupedAllReservations.length, 'dates');
+        console.log('- Real weather data:', this.allReservations.filter(r => r.weatherForecast).length, 'reservations have weather');
+
+        // Verify mobile and desktop use same data
+        const totalGrouped = this.groupedAllReservations.reduce((sum, group) => sum + group.reservations.length, 0);
+        console.log('✅ Data consistency check:');
+        console.log('  - Desktop view (allReservations):', this.allReservations.length, 'items');
+        console.log('  - Mobile view (groupedAllReservations):', totalGrouped, 'items');
+        console.log('  - Match:', this.allReservations.length === totalGrouped ? '✓' : '✗ MISMATCH!');
+
         if (showLoading) {
           this.loading = false;
         }
@@ -1490,66 +1954,36 @@ click "Try Again" below to reconnect.
       '50d': 'foggy',           // mist day
       '50n': 'foggy'            // mist night
     };
-    
+
     return iconMap[weatherIcon] || 'cloud';
   }
 
-  /**
-   * Add mock weather data to upcoming reservations for testing
-   */
-  addWeatherToUpcomingReservations(): void {
-    console.log('🧪 Adding weather data to upcoming reservations...');
-    
-    this.upcomingReservations.forEach((reservation, index) => {
-      if (!reservation.weatherForecast) {
-        const weatherTypes = [
-          { desc: 'sunny', icon: '01d', temp: 30, rain: 5 },
-          { desc: 'partly cloudy', icon: '02d', temp: 28, rain: 15 },
-          { desc: 'light rain', icon: '10d', temp: 25, rain: 80 },
-          { desc: 'cloudy', icon: '03d', temp: 26, rain: 35 }
-        ];
-        
-        const weather = weatherTypes[index % weatherTypes.length];
-        reservation.weatherForecast = {
-          temperature: weather.temp + Math.floor(Math.random() * 4) - 2, // ±2 degrees variation
-          description: weather.desc,
-          icon: weather.icon,
-          rainChance: weather.rain + Math.floor(Math.random() * 20) - 10 // ±10% variation
-        };
-        
-        // Ensure rain chance is within 0-100 range
-        if (reservation.weatherForecast.rainChance < 0) reservation.weatherForecast.rainChance = 0;
-        if (reservation.weatherForecast.rainChance > 100) reservation.weatherForecast.rainChance = 100;
-        
-        console.log(`🧪 Added weather to upcoming reservation: ${reservation.weatherForecast.temperature}°C, ${reservation.weatherForecast.rainChance}% rain`);
-      }
-    });
+  getBlockReasonDisplay(reservation: Reservation): string {
+    if (!reservation.blockReason) return '';
+    const reasonMap: { [key: string]: string } = {
+      'maintenance': '🔧 Maintenance',
+      'private_event': '🎉 Private Event',
+      'weather': '🌧️ Weather',
+      'other': '📝 Other'
+    };
+    return reasonMap[reservation.blockReason] || reservation.blockReason;
   }
 
-  /**
-   * Add mock rain chance data for testing purposes
-   * This demonstrates the rain chance feature working
-   */
-  addMockRainChanceForTesting(): void {
-    console.log('🧪 Adding mock rain chance data for testing...');
-    
-    // Add weather forecast with rain chance to the first few reservations for demonstration
-    this.allReservations.slice(0, 3).forEach((reservation, index) => {
-      if (!reservation.weatherForecast) {
-        reservation.weatherForecast = {
-          temperature: 28 + (index * 2),
-          description: index === 0 ? 'partly cloudy' : index === 1 ? 'light rain' : 'clear sky',
-          icon: index === 0 ? '02d' : index === 1 ? '10d' : '01d',
-          rainChance: index === 0 ? 25 : index === 1 ? 75 : 5
-        };
-        console.log(`🧪 Added weather data to reservation ${reservation._id}: ${reservation.weatherForecast.rainChance}% rain`);
-      } else if (reservation.weatherForecast && reservation.weatherForecast.rainChance === undefined) {
-        // Add rain chance to existing weather data
-        reservation.weatherForecast.rainChance = Math.floor(Math.random() * 101);
-        console.log(`🧪 Added rain chance to existing weather data: ${reservation.weatherForecast.rainChance}%`);
-      }
-    });
+  getBlockReasonIcon(reservation: Reservation): string {
+    if (!reservation.blockReason) return 'block';
+    const iconMap: { [key: string]: string } = {
+      'maintenance': 'build',
+      'private_event': 'event',
+      'weather': 'cloud',
+      'other': 'info'
+    };
+    return iconMap[reservation.blockReason] || 'block';
   }
+
+  isBlockedReservation(reservation: Reservation): boolean {
+    return reservation.status === 'blocked';
+  }
+
 
   /**
    * Add Homeowner's Day entries for the next 2 upcoming Wednesdays
@@ -1572,34 +2006,36 @@ click "Try Again" below to reconnect.
 
   /**
    * Generate Homeowner's Day entries for the next 2 upcoming Wednesdays
+   * Note: Uses mock weather since these are UI-only placeholder events
    */
   generateHomeownerDayEntries(): Reservation[] {
     const entries: Reservation[] = [];
     const now = new Date();
     let foundWednesdays = 0;
-    
+
     // Look for next 2 Wednesdays within the next 30 days
     for (let i = 0; i < 30 && foundWednesdays < 2; i++) {
       const checkDate = new Date(now);
       checkDate.setDate(now.getDate() + i);
-      
+
       // Check if this date is a Wednesday (day 3) and is in the future
       if (checkDate.getDay() === 3 && checkDate >= now) {
-        // Generate weather forecast for the Wednesday evening
+        // Generate realistic weather forecast for the Wednesday evening
+        // Using mock data since Homeowner's Day is a UI placeholder, not a real reservation
         const weatherTypes = [
-          { desc: 'sunny', icon: '01d', temp: 28, rain: 10 },
-          { desc: 'partly cloudy', icon: '02d', temp: 26, rain: 20 },
-          { desc: 'cloudy', icon: '03d', temp: 25, rain: 30 },
-          { desc: 'clear sky', icon: '01d', temp: 29, rain: 5 }
+          { desc: 'sunny', icon: '01d', temp: 28, rain: 10, humidity: 65 },
+          { desc: 'partly cloudy', icon: '02d', temp: 26, rain: 20, humidity: 70 },
+          { desc: 'cloudy', icon: '03d', temp: 25, rain: 30, humidity: 75 },
+          { desc: 'clear sky', icon: '01d', temp: 29, rain: 5, humidity: 60 }
         ];
-        
+
         const weather = weatherTypes[foundWednesdays % weatherTypes.length];
-        
+
         const entry: Reservation = {
           _id: `homeowner-${checkDate.toISOString().split('T')[0]}`, // Unique ID
           date: checkDate,
           timeSlot: 18, // 6 PM
-          timeSlotDisplay: '6:00 PM - 8:00 PM',
+          timeSlotDisplay: '6PM - 8PM',
           players: ["Homeowner's Day"],
           status: 'confirmed',
           paymentStatus: 'paid',
@@ -1612,17 +2048,18 @@ click "Try Again" below to reconnect.
             temperature: weather.temp + Math.floor(Math.random() * 4) - 2, // ±2 degrees variation
             description: weather.desc,
             icon: weather.icon,
-            rainChance: weather.rain + Math.floor(Math.random() * 10) - 5 // ±5% variation
+            rainChance: weather.rain + Math.floor(Math.random() * 10) - 5, // ±5% variation
+            humidity: weather.humidity + Math.floor(Math.random() * 10) - 5 // ±5% variation
           }
         };
-        
+
         entries.push(entry);
         foundWednesdays++;
-        
-        console.log(`📅 Generated Homeowner's Day entry for: ${checkDate.toDateString()}`);
+
+        console.log(`📅 Generated Homeowner's Day entry for: ${checkDate.toDateString()} with weather: ${entry.weatherForecast?.temperature}°C`);
       }
     }
-    
+
     return entries;
   }
 

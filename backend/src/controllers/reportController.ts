@@ -1176,9 +1176,50 @@ export const getFinancialReport = asyncHandler(async (req: AuthenticatedRequest,
       console.warn('⚠️ Could not calculate recorded payments for Tennis Court Usage Receipts:', error);
     }
 
+    // Calculate total credit balances and update Credit Balances in receipts
+    try {
+      // Get sum of all user credit balances
+      const creditBalanceResult = await User.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalCredits: { $sum: '$creditBalance' }
+          }
+        }
+      ]);
+
+      const totalCreditBalances = creditBalanceResult.length > 0 ? creditBalanceResult[0].totalCredits : 0;
+
+      console.log(`💳 Total credit balances across all users: ₱${totalCreditBalances}`);
+
+      // Find Credit Balances and update with calculated total
+      const creditBalancesIndex = financialData.receiptsCollections.findIndex((item: any) =>
+        item.description === 'Credit Balances'
+      );
+
+      if (creditBalancesIndex !== -1 && totalCreditBalances > 0) {
+        financialData.receiptsCollections[creditBalancesIndex].amount = totalCreditBalances;
+
+        console.log(`🧮 Updated Credit Balances: ₱${totalCreditBalances}`);
+
+        // Recalculate totals with updated credit balances
+        financialData.totalReceipts = financialData.receiptsCollections.reduce(
+          (sum: number, item: any) => sum + item.amount, 0
+        );
+        financialData.netIncome = financialData.totalReceipts - financialData.totalDisbursements;
+        financialData.fundBalance = financialData.beginningBalance.amount + financialData.netIncome;
+
+        console.log(`📊 Updated totals with credit balances: receipts ₱${financialData.totalReceipts}, net income ₱${financialData.netIncome}, fund balance ₱${financialData.fundBalance}`);
+      }
+
+    } catch (error) {
+      console.warn('⚠️ Could not calculate credit balances for financial report:', error);
+    }
+
     // Financial data is updated directly in recordPayment/unrecordPayment functions
     // App Service Fee is now calculated and included in the disbursements
     // Tennis Court Usage Receipts now includes recorded payments from database
+    // Credit Balances now includes total prepaid credits from all users
     
     // Debug: Log financial statement loaded
     console.log('📊 Financial statement loaded for:', financialData.clubName);

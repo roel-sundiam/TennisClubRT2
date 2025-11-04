@@ -271,7 +271,7 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
     const occupyingReservation = reservations.find((r: any) =>
       hour >= r.timeSlot &&
       hour < (r.endTimeSlot || r.timeSlot + (r.duration || 1)) &&
-      (r.status === 'pending' || r.status === 'confirmed')
+      (r.status === 'pending' || r.status === 'confirmed' || r.status === 'blocked')
     );
 
     // For END TIME availability: hour can be used as end time if no reservation STARTS at that hour
@@ -283,14 +283,16 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
       // Hour 22 is available as end time if there's no reservation that extends beyond 22
       canBeEndTime = !reservations.find((r: any) =>
         (r.endTimeSlot || r.timeSlot + (r.duration || 1)) > 22 &&
-        (r.status === 'pending' || r.status === 'confirmed')
+        (r.status === 'pending' || r.status === 'confirmed' || r.status === 'blocked')
       );
     } else {
-      // For other hours: can be end time if hour-1 is not occupied by any reservation
+      // For other hours: can be end time if no reservation extends PAST this hour
+      // Key insight: If a reservation ends AT hour H, then H is available as an end time
+      // Only block if a reservation extends BEYOND hour H (i.e., ends > H)
       canBeEndTime = !reservations.find((r: any) =>
         r.timeSlot < hour &&
-        (r.endTimeSlot || r.timeSlot + (r.duration || 1)) >= hour &&
-        (r.status === 'pending' || r.status === 'confirmed')
+        (r.endTimeSlot || r.timeSlot + (r.duration || 1)) > hour &&
+        (r.status === 'pending' || r.status === 'confirmed' || r.status === 'blocked')
       );
     }
 
@@ -842,10 +844,10 @@ export const createReservation = asyncHandler(async (req: AuthenticatedRequest, 
   });
 });
 
-// Update reservation
+// Update reservation (with duration and payment recalculation)
 export const updateReservation = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
-  const { date, timeSlot, players }: UpdateReservationRequest = req.body;
+  const { date, timeSlot, endTimeSlot, duration, isMultiHour, players }: UpdateReservationRequest = req.body;
 
   const reservation = await Reservation.findById(id);
   
@@ -926,6 +928,17 @@ export const updateReservation = asyncHandler(async (req: AuthenticatedRequest, 
 
     reservation.date = newDate;
     reservation.timeSlot = newTimeSlot;
+  }
+
+  // Update duration and end time slot if provided
+  if (endTimeSlot !== undefined) {
+    reservation.endTimeSlot = endTimeSlot;
+  }
+  if (duration !== undefined) {
+    reservation.duration = duration;
+  }
+  if (isMultiHour !== undefined) {
+    reservation.isMultiHour = isMultiHour;
   }
 
   // Update players if provided
@@ -1020,8 +1033,87 @@ export const updateReservation = asyncHandler(async (req: AuthenticatedRequest, 
       await reservation.save({ validateBeforeSave: false });
       console.log(`✅ Created ${paymentIds.length} new payments for reservation ${id}`);
     }
+  } else if (!players && (endTimeSlot !== undefined || duration !== undefined)) {
+    // No player changes but duration/time changed - need to recalculate fee and update payments
+    console.log('🔄 Duration/time changed without player changes - recalculating fees');
+
+    // Recalculate total fee (will be done by pre-save hook)
+    reservation.totalFee = 0;
+    await reservation.save();
+
+    // Cancel old payments and create new ones
+    if (reservation.paymentIds && reservation.paymentIds.length > 0) {
+      await Payment.updateMany(
+        { _id: { $in: reservation.paymentIds }, status: 'pending' },
+        { $set: { status: 'cancelled' } }
+      );
+      console.log(`📝 Cancelled ${reservation.paymentIds.length} pending payments for reservation ${id}`);
+    }
+
+    // Create new payments based on updated reservation
+    const paymentIds: string[] = [];
+    const members = reservation.players.filter((p: any) => p.isMember);
+    const guests = reservation.players.filter((p: any) => p.isGuest);
+    const peakHours = (process.env.PEAK_HOURS || '5,18,19,21').split(',').map(h => parseInt(h));
+
+    if (members.length > 0) {
+      const PEAK_BASE_FEE = 150;
+      const NON_PEAK_BASE_FEE = 100;
+      const GUEST_FEE = 70;
+
+      const calculatedEndTimeSlot = reservation.endTimeSlot || (reservation.timeSlot + reservation.duration);
+      let totalBaseFee = 0;
+      let totalGuestFee = 0;
+
+      for (let hour = reservation.timeSlot; hour < calculatedEndTimeSlot; hour++) {
+        const isPeakHour = peakHours.includes(hour);
+        totalBaseFee += isPeakHour ? PEAK_BASE_FEE : NON_PEAK_BASE_FEE;
+        totalGuestFee += guests.length * GUEST_FEE;
+      }
+
+      const memberShare = totalBaseFee / members.length;
+      const reserverId = reservation.userId.toString();
+
+      for (const member of members) {
+        const memberUserId = typeof member === 'string' ? null : member.userId;
+        const isReserver = memberUserId === reserverId;
+        const paymentAmount = isReserver ? (memberShare + totalGuestFee) : memberShare;
+
+        const paymentDueDate = new Date(reservation.date);
+        paymentDueDate.setDate(paymentDueDate.getDate() + 1);
+        paymentDueDate.setHours(23, 59, 59, 999);
+
+        const payment = new Payment({
+          userId: memberUserId,
+          reservationId: reservation._id,
+          amount: Math.round(paymentAmount * 100) / 100,
+          currency: 'PHP',
+          paymentMethod: 'cash',
+          status: 'pending',
+          dueDate: paymentDueDate,
+          description: `Court reservation ${isReserver ? '(Reserver)' : ''} - ${reservation.date.toDateString()} ${reservation.timeSlot}:00-${calculatedEndTimeSlot}:00`,
+          metadata: {
+            timeSlot: reservation.timeSlot,
+            date: reservation.date,
+            playerCount: reservation.players.length,
+            memberCount: members.length,
+            guestCount: guests.length,
+            isReserver: isReserver,
+            memberShare: Math.round(memberShare * 100) / 100,
+            guestFees: isReserver ? Math.round(totalGuestFee * 100) / 100 : 0
+          }
+        });
+
+        await payment.save();
+        paymentIds.push((payment._id as any).toString());
+      }
+
+      reservation.paymentIds = paymentIds;
+      await reservation.save({ validateBeforeSave: false });
+      console.log(`✅ Created ${paymentIds.length} new payments for updated reservation ${id}`);
+    }
   } else if (!players) {
-    // No player changes, just save other modifications
+    // No player changes and no time changes, just save other modifications
     await reservation.save({ validateBeforeSave: false });
   }
 
@@ -1292,13 +1384,9 @@ export const getMyUpcomingReservations = asyncHandler(async (req: AuthenticatedR
     return;
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
   const reservations = await Reservation.find({
-    userId: req.user._id,
-    date: { $gte: today },
-    status: { $in: ['pending', 'confirmed'] }
+    userId: req.user._id.toString(),
+    status: { $in: ['pending', 'confirmed', 'cancelled', 'completed', 'no-show'] }
   }).sort({ date: 1, timeSlot: 1 });
 
   res.status(200).json({
@@ -1371,4 +1459,280 @@ export const completeReservationValidation = [
     .trim()
     .isLength({ max: 50 })
     .withMessage('Score must be a string with max 50 characters')
+];
+
+// Admin: Block court (create administrative block)
+export const blockCourt = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { date, timeSlot, duration = 1, blockReason = 'maintenance', blockNotes = '' } = req.body;
+
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      error: 'Authentication required'
+    });
+    return;
+  }
+
+  // Validate date and time slot
+  const blockDate = new Date(date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (blockDate < today) {
+    res.status(400).json({
+      success: false,
+      error: 'Cannot block courts for past dates'
+    });
+    return;
+  }
+
+  if (timeSlot < 5 || timeSlot > 22) {
+    res.status(400).json({
+      success: false,
+      error: 'Court operates from 5:00 AM to 10:00 PM'
+    });
+    return;
+  }
+
+  // Validate duration
+  if (duration < 1 || duration > 12) {
+    res.status(400).json({
+      success: false,
+      error: 'Duration must be between 1 and 12 hours'
+    });
+    return;
+  }
+
+  const endTimeSlot = timeSlot + duration;
+  if (endTimeSlot > 23) {
+    res.status(400).json({
+      success: false,
+      error: `Block extends beyond court hours. Court closes at 10 PM (22:00).`
+    });
+    return;
+  }
+
+  // Check if slot range is available
+  const isAvailable = await (Reservation as any).isSlotRangeAvailable(blockDate, timeSlot, endTimeSlot);
+  if (!isAvailable) {
+    res.status(400).json({
+      success: false,
+      error: `One or more time slots in the range ${timeSlot}:00-${endTimeSlot}:00 are already reserved or blocked`
+    });
+    return;
+  }
+
+  // Get weather forecast for the blocked time
+  let weatherForecast = null;
+  try {
+    const weather = await weatherService.getWeatherForDateTime(blockDate, timeSlot);
+    if (weather) {
+      weatherForecast = {
+        temperature: weather.temperature,
+        description: weather.description,
+        humidity: weather.humidity,
+        windSpeed: weather.windSpeed,
+        icon: weather.icon,
+        rainChance: weather.rainChance,
+        timestamp: weather.timestamp
+      };
+    }
+  } catch (error) {
+    console.error('Error fetching weather for blocked reservation:', error);
+    // Continue without weather - not critical
+  }
+
+  // Create blocked reservation
+  const blockedReservation = new Reservation({
+    userId: req.user._id,
+    date: blockDate,
+    timeSlot,
+    duration,
+    endTimeSlot,
+    status: 'blocked',
+    paymentStatus: 'not_applicable',
+    blockReason,
+    blockNotes,
+    players: [],
+    totalFee: 0,
+    weatherForecast
+  });
+
+  await blockedReservation.save();
+  await blockedReservation.populate('userId', 'username fullName email');
+
+  console.log(`🚫 Court blocked: ${date} ${timeSlot}:00-${endTimeSlot}:00 by ${req.user.username} (${blockReason})`);
+
+  res.status(201).json({
+    success: true,
+    data: blockedReservation,
+    message: 'Court successfully blocked'
+  });
+});
+
+// Admin: Get all blocked reservations
+export const getBlockedReservations = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const blockedReservations = await Reservation.find({
+    status: 'blocked'
+  })
+    .populate('userId', 'username fullName email')
+    .sort({ date: 1, timeSlot: 1 });
+
+  // Add timeSlotDisplay for frontend
+  const formattedReservations = blockedReservations.map(r => {
+    const endTime = r.endTimeSlot || r.timeSlot + (r.duration || 1);
+    return {
+      ...r.toJSON(),
+      timeSlotDisplay: `${r.timeSlot}:00 - ${endTime}:00`
+    };
+  });
+
+  res.status(200).json({
+    success: true,
+    data: formattedReservations
+  });
+});
+
+// Admin: Update blocked reservation
+export const updateBlockedReservation = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { date, timeSlot, duration, blockReason, blockNotes } = req.body;
+
+  const reservation = await Reservation.findById(id);
+
+  if (!reservation) {
+    res.status(404).json({
+      success: false,
+      error: 'Blocked reservation not found'
+    });
+    return;
+  }
+
+  if (reservation.status !== 'blocked') {
+    res.status(400).json({
+      success: false,
+      error: 'This is not a blocked reservation'
+    });
+    return;
+  }
+
+  // Update fields if provided
+  if (date) {
+    const blockDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (blockDate < today) {
+      res.status(400).json({
+        success: false,
+        error: 'Cannot block courts for past dates'
+      });
+      return;
+    }
+
+    reservation.date = blockDate;
+  }
+
+  if (timeSlot !== undefined) {
+    if (timeSlot < 5 || timeSlot > 22) {
+      res.status(400).json({
+        success: false,
+        error: 'Court operates from 5:00 AM to 10:00 PM'
+      });
+      return;
+    }
+    reservation.timeSlot = timeSlot;
+  }
+
+  if (duration !== undefined) {
+    if (duration < 1 || duration > 12) {
+      res.status(400).json({
+        success: false,
+        error: 'Duration must be between 1 and 12 hours'
+      });
+      return;
+    }
+    reservation.duration = duration;
+    reservation.endTimeSlot = reservation.timeSlot + duration;
+  }
+
+  if (blockReason) reservation.blockReason = blockReason;
+  if (blockNotes !== undefined) reservation.blockNotes = blockNotes;
+
+  // Check availability for the updated time slot
+  const endTimeSlot = reservation.endTimeSlot || reservation.timeSlot + (reservation.duration || 1);
+  const isAvailable = await (Reservation as any).isSlotRangeAvailable(reservation.date, reservation.timeSlot, endTimeSlot, id);
+
+  if (!isAvailable) {
+    res.status(400).json({
+      success: false,
+      error: `Time slot conflict detected`
+    });
+    return;
+  }
+
+  await reservation.save({ validateBeforeSave: false });
+  await reservation.populate('userId', 'username fullName email');
+
+  res.status(200).json({
+    success: true,
+    data: reservation,
+    message: 'Block updated successfully'
+  });
+});
+
+// Admin: Delete blocked reservation
+export const deleteBlockedReservation = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+
+  const reservation = await Reservation.findById(id);
+
+  if (!reservation) {
+    res.status(404).json({
+      success: false,
+      error: 'Blocked reservation not found'
+    });
+    return;
+  }
+
+  if (reservation.status !== 'blocked') {
+    res.status(400).json({
+      success: false,
+      error: 'This is not a blocked reservation'
+    });
+    return;
+  }
+
+  await Reservation.deleteOne({ _id: id });
+
+  console.log(`🗑️ Court block removed: ${reservation.date} ${reservation.timeSlot}:00`);
+
+  res.status(200).json({
+    success: true,
+    message: 'Block removed successfully'
+  });
+});
+
+// Validation rules for blocking
+export const blockCourtValidation = [
+  body('date')
+    .isISO8601()
+    .withMessage('Invalid date format'),
+  body('timeSlot')
+    .isInt({ min: 5, max: 22 })
+    .withMessage('Time slot must be between 5 and 22'),
+  body('duration')
+    .optional()
+    .isInt({ min: 1, max: 12 })
+    .withMessage('Duration must be between 1 and 12 hours'),
+  body('blockReason')
+    .optional()
+    .isIn(['maintenance', 'private_event', 'weather', 'other'])
+    .withMessage('Invalid block reason'),
+  body('blockNotes')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ max: 200 })
+    .withMessage('Block notes must not exceed 200 characters')
 ];
