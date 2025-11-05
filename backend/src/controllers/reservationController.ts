@@ -223,21 +223,23 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
     const openPlayEvent = isBlockedByOpenPlay ?
       openPlayEvents.find(event => event.openPlayEvent?.blockedTimeSlots && Array.isArray(event.openPlayEvent.blockedTimeSlots) && event.openPlayEvent.blockedTimeSlots.includes(hour)) : null;
 
-    // Block Wednesday 6:00-8:00 PM (hours 18 and 19)
+    // Block Wednesday and Friday 6:00-8:00 PM (hours 18 and 19) for Homeowner's Day
     const isWednesday = queryDate.getDay() === 3;
-    const isBlockedWednesdayTime = isWednesday && (hour === 18 || hour === 19);
-    
+    const isFriday = queryDate.getDay() === 5;
+    const isBlockedHomeownersDay = (isWednesday || isFriday) && (hour === 18 || hour === 19);
+
 
     // Enhanced debugging for specific hours that might be problematic
-    if (hour === 17 || hour === 21 || hour === 22) {
+    if (hour === 17 || hour === 18 || hour === 21 || hour === 22) {
       console.log(`🔍 DETAILED DEBUG for hour ${hour} (NEW LOGIC):`);
       console.log(`  - Occupying reservation: ${occupyingReservation ? `${occupyingReservation.timeSlot}:00-${(occupyingReservation.endTimeSlot || occupyingReservation.timeSlot + (occupyingReservation.duration || 1))}:00 (status: ${occupyingReservation.status})` : 'NONE'}`);
       console.log(`  - Can be end time: ${canBeEndTime}`);
       console.log(`  - Blocked by Open Play: ${isBlockedByOpenPlay}`);
-      console.log(`  - Available for START: ${!occupyingReservation && !isBlockedByOpenPlay}`);
-      console.log(`  - Available for END: ${canBeEndTime && !isBlockedByOpenPlay}`);
+      console.log(`  - Blocked by Homeowner's Day: ${isBlockedHomeownersDay}`);
+      console.log(`  - Available for START: ${!occupyingReservation && !isBlockedByOpenPlay && !isBlockedHomeownersDay}`);
+      console.log(`  - Available for END: ${canBeEndTime && !isBlockedByOpenPlay} (Homeowner's Day doesn't block END times)`);
     }
-    
+
     // Get weather forecast for this time slot
     let weather = null;
     let weatherSuitability = null;
@@ -249,14 +251,16 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
     } catch (error) {
       console.warn(`Failed to fetch weather for ${date} ${hour}:00:`, error);
     }
-    
+
     const slotData = {
       hour,
       timeDisplay: `${hour}:00 - ${hour + 1}:00`,
       // FIXED: Use correct availability logic for START times
-      available: !occupyingReservation && !isBlockedByOpenPlay && !isBlockedWednesdayTime,
-      // NEW: Add separate field for END time availability
-      availableAsEndTime: canBeEndTime && !isBlockedByOpenPlay && !isBlockedWednesdayTime,
+      // START times cannot be during blocked hours (you can't START playing during Homeowner's Day)
+      available: !occupyingReservation && !isBlockedByOpenPlay && !isBlockedHomeownersDay,
+      // FIXED: END time availability - you CAN end AT a blocked hour (vacate the court when event starts)
+      // Only block if Open Play is active (different from Homeowner's Day which has a specific start time)
+      availableAsEndTime: canBeEndTime && !isBlockedByOpenPlay,
       reservation: occupyingReservation || null,
       blockedByOpenPlay: isBlockedByOpenPlay,
       openPlayEvent: openPlayEvent ? {

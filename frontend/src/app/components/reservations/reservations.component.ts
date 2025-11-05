@@ -175,9 +175,8 @@ interface Reservation {
 
               <!-- Message when no end times available -->
               <div class="no-end-times-message" *ngIf="availableEndTimes.length === 0 && selectedStartTime">
-                <p><strong>No consecutive time slots available</strong> after {{ selectedStartTime }}:00</p>
-                <p>Court reservations require consecutive time blocks. The next hour ({{ selectedStartTime + 1 }}:00) is unavailable.</p>
-
+                <p><strong>No time slots available</strong> after {{ selectedStartTime }}:00</p>
+                <p>The next hour ({{ selectedStartTime + 1 }}:00) is unavailable. This may be due to an existing reservation, Homeowner's Day (Wed/Fri 6-8pm), or court closing time.</p>
               </div>
 
               <small
@@ -989,8 +988,8 @@ export class ReservationsComponent implements OnInit, OnDestroy {
 
     this.availableEndTimes = [];
 
-    // CRITICAL FIX: Restore proper consecutive booking logic
-    // Court reservations must be consecutive - no gaps allowed
+    // FIXED: Allow bookings up to blocked slots
+    // Users can book any consecutive available hours, even if the next hour after is blocked
     console.log('🔍 Checking consecutive hours starting from', this.selectedStartTime + 1);
 
     for (let hour = this.selectedStartTime + 1; hour <= 22; hour++) {
@@ -1037,8 +1036,9 @@ export class ReservationsComponent implements OnInit, OnDestroy {
             console.log(`   No slot found for hour ${hour}`);
           }
 
-          // CRITICAL: Stop at first unavailable slot for consecutive booking
-          console.log('🛑 Breaking consecutive check - no more end times will be available');
+          // FIXED: Stop at first unavailable slot - this is correct for consecutive booking
+          // The difference is we now allow ending at the last available hour before a block
+          console.log('🛑 Breaking consecutive check - blocked slot reached');
           break;
         }
       } else if (hour === 22) {
