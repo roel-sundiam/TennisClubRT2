@@ -2,14 +2,14 @@
   "clubName": "RICH TOWN 2 TENNIS CLUB",
   "location": "Rich Town 2 Subdivision, City of San Fernando, Pampanga",
   "statementTitle": "Statement of Accounts and Disbursements",
-  "period": "COVERING January 1, 2025 - September 15, 2025",
+  "period": "COVERING January 1, 2025 - November 6, 2025",
   "beginningBalance": {
     "date": "JANUARY 1, 2025",
     "amount": 2162.85
   },
   "receiptsCollections": [
     {
-      "description": "Annual Membership Fees",
+      "description": "Annual Membership Fees 2025",
       "amount": 40000
     },
     {
@@ -23,9 +23,13 @@
     {
       "description": "Men's Tournament Entries",
       "amount": 0
+    },
+    {
+      "description": "Annual Membership Fees 2026",
+      "amount": 2000
     }
   ],
-  "totalReceipts": 110780,
+  "totalReceipts": 112780,
   "disbursementsExpenses": [
     {
       "description": "Purchase - Miscellaneous",
@@ -77,7 +81,7 @@
     }
   ],
   "totalDisbursements": 58836.5,
-  "netIncome": 51943.5,
-  "fundBalance": 54106.35,
-  "lastUpdated": "2025-09-30T06:21:39.500Z"
+  "netIncome": 53943.5,
+  "fundBalance": 56106.35,
+  "lastUpdated": "2025-11-06T01:11:01.274Z"
 }

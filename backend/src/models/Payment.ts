@@ -19,6 +19,8 @@ export interface IPaymentDocument extends Document {
   approvedAt?: Date; // When payment was approved
   recordedBy?: string; // Admin who recorded the payment
   recordedAt?: Date; // When payment was recorded
+  paymentType?: 'court_usage' | 'membership_fee' | 'tournament_entry'; // Type of payment
+  membershipYear?: number; // Year for membership fee (e.g., 2026)
   metadata?: {
     timeSlot?: number;
     date?: Date;
@@ -77,6 +79,19 @@ const paymentSchema = new Schema<IPaymentDocument>({
   paidBy: {
     type: String,
     ref: 'User',
+    index: true
+  },
+  paymentType: {
+    type: String,
+    enum: {
+      values: ['court_usage', 'membership_fee', 'tournament_entry'],
+      message: 'Payment type must be court_usage, membership_fee, or tournament_entry'
+    },
+    default: 'court_usage',
+    index: true
+  },
+  membershipYear: {
+    type: Number,
     index: true
   },
   amount: {
@@ -209,21 +224,34 @@ paymentSchema.index({ pollId: 1, status: 1 }); // For Open Play payments
 paymentSchema.index({ paymentDate: -1, status: 1 });
 paymentSchema.index({ dueDate: 1, status: 1 });
 paymentSchema.index({ status: 1, paymentMethod: 1 });
+paymentSchema.index({ paymentType: 1, status: 1 }); // For filtering by payment type
+paymentSchema.index({ userId: 1, paymentType: 1, membershipYear: 1 }); // For membership fee queries
 
 // Pre-save middleware to set payment date when status changes to completed
 paymentSchema.pre('save', function(next) {
   const payment = this;
-  
-  // Check if this is a manual payment
+
+  // Check if this is a manual payment or membership fee
   const isManualPayment = payment.metadata?.isManualPayment;
-  
+  const isMembershipFee = payment.paymentType === 'membership_fee';
+
   // Validate payment type requirements
-  if (!isManualPayment) {
-    // Regular payments need reservationId or pollId
+  if (isMembershipFee) {
+    // Membership fee payments must have a membership year
+    if (!payment.membershipYear) {
+      return next(new Error('Membership fee payments must have a membership year'));
+    }
+
+    // Membership fees should not have reservationId or pollId
+    if (payment.reservationId || payment.pollId) {
+      return next(new Error('Membership fee payments cannot have reservationId or pollId'));
+    }
+  } else if (!isManualPayment) {
+    // Regular court usage payments need reservationId or pollId
     if (!payment.reservationId && !payment.pollId) {
       return next(new Error('Either reservationId or pollId must be provided'));
     }
-    
+
     // Validate that both are not provided at the same time
     if (payment.reservationId && payment.pollId) {
       return next(new Error('Cannot have both reservationId and pollId'));
@@ -233,12 +261,12 @@ paymentSchema.pre('save', function(next) {
     if (payment.reservationId || payment.pollId) {
       return next(new Error('Manual payments cannot have reservationId or pollId'));
     }
-    
+
     // Validate manual payment required fields
     if (!payment.metadata?.playerNames || payment.metadata.playerNames.length === 0) {
       return next(new Error('Manual payments must have player names'));
     }
-    
+
     if (!payment.metadata?.courtUsageDate) {
       return next(new Error('Manual payments must have court usage date'));
     }

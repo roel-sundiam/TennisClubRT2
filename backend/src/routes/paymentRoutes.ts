@@ -18,7 +18,11 @@ import {
   payOnBehalf,
   createPaymentValidation,
   processPaymentValidation,
-  payOnBehalfValidation
+  payOnBehalfValidation,
+  recordMembershipFeePayment,
+  getMembershipPayments,
+  getMembershipPaymentSummary,
+  validateMembershipFeePayment
 } from '../controllers/paymentController';
 import { authenticateToken, requireRole, AuthenticatedRequest } from '../middleware/auth';
 import { autoFixPaymentsMiddleware } from '../middleware/autoFixPayments';
@@ -152,6 +156,48 @@ router.post(
   authenticateToken,
   requireRole(['admin', 'superadmin']),
   cleanupDuplicatePayments
+);
+
+// ======================
+// MEMBERSHIP FEE ROUTES (Must come BEFORE /:id route)
+// ======================
+
+/**
+ * @route POST /api/payments/membership-fee
+ * @desc Record membership fee payment for a member (Admin only)
+ * @access Private (Admin/SuperAdmin only)
+ */
+router.post(
+  '/membership-fee',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  validateMembershipFeePayment,
+  handleValidationErrors,
+  recordMembershipFeePayment
+);
+
+/**
+ * @route GET /api/payments/membership-fees
+ * @desc Get all membership fee payments with filtering
+ * @access Private (Admin/SuperAdmin only)
+ */
+router.get(
+  '/membership-fees',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  getMembershipPayments
+);
+
+/**
+ * @route GET /api/payments/membership-fees/summary
+ * @desc Get membership fee payment summary by year
+ * @access Private (Admin/SuperAdmin only)
+ */
+router.get(
+  '/membership-fees/summary',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  getMembershipPaymentSummary
 );
 
 /**

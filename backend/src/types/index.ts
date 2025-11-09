@@ -16,6 +16,8 @@ export interface User {
   registrationDate: Date;
   lastLogin?: Date;
   membershipFeesPaid: boolean;
+  membershipYearsPaid: number[];
+  lastMembershipPaymentDate?: Date;
   seedPoints: number;
   matchesWon: number;
   matchesPlayed: number;

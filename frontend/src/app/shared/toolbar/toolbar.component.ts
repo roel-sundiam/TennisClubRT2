@@ -164,17 +164,22 @@ import { Subscription } from 'rxjs';
               <mat-icon>people_alt</mat-icon>
               <span>Member Management</span>
             </button>
-            
+
+            <button mat-button class="mobile-nav-item admin-item" (click)="navigateAndClose('/admin/membership-payments')">
+              <mat-icon>card_membership</mat-icon>
+              <span>Membership Payments</span>
+            </button>
+
             <button mat-button class="mobile-nav-item admin-item" (click)="navigateAndClose('/admin/reports')">
               <mat-icon>analytics</mat-icon>
               <span>Reports & Analytics</span>
             </button>
-            
+
             <button mat-button class="mobile-nav-item admin-item" (click)="navigateAndClose('/admin/polls')">
               <mat-icon>poll</mat-icon>
               <span>Poll Management</span>
             </button>
-            
+
             <button mat-button class="mobile-nav-item admin-item" (click)="navigateAndClose('/admin/coins')">
               <mat-icon>monetization_on</mat-icon>
               <span>Coin Management</span>

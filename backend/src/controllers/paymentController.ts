@@ -2434,3 +2434,279 @@ export const payOnBehalfValidation = [
     .isLength({ max: 500 })
     .withMessage('Notes cannot exceed 500 characters')
 ];
+
+// ======================
+// MEMBERSHIP FEE PAYMENTS
+// ======================
+
+// Record membership fee payment (Admin only)
+export const recordMembershipFeePayment = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { userId, membershipYear, amount, paymentMethod, paymentDate, notes } = req.body;
+
+  console.log('💳 Recording membership fee payment:', { userId, membershipYear, amount, paymentMethod });
+
+  // Check if user exists
+  const user = await User.findById(userId);
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'User not found'
+    });
+  }
+
+  // Check if user already paid for this year
+  if (user.membershipYearsPaid && user.membershipYearsPaid.includes(membershipYear)) {
+    return res.status(400).json({
+      success: false,
+      message: `User has already paid membership fee for year ${membershipYear}`
+    });
+  }
+
+  // Create payment record
+  const payment = await Payment.create({
+    userId,
+    amount,
+    paymentMethod,
+    paymentType: 'membership_fee',
+    membershipYear,
+    status: 'record', // Directly recorded by admin
+    currency: 'PHP',
+    description: `Annual Membership Fee for ${membershipYear}`,
+    dueDate: new Date(membershipYear, 11, 31), // December 31 of the membership year
+    paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+    notes,
+    recordedBy: req.user?._id,
+    recordedAt: new Date()
+  });
+
+  // Update user's membership years paid
+  if (!user.membershipYearsPaid) {
+    user.membershipYearsPaid = [];
+  }
+  user.membershipYearsPaid.push(membershipYear);
+  user.membershipYearsPaid.sort((a, b) => b - a); // Sort descending
+  user.lastMembershipPaymentDate = payment.paymentDate || new Date();
+
+  // Also set the boolean flag to true for backward compatibility
+  user.membershipFeesPaid = true;
+
+  await user.save();
+
+  console.log(`✅ Membership fee payment recorded for ${user.fullName} - Year ${membershipYear}`);
+
+  // Update financial report
+  await updateFinancialReportMembershipFees();
+
+  const populatedPayment = await Payment.findById(payment._id)
+    .populate('userId', 'username fullName email')
+    .populate('recordedBy', 'username fullName');
+
+  res.status(201).json({
+    success: true,
+    message: `Membership fee payment for ${membershipYear} recorded successfully`,
+    data: populatedPayment
+  });
+});
+
+// Get all membership fee payments
+export const getMembershipPayments = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { year, userId, status } = req.query;
+
+  const filter: any = { paymentType: 'membership_fee' };
+
+  if (year) {
+    filter.membershipYear = parseInt(year as string);
+  }
+
+  if (userId) {
+    filter.userId = userId;
+  }
+
+  if (status) {
+    filter.status = status;
+  }
+
+  const payments = await Payment.find(filter)
+    .populate('userId', 'username fullName email membershipYearsPaid')
+    .populate('recordedBy', 'username fullName')
+    .sort({ membershipYear: -1, createdAt: -1 });
+
+  const total = payments.reduce((sum, p) => sum + p.amount, 0);
+
+  res.json({
+    success: true,
+    data: {
+      payments,
+      summary: {
+        count: payments.length,
+        totalAmount: total,
+        years: [...new Set(payments.map(p => p.membershipYear))].sort((a, b) => (b || 0) - (a || 0))
+      }
+    }
+  });
+});
+
+// Get membership payment summary by year
+export const getMembershipPaymentSummary = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const summary = await Payment.aggregate([
+    {
+      $match: {
+        paymentType: 'membership_fee',
+        status: 'record'
+      }
+    },
+    {
+      $group: {
+        _id: '$membershipYear',
+        totalAmount: { $sum: '$amount' },
+        count: { $sum: 1 }
+      }
+    },
+    {
+      $sort: { _id: -1 }
+    }
+  ]);
+
+  res.json({
+    success: true,
+    data: summary.map(item => ({
+      year: item._id,
+      totalAmount: item.totalAmount,
+      memberCount: item.count
+    }))
+  });
+});
+
+// Update financial report to include membership fees
+async function updateFinancialReportMembershipFees(): Promise<void> {
+  try {
+    console.log('💰 Updating Annual Membership Fees in financial report...');
+
+    // Calculate total from all recorded membership fee payments grouped by year
+    const result = await Payment.aggregate([
+      {
+        $match: {
+          paymentType: 'membership_fee',
+          status: 'record',
+          recordedAt: { $exists: true, $ne: null }
+        }
+      },
+      {
+        $group: {
+          _id: '$membershipYear',
+          totalAmount: { $sum: '$amount' }
+        }
+      },
+      {
+        $sort: { _id: 1 } // Sort by year ascending
+      }
+    ]);
+
+    console.log(`💰 Membership fees by year:`, result);
+
+    // Read current financial report
+    const dataPath = path.join(__dirname, '../../data/financial-report.json');
+    if (!fs.existsSync(dataPath)) {
+      console.warn('⚠️ Financial report JSON file not found, skipping update');
+      return;
+    }
+
+    const fileContent = fs.readFileSync(dataPath, 'utf8');
+    const financialData = JSON.parse(fileContent);
+
+    // Update or add entries for each year with payments from database
+    result.forEach(({ _id: year, totalAmount }) => {
+      const existingIndex = financialData.receiptsCollections.findIndex((item: any) =>
+        item.description === `Annual Membership Fees ${year}`
+      );
+
+      if (existingIndex !== -1) {
+        // Update existing entry
+        const oldAmount = financialData.receiptsCollections[existingIndex].amount;
+        financialData.receiptsCollections[existingIndex].amount = totalAmount;
+        console.log(`💰 Updated: Annual Membership Fees ${year}: ₱${oldAmount} → ₱${totalAmount.toFixed(2)}`);
+      } else {
+        // Add new entry
+        financialData.receiptsCollections.push({
+          description: `Annual Membership Fees ${year}`,
+          amount: totalAmount
+        });
+        console.log(`💰 Added: Annual Membership Fees ${year}: ₱${totalAmount.toFixed(2)}`);
+      }
+    });
+
+    // Recalculate total receipts
+    financialData.totalReceipts = financialData.receiptsCollections.reduce((sum: number, item: any) => sum + item.amount, 0);
+
+    // Recalculate net income and fund balance
+    financialData.netIncome = financialData.totalReceipts - financialData.totalDisbursements;
+    financialData.fundBalance = financialData.beginningBalance.amount + financialData.netIncome;
+
+    // Update period with current date
+    const today = new Date();
+    const formattedDate = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    financialData.period = `COVERING January 1, ${today.getFullYear()} - ${formattedDate}`;
+
+    // Update timestamp
+    financialData.lastUpdated = new Date().toISOString();
+
+    // Save updated financial report
+    fs.writeFileSync(dataPath, JSON.stringify(financialData, null, 2), 'utf8');
+
+    console.log(`💰 Financial report updated with membership fees by year`);
+    console.log(`💰 New Total Receipts: ₱${financialData.totalReceipts.toLocaleString()}`);
+    console.log(`💰 New Fund Balance: ₱${financialData.fundBalance.toLocaleString()}`);
+
+    // Emit real-time financial update
+    try {
+      const { webSocketService } = await import('../services/websocketService');
+      if (webSocketService.isInitialized()) {
+        webSocketService.emitFinancialUpdate({
+          type: 'financial_data_updated',
+          data: financialData,
+          timestamp: new Date().toISOString(),
+          message: `💰 Annual Membership Fees updated by year`
+        });
+        console.log('📡 Real-time financial update broadcasted');
+      }
+    } catch (error) {
+      console.error('⚠️ Failed to broadcast financial update:', error);
+    }
+
+  } catch (error) {
+    console.error('❌ Error updating financial report for membership fees:', error);
+    throw error;
+  }
+}
+
+// Validation rules for membership fee payment
+export const validateMembershipFeePayment = [
+  body('userId')
+    .notEmpty()
+    .withMessage('User ID is required')
+    .isMongoId()
+    .withMessage('Invalid user ID'),
+  body('membershipYear')
+    .notEmpty()
+    .withMessage('Membership year is required')
+    .isInt({ min: 2020, max: 2100 })
+    .withMessage('Membership year must be between 2020 and 2100'),
+  body('amount')
+    .notEmpty()
+    .withMessage('Amount is required')
+    .isFloat({ min: 0.01 })
+    .withMessage('Amount must be greater than zero'),
+  body('paymentMethod')
+    .notEmpty()
+    .withMessage('Payment method is required')
+    .isIn(['cash', 'bank_transfer', 'gcash', 'coins'])
+    .withMessage('Invalid payment method'),
+  body('paymentDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Invalid payment date'),
+  body('notes')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Notes cannot exceed 500 characters')
+];

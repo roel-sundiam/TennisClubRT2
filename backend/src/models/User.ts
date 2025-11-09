@@ -111,6 +111,15 @@ const userSchema = new Schema<IUserDocument>({
     default: false,
     index: true
   },
+  membershipYearsPaid: {
+    type: [Number],
+    default: [],
+    index: true
+  },
+  lastMembershipPaymentDate: {
+    type: Date,
+    default: null
+  },
   seedPoints: {
     type: Number,
     default: 0,

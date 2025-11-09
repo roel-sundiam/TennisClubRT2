@@ -410,6 +410,31 @@ import { environment } from '../../../environments/environment';
               </mat-card-actions>
             </mat-card>
 
+            <!-- Membership Payments -->
+            <mat-card class="action-card admin-card" data-icon="card_membership" data-title="Membership Payments" (click)="navigateTo('/admin/membership-payments')">
+              <!-- Mobile Icon -->
+              <div class="mobile-card-icon">
+                <mat-icon>card_membership</mat-icon>
+              </div>
+              <div class="mobile-card-title">Membership Payments</div>
+
+              <!-- Desktop Content -->
+              <mat-card-header>
+                <mat-icon mat-card-avatar class="action-icon admin-icon">card_membership</mat-icon>
+                <mat-card-title>Membership Payments</mat-card-title>
+                <mat-card-subtitle>Record annual membership fees</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <p>Record and track annual membership fee payments for club members.</p>
+              </mat-card-content>
+              <mat-card-actions>
+                <button mat-raised-button class="admin-btn" (click)="navigateTo('/admin/membership-payments')">
+                  <mat-icon>card_membership</mat-icon>
+                  Manage Fees
+                </button>
+              </mat-card-actions>
+            </mat-card>
+
             <!-- Poll Management -->
             <mat-card class="action-card admin-card" data-icon="poll" data-title="Poll Management" (click)="navigateTo('/admin/polls')">
               <!-- Mobile Icon -->

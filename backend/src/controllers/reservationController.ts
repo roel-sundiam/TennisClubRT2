@@ -300,10 +300,13 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
     const openPlayEvent = isBlockedByOpenPlay ?
       openPlayEvents.find(event => event.openPlayEvent?.blockedTimeSlots && Array.isArray(event.openPlayEvent.blockedTimeSlots) && event.openPlayEvent.blockedTimeSlots.includes(hour)) : null;
 
-    // Block Wednesday 6:00-8:00 PM (hours 18 and 19)
+    // Block Wednesday 6:00-8:00 PM (hours 18 and 19) for Homeowner's Day
+    // START times: Block hours 18 and 19 (can't start at 6 PM or 7 PM)
+    // END times: Only block hour 19 and beyond (can end at 6 PM, allowing 5-6 PM bookings)
     const isWednesday = queryDate.getDay() === 3;
-    const isBlockedWednesdayTime = isWednesday && (hour === 18 || hour === 19);
-    
+    const isBlockedWednesdayStartTime = isWednesday && (hour === 18 || hour === 19);
+    const isBlockedWednesdayEndTime = isWednesday && hour >= 19;
+
 
     // Enhanced debugging for specific hours that might be problematic
     if (hour === 17 || hour === 21 || hour === 22) {
@@ -314,7 +317,7 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
       console.log(`  - Available for START: ${!occupyingReservation && !isBlockedByOpenPlay}`);
       console.log(`  - Available for END: ${canBeEndTime && !isBlockedByOpenPlay}`);
     }
-    
+
     // Get weather forecast for this time slot
     let weather = null;
     let weatherSuitability = null;
@@ -326,14 +329,14 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
     } catch (error) {
       console.warn(`Failed to fetch weather for ${date} ${hour}:00:`, error);
     }
-    
+
     const slotData = {
       hour,
       timeDisplay: `${hour}:00 - ${hour + 1}:00`,
-      // FIXED: Use correct availability logic for START times
-      available: !occupyingReservation && !isBlockedByOpenPlay && !isBlockedWednesdayTime,
-      // NEW: Add separate field for END time availability
-      availableAsEndTime: canBeEndTime && !isBlockedByOpenPlay && !isBlockedWednesdayTime,
+      // START time: Block if occupied, Open Play, or Wednesday Homeowner's Day start time
+      available: !occupyingReservation && !isBlockedByOpenPlay && !isBlockedWednesdayStartTime,
+      // END time: Allow hour 18 as end time on Wednesdays (for 5-6 PM bookings)
+      availableAsEndTime: canBeEndTime && !isBlockedByOpenPlay && !isBlockedWednesdayEndTime,
       reservation: occupyingReservation || null,
       blockedByOpenPlay: isBlockedByOpenPlay,
       openPlayEvent: openPlayEvent ? {
