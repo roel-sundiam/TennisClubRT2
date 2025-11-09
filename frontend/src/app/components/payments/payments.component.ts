@@ -2721,7 +2721,7 @@ export class PaymentsComponent implements OnInit {
     const feeBreakdown = this.getPlayerFeeInfo(payment);
 
     // Determine if it's peak hour for context
-    const peakHours = [5, 18, 19, 21];
+    const peakHours = [5, 18, 19, 20, 21];
     const isPeakHour = peakHours.includes(timeSlot);
     const timeContext = isPeakHour ? ' (Peak)' : ' (Off-Peak)';
 

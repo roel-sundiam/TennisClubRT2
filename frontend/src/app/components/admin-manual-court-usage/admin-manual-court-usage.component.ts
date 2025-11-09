@@ -84,7 +84,7 @@ export class AdminManualCourtUsageComponent implements OnInit {
   historyColumns = ['date', 'timeSlot', 'players', 'totalAmount'];
 
   // Peak hours configuration
-  peakHours = [5, 18, 19, 21]; // 5AM, 6PM, 7PM, 9PM
+  peakHours = [5, 18, 19, 20, 21]; // 5AM, 6PM, 7PM, 8PM, 9PM
   peakHourFee = 100;
   offPeakFeePerMember = 20;
   offPeakFeePerNonMember = 50;
