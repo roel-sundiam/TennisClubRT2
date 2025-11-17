@@ -1,0 +1,150 @@
+<div class="modern-dialog-container">
+  <!-- Modern Header -->
+  <div class="modern-header">
+    <div class="header-top">
+      <div class="date-badge">
+        <div class="month">{{ data.date | date: 'MMM' }}</div>
+        <div class="day-num">{{ data.date | date: 'd' }}</div>
+      </div>
+      <div class="header-info">
+        <h2 class="dialog-title">{{ data.date | date: 'EEEE' }}</h2>
+        <p class="dialog-subtitle">{{ data.date | date: 'MMMM d, yyyy' }}</p>
+        <div class="header-tags">
+          <span *ngIf="data.dayInfo.isWednesday" class="tag homeowner-tag">
+            <mat-icon>home</mat-icon>
+            Homeowner's Day
+          </span>
+          <span *ngIf="data.dayInfo.totalHours > 0" class="tag hours-tag">
+            <mat-icon>schedule</mat-icon>
+            {{ data.dayInfo.totalHours }}h booked
+          </span>
+        </div>
+      </div>
+      <button mat-icon-button (click)="close()" class="modern-close-btn">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <mat-dialog-content class="dialog-content">
+    <!-- Homeowner's Day Card (shown first if Wednesday) -->
+    <div *ngIf="data.dayInfo.isWednesday" class="reservations-list">
+      <div class="reservation-card homeowner-special">
+        <div class="reservation-header">
+          <div class="time-info">
+            <mat-icon>home</mat-icon>
+            <span class="time-text">6:00 PM - 8:00 PM</span>
+            <span class="duration-badge">2h</span>
+          </div>
+          <span class="status-badge homeowner">homeowner</span>
+        </div>
+
+        <div class="reservation-details">
+          <div class="detail-row">
+            <mat-icon>info</mat-icon>
+            <span class="detail-label">Reserved for:</span>
+            <span class="detail-value">Homeowner's Day</span>
+          </div>
+          <div class="detail-row">
+            <mat-icon>groups</mat-icon>
+            <span class="detail-label">Priority:</span>
+            <span class="detail-value">Homeowners only during this time</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- No Other Reservations -->
+    <div *ngIf="data.dayInfo.reservations.length === 0 && !data.dayInfo.isWednesday" class="no-reservations">
+      <mat-icon class="large-icon">event_available</mat-icon>
+      <p class="no-reservations-text">No reservations for this day</p>
+      <p class="availability-text">All time slots are available!</p>
+    </div>
+
+    <!-- Regular Reservations List -->
+    <div *ngIf="data.dayInfo.reservations.length > 0" class="reservations-list">
+      <div *ngFor="let reservation of data.dayInfo.reservations"
+           class="reservation-card"
+           [class.confirmed]="reservation.status === 'confirmed'"
+           [class.pending]="reservation.status === 'pending'"
+           [class.blocked]="reservation.status === 'blocked'"
+           [class.cancelled]="reservation.status === 'cancelled'">
+
+        <div class="reservation-header">
+          <div class="time-info">
+            <mat-icon>schedule</mat-icon>
+            <span class="time-text">{{ getTimeDisplay(reservation) }}</span>
+            <span class="duration-badge">{{ reservation.duration }}h</span>
+          </div>
+          <span class="status-badge" [class]="reservation.status">
+            {{ reservation.status }}
+          </span>
+        </div>
+
+        <div class="reservation-details">
+          <div class="detail-row">
+            <mat-icon>person</mat-icon>
+            <span class="detail-label">Reserved by:</span>
+            <span class="detail-value">{{ getReserverName(reservation) }}</span>
+          </div>
+
+          <div class="detail-row" *ngIf="reservation.players && reservation.players.length > 0">
+            <mat-icon>groups</mat-icon>
+            <span class="detail-label">Players:</span>
+            <span class="detail-value">{{ reservation.players.length }} player(s)</span>
+          </div>
+
+          <div class="detail-row" *ngIf="reservation.totalFee">
+            <mat-icon>payments</mat-icon>
+            <span class="detail-label">Total Fee:</span>
+            <span class="detail-value">₱{{ reservation.totalFee }}</span>
+          </div>
+
+          <div class="detail-row" *ngIf="reservation.blockReason">
+            <mat-icon>block</mat-icon>
+            <span class="detail-label">Reason:</span>
+            <span class="detail-value">{{ reservation.blockReason }}</span>
+          </div>
+
+          <div class="detail-row" *ngIf="reservation.blockNotes">
+            <mat-icon>note</mat-icon>
+            <span class="detail-label">Notes:</span>
+            <span class="detail-value">{{ reservation.blockNotes }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="day-summary" *ngIf="data.dayInfo.reservations.length > 0">
+      <div class="summary-item">
+        <mat-icon>event</mat-icon>
+        <span>{{ data.dayInfo.activeCount }} active reservation(s)</span>
+      </div>
+      <div class="summary-item" *ngIf="data.dayInfo.blockedCount > 0">
+        <mat-icon>block</mat-icon>
+        <span>{{ data.dayInfo.blockedCount }} blocked slot(s)</span>
+      </div>
+      <div class="summary-item">
+        <mat-icon>schedule</mat-icon>
+        <span>{{ data.dayInfo.totalHours }} hour(s) booked</span>
+      </div>
+      <div class="summary-item" *ngIf="data.dayInfo.hasAvailability">
+        <mat-icon>check_circle</mat-icon>
+        <span>Availability remaining</span>
+      </div>
+    </div>
+  </mat-dialog-content>
+
+  <!-- Modern Actions -->
+  <div class="modern-actions">
+    <button mat-button (click)="close()" class="action-btn secondary-btn">
+      Close
+    </button>
+    <button mat-flat-button color="primary" (click)="bookThisDay()" *ngIf="!isDateInPast()" class="action-btn primary-btn">
+      <mat-icon>add_circle</mat-icon>
+      Book This Day
+    </button>
+  </div>
+</div>

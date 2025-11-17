@@ -4,7 +4,6 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormArray } fr
 import { Router, ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
-import { CreditService } from '../../services/credit.service';
 import { trigger, transition, style, animate } from '@angular/animations';
 import { environment } from '../../../environments/environment';
 
@@ -423,59 +422,6 @@ interface Reservation {
             </div>
           </div>
 
-          <!-- Payment Method Information -->
-          <div
-            class="payment-info"
-            *ngIf="selectedStartTime && selectedEndTime && calculatedFee > 0 && !isEditMode"
-          >
-            <h3>Payment Method</h3>
-            <div class="payment-details">
-              <!-- Credit Auto-Payment -->
-              <div class="payment-method credit-payment" *ngIf="willUseCredits">
-                <div class="method-header">
-                  <span class="method-icon">💳</span>
-                  <span class="method-title">Auto-Payment from Credits</span>
-                  <span class="method-status paid">WILL BE PAID</span>
-                </div>
-                <div class="method-details">
-                  <div class="payment-breakdown">
-                    <span>Credits will be deducted:</span>
-                    <span class="deduction-amount">-₱{{ creditAmountToUse }}</span>
-                  </div>
-                  <div class="payment-breakdown">
-                    <span>Remaining credits after payment:</span>
-                    <span class="remaining-credits"
-                      >₱{{ userCreditBalance - creditAmountToUse }}</span
-                    >
-                  </div>
-                </div>
-              </div>
-
-              <!-- Partial Credit Payment -->
-              <div
-                class="payment-method partial-payment"
-                *ngIf="!willUseCredits && creditAmountToUse > 0"
-              >
-                <div class="method-header">
-                  <span class="method-icon">💳</span>
-                  <span class="method-title">Partial Payment from Credits</span>
-                  <span class="method-status partial">PARTIAL</span>
-                </div>
-                <div class="method-details">
-                  <div class="payment-breakdown">
-                    <span>Credits will be deducted:</span>
-                    <span class="deduction-amount">-₱{{ creditAmountToUse }}</span>
-                  </div>
-                  <div class="payment-breakdown remaining">
-                    <span>Remaining to pay manually:</span>
-                    <span class="manual-payment">₱{{ calculatedFee - creditAmountToUse }}</span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
           <!-- Form Actions -->
           <div class="form-actions">
             <button type="submit" [disabled]="reservationForm.invalid || loading" class="book-btn">
@@ -484,15 +430,7 @@ interface Reservation {
               </ng-container>
               <ng-container *ngIf="!loading">
                 <ng-container *ngIf="isEditMode">Update Reservation</ng-container>
-                <ng-container *ngIf="!isEditMode && willUseCredits"
-                  >Book Court (Auto-Pay ₱{{ creditAmountToUse }})</ng-container
-                >
-                <ng-container *ngIf="!isEditMode && !willUseCredits && creditAmountToUse > 0"
-                  >Book Court (₱{{ creditAmountToUse }} from Credits)</ng-container
-                >
-                <ng-container *ngIf="!isEditMode && creditAmountToUse === 0"
-                  >Book Court</ng-container
-                >
+                <ng-container *ngIf="!isEditMode">Book Court</ng-container>
               </ng-container>
             </button>
 
@@ -589,10 +527,6 @@ export class ReservationsComponent implements OnInit, OnDestroy {
   // Expose Math for template use
   Math = Math;
 
-  // Credit system properties
-  userCreditBalance = 0;
-  willUseCredits = false;
-  creditAmountToUse = 0;
   timeSlots: TimeSlot[] = []; // For START times (hours 5-21)
   allTimeSlots: TimeSlot[] = []; // All slots including hour 22 for END time calculations
   timeSlotsLoaded = false; // Track if time slot data has been loaded
@@ -627,8 +561,7 @@ export class ReservationsComponent implements OnInit, OnDestroy {
     private http: HttpClient,
     private authService: AuthService,
     private router: Router,
-    private route: ActivatedRoute,
-    private creditService: CreditService
+    private route: ActivatedRoute
   ) {
     this.reservationForm = this.fb.group({
       date: ['', Validators.required],
@@ -651,10 +584,8 @@ export class ReservationsComponent implements OnInit, OnDestroy {
     this.updateMinDate();
     // Load members for player selection
     this.loadMembers();
-    // Load user's credit balance
-    this.loadCreditBalance();
 
-    // Check for edit mode
+    // Check for edit mode and pre-selected date
     this.route.queryParams.subscribe((params) => {
       if (params['edit']) {
         this.isEditMode = true;
@@ -663,6 +594,20 @@ export class ReservationsComponent implements OnInit, OnDestroy {
       } else {
         // Auto-populate Player 1 with logged-in user only if not editing
         this.setLoggedInUserAsPlayer1();
+      }
+
+      // Handle pre-selected date from calendar
+      if (params['date']) {
+        const dateString = params['date']; // Format: YYYY-MM-DD
+        const [year, month, day] = dateString.split('-').map(Number);
+        const selectedDate = new Date(year, month - 1, day); // month is 0-indexed
+
+        // Set the date in the form
+        this.reservationForm.get('date')?.setValue(dateString);
+
+        // Trigger date change to load time slots
+        this.onDateChangeInternal(selectedDate);
+        console.log('🗓️ Pre-selected date from calendar:', dateString);
       }
     });
 
@@ -1001,10 +946,6 @@ export class ReservationsComponent implements OnInit, OnDestroy {
         startTime: '',
         endTime: ''
       });
-
-      // Reset credit calculations
-      this.willUseCredits = false;
-      this.creditAmountToUse = 0;
     }
 
     this.loadReservationsForDate();
@@ -1048,31 +989,6 @@ export class ReservationsComponent implements OnInit, OnDestroy {
 
     // Trigger fee calculation
     this.calculateFee();
-  }
-
-  loadCreditBalance(): void {
-    this.creditService.getCreditBalance().subscribe({
-      next: (response) => {
-        if (response.success && response.data) {
-          this.userCreditBalance = response.data.balance;
-          this.checkCreditUsage();
-        }
-      },
-      error: (error) => {
-        console.error('Error loading credit balance:', error);
-        this.userCreditBalance = 0;
-      },
-    });
-  }
-
-  checkCreditUsage(): void {
-    if (this.calculatedFee > 0 && this.userCreditBalance > 0) {
-      this.willUseCredits = this.userCreditBalance >= this.calculatedFee;
-      this.creditAmountToUse = this.willUseCredits ? this.calculatedFee : this.userCreditBalance;
-    } else {
-      this.willUseCredits = false;
-      this.creditAmountToUse = 0;
-    }
   }
 
   onTimeRangeChange(): void {
@@ -1447,9 +1363,6 @@ export class ReservationsComponent implements OnInit, OnDestroy {
     // Round to nearest 10 pesos (e.g., 550 → 550, 183.33 → 190)
     this.calculatedFee = Math.ceil(totalFee / 10) * 10;
     console.log(`🔍 Final calculated fee: ₱${totalFee} → ₱${this.calculatedFee} (rounded)`);
-
-    // Update credit usage after fee calculation
-    this.checkCreditUsage();
   }
 
   isPeakHour(hour: number): boolean {
@@ -1824,19 +1737,10 @@ export class ReservationsComponent implements OnInit, OnDestroy {
         console.log('✅ Single multi-hour reservation created successfully:', response);
         this.loading = false;
 
-        // Create success message with credit information
-        let successMessage = `Court booked for ${this.getTimeRangeDisplay()} on ${new Date(
+        // Create success message
+        const successMessage = `Court booked for ${this.getTimeRangeDisplay()} on ${new Date(
           formValue.date
-        ).toLocaleDateString()}`;
-        if (this.willUseCredits) {
-          successMessage += `\n💳 ₱${this.creditAmountToUse} automatically deducted from credits`;
-        } else if (this.creditAmountToUse > 0) {
-          successMessage += `\n💳 ₱${this.creditAmountToUse} deducted from credits, ₱${
-            this.calculatedFee - this.creditAmountToUse
-          } requires manual payment`;
-        } else {
-          successMessage += `\n💰 Manual payment required: ₱${this.calculatedFee}`;
-        }
+        ).toLocaleDateString()}\n💰 Payment required: ₱${this.calculatedFee}`;
 
         this.showSuccess('Reservation Confirmed!', successMessage);
         setTimeout(() => {

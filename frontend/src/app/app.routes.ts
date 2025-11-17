@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { LoginComponent } from './components/login/login.component';
 import { DashboardComponent } from './components/dashboard/dashboard.component';
+import { CalendarViewComponent } from './components/calendar-view/calendar-view.component';
 import { ReservationsComponent } from './components/reservations/reservations.component';
 import { RegisterComponent } from './components/register/register.component';
 import { MyReservationsComponent } from './components/my-reservations/my-reservations.component';
@@ -35,7 +36,7 @@ import { AdminMembershipPaymentsComponent } from './components/admin-membership-
 import { authGuard, loginGuard, adminGuard, superadminGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
-  { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
+  { path: '', redirectTo: '/calendar', pathMatch: 'full' },
   { 
     path: 'login', 
     component: LoginComponent,
@@ -46,9 +47,15 @@ export const routes: Routes = [
     component: RegisterComponent,
     canActivate: [loginGuard]
   },
-  { 
-    path: 'dashboard', 
+  {
+    path: 'dashboard',
     component: DashboardComponent,
+    canActivate: [authGuard]
+  },
+  // Calendar view (new landing page)
+  {
+    path: 'calendar',
+    component: CalendarViewComponent,
     canActivate: [authGuard]
   },
   // Court reservation
@@ -195,5 +202,5 @@ export const routes: Routes = [
   { path: 'admin/manual-court-usage', component: AdminManualCourtUsageComponent, canActivate: [authGuard, superadminGuard] },
   { path: 'admin/block-court', component: AdminBlockCourtComponent, canActivate: [authGuard, adminGuard] },
   { path: 'admin/membership-payments', component: AdminMembershipPaymentsComponent, canActivate: [authGuard, adminGuard] },
-  { path: '**', redirectTo: '/dashboard' }
+  { path: '**', redirectTo: '/calendar' }
 ];

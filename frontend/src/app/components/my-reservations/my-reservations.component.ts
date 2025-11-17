@@ -90,6 +90,10 @@ interface AvatarInfo {
             <p class="page-subtitle">View and manage your court bookings</p>
           </div>
           <div class="page-actions">
+            <button mat-raised-button class="btn-calendar" (click)="viewCalendar()">
+              <mat-icon>calendar_month</mat-icon>
+              <span class="btn-text">Calendar View</span>
+            </button>
             <button mat-raised-button class="btn-primary" (click)="createNewReservation()">
               <mat-icon>add</mat-icon>
               Book Court
@@ -1787,6 +1791,10 @@ click "Try Again" below to reconnect.
 
   createNewReservation(): void {
     this.router.navigate(['/reservations']);
+  }
+
+  viewCalendar(): void {
+    this.router.navigate(['/calendar']);
   }
 
   // New methods for All Reservations tab

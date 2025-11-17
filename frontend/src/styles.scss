@@ -593,3 +593,100 @@ app-reservations {
   }
 }
 
+/* FullCalendar Mobile Optimizations - v3.0 AGGRESSIVE */
+@media (max-width: 768px) {
+  .fc .fc-daygrid-day {
+    min-height: 50px !important;
+    max-height: 80px !important;
+  }
+
+  .fc .fc-daygrid-day-frame {
+    min-height: 50px !important;
+    max-height: 80px !important;
+    padding: 2px !important;
+  }
+
+  .fc .fc-daygrid-day-number {
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    padding: 4px 6px !important;
+    line-height: 1 !important;
+  }
+
+  .fc .fc-daygrid-event-harness {
+    margin: 0 1px 1px 1px !important;
+  }
+
+  .fc .fc-event {
+    font-size: 0.55rem !important;
+    padding: 1px 2px !important;
+    margin: 0 !important;
+    border-radius: 2px !important;
+    line-height: 1.1 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    max-height: 16px !important;
+  }
+
+  .fc .fc-event-title {
+    font-size: 0.55rem !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .fc .fc-event-main {
+    padding: 0 !important;
+  }
+
+  .fc .fc-event-main-frame {
+    padding: 0 !important;
+  }
+
+  .fc .fc-bg-event {
+    font-size: 0.5rem !important;
+    padding: 1px 2px !important;
+    margin: 0 !important;
+    opacity: 0.7 !important;
+    line-height: 1.1 !important;
+    max-height: 14px !important;
+  }
+
+  .fc .fc-daygrid-more-link {
+    font-size: 0.5rem !important;
+    padding: 1px 3px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .fc .fc-daygrid-day {
+    min-height: 45px !important;
+    max-height: 70px !important;
+  }
+
+  .fc .fc-daygrid-day-frame {
+    min-height: 45px !important;
+    max-height: 70px !important;
+  }
+
+  .fc .fc-daygrid-day-number {
+    font-size: 0.7rem !important;
+    padding: 3px 4px !important;
+  }
+
+  .fc .fc-event {
+    font-size: 0.5rem !important;
+    padding: 1px !important;
+    max-height: 14px !important;
+  }
+
+  .fc .fc-event-title {
+    font-size: 0.5rem !important;
+  }
+
+  .fc .fc-bg-event {
+    font-size: 0.45rem !important;
+    max-height: 12px !important;
+  }
+}
+

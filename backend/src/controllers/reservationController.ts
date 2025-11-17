@@ -302,10 +302,10 @@ export const getReservationsForDate = asyncHandler(async (req: AuthenticatedRequ
 
     // Block Wednesday 6:00-8:00 PM (hours 18 and 19) for Homeowner's Day
     // START times: Block hours 18 and 19 (can't start at 6 PM or 7 PM)
-    // END times: Only block hour 19 and beyond (can end at 6 PM, allowing 5-6 PM bookings)
+    // END times: Block hours 18 and 19 (can end at 8 PM, allowing 8-10 PM bookings)
     const isWednesday = queryDate.getDay() === 3;
     const isBlockedWednesdayStartTime = isWednesday && (hour === 18 || hour === 19);
-    const isBlockedWednesdayEndTime = isWednesday && hour >= 19;
+    const isBlockedWednesdayEndTime = isWednesday && (hour === 18 || hour === 19);
 
 
     // Enhanced debugging for specific hours that might be problematic

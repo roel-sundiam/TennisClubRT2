@@ -252,8 +252,8 @@ export class LoginComponent implements OnInit {
     
     // Redirect if already authenticated
     if (this.authService.isAuthenticated()) {
-      console.log('Already authenticated, redirecting to dashboard');
-      this.router.navigate(['/dashboard']);
+      console.log('Already authenticated, redirecting to calendar');
+      this.router.navigate(['/calendar']);
     }
     
   }
@@ -295,8 +295,8 @@ export class LoginComponent implements OnInit {
           this.analyticsService.trackLogin(username);
           
           // Success - no toast needed, just navigate
-          console.log('Navigating to dashboard...');
-          this.router.navigate(['/dashboard']);
+          console.log('Navigating to calendar...');
+          this.router.navigate(['/calendar']);
         },
         error: (error: any) => {
           console.log('Login error:', error);
